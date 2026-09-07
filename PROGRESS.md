@@ -367,8 +367,27 @@ here.
       literals across the rest of the app), not yet wired to an actual
       CI service since none exists in this repo. Both app targets build
       clean with the localization changes.
-- [ ] 2.10 Full Phase 10 test/fuzz suite pass — not started; depends on
-      the above.
+- [ ] 2.10 Full Phase 10 test/fuzz suite pass. **Partial.** Spec §10's
+      unit tests (KDF/AEAD/merge/sign_count), crash-safety test, and
+      fuzz tests (container parser, JSON-RPC parser) are all `vaultcore`-
+      level work already done in Phase 1 (item 1.12) and still passing
+      (113 tests as of this commit) — since every platform links the
+      same `vaultcore` binary, none of that needs redoing per-platform
+      (108 `vaultcore` tests passing as of this commit). §10's throttling
+      test is also `vaultcore`-level and already covered (`throttle.rs`'s
+      own tests). What item 2.10 adds on top —
+      "including self-import/export exercising the shared merge logic"
+      — means actually driving `ExportPacketView`/`ImportPacketView`/
+      `MasterKeyDualityView` through a real self-export-then-reimport in
+      the running app, which needs the same Screen Recording/
+      Accessibility permission gap noted under 2.1/2.3-2.5 to verify
+      properly (the underlying `vaultcore` logic those views call is
+      already covered by `vault.rs`'s
+      `export_as_is_then_import_into_another_vault_preserves_key_passphrase`
+      test — what's unverified is specifically the UI wiring driving it).
+      §10's interop tests (2-3 real relying parties per platform in an
+      actual browser) are blocked on item 2.7's Apple Developer signing,
+      same as 2.7 itself.
 
 ## Phase 3 — Windows
 

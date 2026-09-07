@@ -31,6 +31,7 @@ MIGRATED_FILES = {
     "WelcomeView.swift",
     "ImportPacketView.swift",
     "MasterKeyDualityView.swift",
+    "ManageVaultsView.swift",
 }
 
 # Matches Text("..."), Button("..."), Label("...", ...), SecureField("...", ...),

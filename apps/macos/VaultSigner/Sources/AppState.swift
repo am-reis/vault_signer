@@ -16,9 +16,46 @@ final class AppState: ObservableObject {
     @Published var keys: [KeyInfo] = []
     @Published var isBusy = false
     @Published var errorMessage: String?
+    /// Spec §5.6: remembered vault locations, most-recently-accessed
+    /// first. Populated at launch and refreshed after every add/forget.
+    @Published var knownVaults: [KnownVaultEntry] = []
+
+    init() {
+        refreshKnownVaults()
+    }
 
     func clearError() {
         errorMessage = nil
+    }
+
+    func refreshKnownVaults() {
+        knownVaults = KnownVaultsStore.load()
+    }
+
+    /// Spec §5.6: add a vault to the known-vaults list without opening
+    /// it (the management screen's "add a known vault by browsing to a
+    /// file without opening it immediately").
+    func addKnownVaultWithoutOpening(path: String) {
+        KnownVaultsStore.addWithoutOpening(path: path)
+        refreshKnownVaults()
+    }
+
+    /// Spec §5.6: "Forgetting an entry only removes it from this list —
+    /// it must never delete, move, or modify the underlying vault file."
+    func forgetKnownVault(path: String) {
+        KnownVaultsStore.forget(path: path)
+        refreshKnownVaults()
+    }
+
+    /// Spec §5.6: "a way to close the currently-open vault and return to
+    /// the entry screen without quitting the app." Never touches the
+    /// known-vaults list — closing isn't forgetting.
+    func closeVault() {
+        vault = nil
+        vaultPath = nil
+        compartments = []
+        unlockedCompartmentId = nil
+        keys = []
     }
 
     private func run<T>(_ work: @escaping () throws -> T) async -> T? {
@@ -43,6 +80,8 @@ final class AppState: ObservableObject {
         vault = created
         vaultPath = path
         VaultConfig.save(vaultPath: path)
+        KnownVaultsStore.recordOpened(path: path)
+        refreshKnownVaults()
         refreshCompartments()
         if let first = compartments.first {
             unlockedCompartmentId = first.compartmentId
@@ -55,6 +94,8 @@ final class AppState: ObservableObject {
         vault = opened
         vaultPath = path
         VaultConfig.save(vaultPath: path)
+        KnownVaultsStore.recordOpened(path: path)
+        refreshKnownVaults()
         unlockedCompartmentId = nil
         keys = []
         refreshCompartments()

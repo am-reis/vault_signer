@@ -422,27 +422,53 @@ here.
       literals across the rest of the app), not yet wired to an actual
       CI service since none exists in this repo. Both app targets build
       clean with the localization changes.
-- [ ] 2.10 Full Phase 10 test/fuzz suite pass. **Partial.** Spec §10's
-      unit tests (KDF/AEAD/merge/sign_count), crash-safety test, and
-      fuzz tests (container parser, JSON-RPC parser) are all `vaultcore`-
-      level work already done in Phase 1 (item 1.12) and still passing
-      (113 tests as of this commit) — since every platform links the
-      same `vaultcore` binary, none of that needs redoing per-platform
-      (108 `vaultcore` tests passing as of this commit). §10's throttling
-      test is also `vaultcore`-level and already covered (`throttle.rs`'s
-      own tests). What item 2.10 adds on top —
-      "including self-import/export exercising the shared merge logic"
-      — means actually driving `ExportPacketView`/`ImportPacketView`/
-      `MasterKeyDualityView` through a real self-export-then-reimport in
-      the running app, which needs the same Screen Recording/
-      Accessibility permission gap noted under 2.1/2.3-2.5 to verify
-      properly (the underlying `vaultcore` logic those views call is
-      already covered by `vault.rs`'s
-      `export_as_is_then_import_into_another_vault_preserves_key_passphrase`
-      test — what's unverified is specifically the UI wiring driving it).
+- [x] 2.10 Full Phase 10 test/fuzz suite pass, except interop. Spec §10's
+      unit tests (KDF/AEAD/merge/sign_count), crash-safety test, fuzz
+      tests (container parser, JSON-RPC parser), and throttling test are
+      all `vaultcore`-level work already done in Phase 1 (item 1.12) and
+      still passing (108 `vaultcore` tests as of this commit) — since
+      every platform links the same `vaultcore` binary, none of that
+      needs redoing per-platform. What item 2.10 adds on top —
+      "including self-import/export exercising the shared merge logic" —
+      is now done and verified: driving `ExportPacketView`/
+      `ImportPacketView` through a real self-export-then-reimport
+      between two separate real vaults in the running app (see item 2.3's
+      entry for the exact steps), confirmed via the Accessibility API.
       §10's interop tests (2-3 real relying parties per platform in an
-      actual browser) are blocked on item 2.7's Apple Developer signing,
-      same as 2.7 itself.
+      actual browser) remain blocked on item 2.7's Apple Developer
+      signing, same as 2.7 itself.
+- [x] 2.11 Known vaults (spec §5.6, added this session — see the spec
+      amendment note below). `Shared/KnownVaultsStore.swift` persists a
+      `path` + `lastAccessedAt` list to
+      `~/Library/Application Support/VaultSigner/known_vaults.json`
+      (plain paths, not security-scoped bookmarks, since this app
+      doesn't request App Sandbox yet — see the file's own doc comment
+      for what changes if that's adopted later). `WelcomeView` now shows
+      this list (most-recently-accessed first) with one-click reopen, a
+      "Forget" action per entry, and an unavailable-file indicator
+      (missing/moved files show a warning icon rather than silently
+      vanishing, per spec). `ManageVaultsView` is the dedicated
+      management screen (spec's explicit ask), reachable from both
+      `WelcomeView` and a new "Vaults" section in `SettingsView`, with
+      "Add Existing Vault…" (add without opening) and per-entry forget.
+      `AppState.closeVault()` returns to the entry screen without
+      quitting the app. All of this was interactively verified via the
+      Accessibility API: created a vault (confirmed recorded), closed it
+      from Settings (confirmed return to `WelcomeView` with the entry
+      now showing), reopened it with one click (confirmed no file picker
+      needed), forgot it (confirmed the entry disappeared but the actual
+      `.vlt` file on disk was untouched), and added it back via "Add
+      Existing Vault…" without opening it (confirmed it appeared in both
+      `ManageVaultsView` and `WelcomeView`'s list, reactively, from the
+      same underlying state). New i18n keys added to both `en.json` and
+      `ar.json` for every new string, `WelcomeView` kept in
+      `lint-hardcoded-strings.py`'s strict set, `ManageVaultsView` added
+      to it (both fully migrated, not just partially).
+      **Spec amendment, this session:** added §5.6 ("Known vaults")
+      describing this as a Section 5.1-level core-UI requirement (not
+      optional polish) for every platform, plus execution-plan item 2.11
+      above — raised directly by the user after finding VaultSigner
+      asked for the vault file location on every single launch.
 
 ## Phase 3 — Windows
 

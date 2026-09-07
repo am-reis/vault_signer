@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var showingAutoUnlockConfirmation = false
     @State private var showingBackupEverything = false
     @State private var showingBackupMasterKeyOnly = false
+    @State private var showingManageVaults = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -60,6 +61,19 @@ struct SettingsView: View {
                     .font(.caption)
             }
 
+            Section {
+                Button("manage_vaults.open_button") { showingManageVaults = true }
+                Button("manage_vaults.close_vault_button") {
+                    dismiss()
+                    state.closeVault()
+                }
+            } header: {
+                Text("Vaults")
+            } footer: {
+                Text("manage_vaults.settings_footer")
+                    .font(.caption)
+            }
+
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
             }
@@ -97,6 +111,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingBackupMasterKeyOnly) {
             BackupMasterKeyOnlyView().environmentObject(state)
+        }
+        .sheet(isPresented: $showingManageVaults) {
+            ManageVaultsView().environmentObject(state)
         }
     }
 

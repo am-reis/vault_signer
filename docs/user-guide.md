@@ -28,6 +28,10 @@ Creating one asks for:
 
 That's it — your vault is created empty, ready for you to add keys to it.
 
+**You won't be asked where it is again.** VaultSigner remembers every vault you create or open, and shows them under **Recent Vaults** on that same opening screen — click one to unlock it directly, no browsing to the file again. If you use more than one vault (say, a personal one and a work one), switch between them with **Close This Vault** in Settings, which takes you back to that same list without quitting the app.
+
+If a listed vault shows a warning triangle, its file couldn't be found where VaultSigner last saw it — it may have moved or been deleted. Use **Manage Known Vaults…** (from either the opening screen or Settings) to add a vault you keep somewhere without opening it right away, or to **Forget** an entry you no longer want listed. Forgetting only removes it from this list — it never touches or deletes the actual file.
+
 ---
 
 ## Adding a key

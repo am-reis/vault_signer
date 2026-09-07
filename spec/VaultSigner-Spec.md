@@ -243,6 +243,16 @@ When importing a `.vltpack`:
 - After N consecutive wrong attempts against a given secret (default 5), impose an increasing backoff delay before that same secret can be attempted again. Track attempt counts per secret (per key_id, or for the master key, per compartment), not globally, so a lockout on one key does not block unrelated operations.
 - Backoff state is held in memory by the background service (Section 8) and is not required to survive a service restart, but must not be resettable by the calling application in the custom-protocol case — only by the elapsed backoff period.
 
+### 5.6 Known vaults (remembering where a vault's file lives)
+
+A vault file can live anywhere the user put it — there is no fixed, app-owned storage location (Section 4.1 deliberately describes the `.vlt` file as a portable archive, not a database the app manages internally). Without this section, that portability comes at a real usability cost: the app would have to ask the user to browse to the file's location on every single launch, which is the kind of friction that trains users to leave a vault unlocked longer than they should, or to stop using the app. This is not optional polish; treat it as part of the core management UI (Section 5.1), not a later enhancement.
+
+- On every platform, the management UI maintains a **known-vaults list**: for each vault the user has created or opened, remember its file path (or platform-equivalent stable reference — e.g. a security-scoped bookmark where the OS sandbox requires one, rather than a bare path that can silently go stale) and the last time it was opened. This list is local device state, not vault content — it is never written into any `.vlt`/`.vltpack`/`.vltkey` file, never synced, and contains no passphrases or key material.
+- The app's entry screen (shown when no vault is currently open) presents this list first, most-recently-opened first, each entry openable with one action rather than a file browse. Creating or opening a vault by any means (including a fresh browse, or opening a file handed to the app externally) adds or updates its entry in this list automatically.
+- Provide a dedicated **management surface** (reachable both from the entry screen and from the app's settings, so it doesn't require closing whatever vault is currently open) where the user can: add a known vault by browsing to a file without opening it immediately, and remove ("forget") an entry. Forgetting an entry only removes it from this list — it must never delete, move, or modify the underlying vault file.
+- Provide a way to close the currently-open vault and return to the entry screen without quitting the app, so switching between known vaults doesn't require relaunching. This does not require re-entering any credentials beyond what opening that vault normally requires.
+- If a remembered path no longer resolves to a valid vault file (moved, deleted, or — on a sandboxed platform — a stale bookmark), show that entry as unavailable rather than silently dropping it or erroring the whole list; let the user re-locate or forget it.
+
 ---
 
 ## 6. FIDO2 / WebAuthn OS integration
@@ -392,6 +402,7 @@ Each platform phase must produce a complete, independently functional, demonstra
 - [ ] 2.8 Custom protocol (Section 7) verified against a minimal test client app.
 - [ ] 2.9 i18n resource-file scaffolding wired up, at least one locale populated.
 - [ ] 2.10 macOS build passes the Phase 10 test/fuzz suite, including self-import/export exercising the shared merge logic.
+- [ ] 2.11 Known-vaults list (5.6): entry screen shows remembered vaults most-recently-opened first, each openable in one action; a management screen (reachable from both the entry screen and Settings) to add a vault by browsing without opening it and to forget entries; a way to close the current vault and return to the entry screen without quitting.
 
 **Phase 3 — Windows**
 - [ ] 3.1 WinUI 3 (or native) management UI, mirroring 2.1–2.5 functionality.

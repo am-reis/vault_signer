@@ -443,6 +443,7 @@ Each platform phase must produce a complete, independently functional, demonstra
 - [ ] 8.2 RTL verification of import/export screens on every platform.
 - [ ] 8.3 Additional target locales translated.
 - [ ] 8.4 First-run disclosure screens finalized on every platform (autostart default, no-telemetry statement, plain-language threat-model summary).
+- [ ] 8.5 User-facing documentation (Section 14) complete and current against the shipped UI on every platform, with per-platform addenda only where a flow genuinely differs.
 
 ---
 
@@ -453,3 +454,25 @@ Each platform phase must produce a complete, independently functional, demonstra
 3. Minimum supported Linux distribution/version floor.
 4. Localization launch-language list.
 5. Whether Windows auto-unlock should require CNG/TPM-backed protection or Windows Hello gating as a hard requirement, or ship with plain DPAPI plus a stronger in-app disclosure for v1 (Section 8).
+
+---
+
+## 14. User-facing documentation
+
+Everything above this section specifies the product for the people building it. This section specifies a second, much shorter deliverable for the people *using* it — most of whom have never heard of FIDO2, don't know what a "master key" is, and never will need to. Building the software correctly does not by itself make it usable by that audience.
+
+**Audience and tone.** Write for someone who wants to store a password-like secret or a signing key safely and has no interest in why the cryptography works. Never explain Argon2id, AEAD, CTAP2, key derivation, or the master-key/per-key distinction in cryptographic terms. Where the two-secret design (Section 3) has a practical consequence a user must act on — "this key needs its own passphrase, separate from your vault password" — state the consequence and the action, not the reason. If a sentence would only make sense to someone who has read Sections 3–8, delete it and replace it with the instruction the user actually needs.
+
+**Scope: what this guide covers.** One short document (or a small set of them, if per-platform screenshots make that cleaner) walking through, task by task:
+- Creating a vault for the first time, and what the vault/master password is *for* in one plain sentence ("this protects the list of your keys — not the keys themselves").
+- Creating a key, and why it asks for a second passphrase.
+- Using a key day to day: the FIDO2/passkey prompt, and the "an app wants to sign something" prompt (Sections 6–7) — what the user will see and what to click, not how the protocol underneath works.
+- Revealing a raw key: why it's gated behind a warning, and that doing it carelessly is genuinely risky (say this plainly, without alarmism).
+- Exporting/importing/backing up (Section 5.2–5.4): phrased as "sending a key to another device" and "making a copy in case something goes wrong," with the three encryption choices (5.2.2) described by their practical effect ("anyone with this file can read what it's for" / "only someone with the other vault's password" / "only someone you give this one-time password to"), not by name.
+- The master-key-duality import screen (5.3): what the three cards mean for the user *doing the import*, phrased as consequences ("your imported keys will use your existing password" / "you'll have two separate passwords now" / "this replaces your current password everywhere"), not as a merge-logic explainer.
+- The autostart and auto-unlock settings (Section 8): what turning each on actually changes for the user, in the same plain terms as the in-app disclosure copy those settings already require — this guide and that in-app copy should agree, not diverge.
+- What happens if a password is forgotten: state plainly that it cannot be recovered by design, and what that means the user loses.
+
+**Scope: what this guide does not cover.** Anything in Sections 2–4 and 6 (algorithms, wire formats, the threat model's adversary classes, protocol internals). If a reviewer needs that, Sections 2–4 and 6 are the reference, not this guide.
+
+**Where it lives, and how it stays current.** One `docs/user-guide.md` at the repository root, written platform-generically (referring to actions like "the Settings screen" or "the Create Key button" rather than platform-specific chrome), with a short per-platform addendum only where the flow genuinely differs (e.g. iOS's App Intents-based custom-protocol handoff, Section 7.1, is a different enough experience to need its own paragraph). Treat it the same way as the in-app first-run disclosure screens (Phase 8 item 8.4): both are user-facing explanations of the same behavior, and a change to one that isn't reflected in the other is a bug. Update it as part of finishing each platform phase (Section 12's Phases 2–6), not as a single end-of-project task — a guide written once at the end tends to describe the UI as it was, not as it shipped.

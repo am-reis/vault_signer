@@ -274,6 +274,12 @@ here.
       order; `SecureField` needs `set focused` + `keystroke`, not
       `set value`). Not yet driven this way: change-passphrase,
       discard-key, and the export/import/settings screens (2.3-2.5).
+      **Gap found while writing `docs/user-guide.md` (spec §14):**
+      spec §4.5 specifies the retention timer as user-configurable
+      (0-300s); `vaultcore`'s `Vault::unlock_key` already takes a
+      `retention_secs` parameter, but no Settings control exists yet to
+      let a user actually choose it — every call site hardcodes a
+      default. Not fixed yet.
 - [x] 2.2 Screen-capture blocking. `CaptureProtected.swift` sets
       `NSWindow.sharingType = .none` per spec §5.0, applied to the main
       window and every sheet. This session's own screenshot attempts
@@ -460,7 +466,31 @@ Not started.
 
 ## Phase 8 — i18n completion & release polish
 
-Not started.
+Not started, except a first draft of item 8.5's deliverable.
+
+- [ ] 8.5 User-facing documentation (spec §14, added this session — see
+      the spec amendment note below). **First draft written**,
+      `docs/user-guide.md`: covers first vault/first key, day-to-day
+      use, reveal-raw-key's danger-zone framing, export/import/backup
+      (including the three §5.2.2 encryption choices and the §5.3
+      duality screen) in plain consequence-first language, the two
+      autostart/auto-unlock settings, forgotten-password behavior, and
+      an iOS-specific note (§7.1). Written against the real macOS UI
+      built and interactively verified this session (2.1/2.3-2.5), so
+      it describes actual behavior, not aspirational behavior — except
+      where it describes spec-mandated behavior not yet built (flagged
+      inline above, e.g. the 2.1 note on retention-timer
+      configurability). Not yet reconciled against Windows/Android/iOS/
+      Linux, since none of those phases have started; per spec §14,
+      update it alongside each platform phase rather than only at the
+      end.
+
+**Spec amendment, this session:** added spec §14 ("User-facing
+documentation") describing this deliverable's audience, tone, and scope
+at a bird's-eye level — requested directly by the user after this
+session's macOS UI-testing made clear that a technically-correct app is
+not the same thing as a usable one for someone with no cryptography/FIDO
+background. Item 8.5 above is the corresponding execution-plan entry.
 
 ---
 

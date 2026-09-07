@@ -65,8 +65,16 @@ Phase 1.
 - [ ] 1.7 CTAP2 message handling (`authenticatorMakeCredential`,
       `authenticatorGetAssertion`) as a platform-agnostic library
       function. **Not started.**
-- [ ] 1.8 Custom protocol JSON-RPC handling (§7) as a platform-agnostic
-      library function. **Not started.**
+- [x] 1.8 Custom protocol JSON-RPC handling (§7) as a platform-agnostic
+      library function. `vaultcore/src/protocol.rs`: parses/dispatches
+      `vaultsigner.sign` and `vaultsigner.list_public_keys`, backed by a
+      `SigningBackend` trait a real vault implementation plugs into.
+      Transport (Unix socket/named pipe/loopback TCP, or the iOS App
+      Intents adaptation) is explicitly **not** built here — spec §12
+      assigns that to each platform phase (items 2.8, 3.6, 4.6, 5.4,
+      6.5), not Phase 1. Rate limiting reuses `ThrottleTracker` (1.9)
+      directly: a throttled key never reaches the backend at all.
+      (`68b4b53`)
 - [x] 1.9 Passphrase-attempt throttling (§5.5) implemented once in
       vaultcore and invoked by every entry point.
       `vaultcore/src/throttle.rs`. Tracks failures per `SecretId` (per
@@ -99,16 +107,35 @@ Phase 1.
       guesswork. Do this once a macOS (Swift) or Android (Kotlin)
       toolchain is available, likely at the start of Phase 2.
 - [x] 1.12 Full unit test suite green, including crash-safety
-      (mid-write kill) tests. `cargo test --workspace` (64 tests) and
+      (mid-write kill) tests. `cargo test --workspace` (72 tests) and
       `cargo test --workspace -- --ignored` (the real-benchmark KDF test
       and the crash-safety chaos test, both slow/deliberately excluded
       from the default run) all pass, clean under `cargo clippy
-      --workspace --all-targets`, as of `a54643e`. Fuzz testing of
-      the container parser and JSON-RPC parser (also called for by
-      Phase 1 in spec §10) is deferred: the JSON-RPC parser doesn't
-      exist yet (1.8), and container-parser fuzzing needs a fuzzing
-      harness (e.g. `cargo-fuzz`) not yet wired up — tracked as
-      outstanding, not silently skipped.
+      --workspace --all-targets`, as of `68b4b53`. Fuzz testing of the
+      container parser and JSON-RPC parser (spec §10) is also done:
+      `vaultcore/fuzz/` (a `cargo-fuzz` harness, excluded from the main
+      workspace per the standard cargo-fuzz convention) has two targets,
+      `container-parser` and `jsonrpc-parser`, each run for 200k
+      iterations under AddressSanitizer with zero crashes as of
+      `68b4b53`. Run them yourself with (requires a nightly toolchain —
+      `rustup toolchain install nightly`, then `cargo install
+      cargo-fuzz` once):
+      ```
+      cd vaultcore && cargo +nightly fuzz run container-parser
+      cd vaultcore && cargo +nightly fuzz run jsonrpc-parser
+      ```
+      Fuzzing the container parser directly caught a real bug, now
+      fixed: a zip entry's declared uncompressed size is
+      attacker/corruption-controlled and was used to pre-reserve a
+      `Vec`'s capacity with no bound, so a malformed archive could force
+      an arbitrarily large allocation before any real bytes were read
+      (`container.rs`'s `MAX_PREALLOCATED_ENTRY_SIZE` cap fixes this).
+      What's *not* done: this was a bounded, one-off fuzzing session,
+      not continuous fuzzing — there's no CI job re-running these
+      targets or a curated seed corpus checked in (corpus/artifacts are
+      gitignored, per cargo-fuzz's own default), so regressions between
+      now and whenever this is next run wouldn't be caught
+      automatically. Worth revisiting once CI exists (Phase 7-ish).
 
 ## Phase 2 — macOS (first fully shipped platform)
 

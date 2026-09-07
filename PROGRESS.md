@@ -354,9 +354,34 @@ here.
       constraint as item 2.7's signing requirement. The known UI-vs-agent
       architecture gap (management UI should route mutations through the
       agent, not hold its own `Vault`) is also in the macOS README.
-- [ ] 2.7 `ASCredentialProviderExtension` — not started; needs real Apple
-      Developer signing/provisioning and live Safari/Chrome verification
-      this environment can't do unattended.
+- [ ] 2.7 `ASCredentialProviderExtension`. **Target scaffolded, blocked
+      on signing — a real, specific finding, not a guess.**
+      `apps/macos/VaultSignerCredentialProvider/` is a real
+      `app-extension` target (`ASCredentialProviderExtensionCapabilities`
+      → `ProvidesPasskeys: true`, the
+      `com.apple.developer.authentication-services.autofill-credential-provider`
+      entitlement, embedded in `VaultSigner.app`'s `PlugIns/`) with a
+      minimal `CredentialProviderViewController` stub (the real CTAP2
+      wiring via `vaultcore::ctap2`/`Vault` is not implemented yet — this
+      only proves the target itself builds and embeds). It compiles, but
+      fails at the code-signing step: `"...has entitlements that require
+      signing with a development certificate."` No Apple ID at all is
+      signed into Xcode on this machine, so this doesn't yet distinguish
+      "needs any development certificate (even a free Personal Team)"
+      from "needs a paid Developer Program team specifically" — that
+      distinction needs someone to actually add an Apple ID in Xcode →
+      Settings → Accounts and retry, which is account/credential entry
+      this session doesn't perform itself. Live Safari/Chrome relying-
+      party verification is a separate, further blocker regardless
+      (needs a properly signed, enabled extension first).
+      **Also found and fixed:** embedding it in `VaultSigner.app` via
+      xcodegen's `embed: true` dependency initially broke that app's own
+      build entirely — an embedded dependency's signing failure fails
+      the whole build, not just the extension's scheme. Decoupled: the
+      extension target exists and builds independently, but is not
+      currently embedded in `VaultSigner.app` (see the comment in
+      `project.yml`), so the rest of the app stays buildable while this
+      is unresolved. Re-embed once signing works.
 - [x] 2.8 Custom protocol verified against a minimal test client.
       `apps/macos/uniffi-verify/agent_test_client.py` runs fully
       non-interactively (~0.7s) against a real running `VaultSignerAgent`

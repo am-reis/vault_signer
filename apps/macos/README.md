@@ -22,6 +22,9 @@ known architectural gaps not worth restating there.
   transport (spec §7, item 2.8). Embedded inside `VaultSigner.app` at
   build time (see `project.yml`'s `postCompileScripts`) so
   `SMAppService` can register it as a real login item.
+- `VaultSignerCredentialProvider/` — the `ASCredentialProviderExtension`
+  (spec §6.1, item 2.7): builds and embeds, blocked on signing — see
+  item 2.7 below.
 - `Shared/` — `VaultConfig.swift` (the vault path + which compartment
   auto-unlocks) and `AutoUnlockStore.swift` (the Keychain wrapper), used
   by both targets above — the agent has no CLI/UI to receive these from
@@ -154,11 +157,19 @@ this:
   (`unlock_compartment`, `unlock_key`, `list_compartments`) — extending it
   to the full management surface and switching the UI app to talk to the
   agent instead of vaultcore directly is real follow-up work, not done.
-- **2.7 `ASCredentialProviderExtension`** — **not started.** Needs real
-  Apple Developer signing/provisioning and interactive verification
-  against live relying parties in Safari and Chrome per the spec's own
-  wording — this is not something to fake or partially build without
-  that verification path available.
+- **2.7 `ASCredentialProviderExtension`** — **scaffolded, blocked on
+  signing.** `VaultSignerCredentialProvider/` is a real `app-extension`
+  target with the `ProvidesPasskeys` capability and the required
+  entitlement, embedded in `VaultSigner.app`. It builds but fails at
+  code-signing: Xcode reports the entitlement "require[s] signing with a
+  development certificate," and since no Apple ID is signed into Xcode
+  on this machine at all, this doesn't yet tell us whether a **free**
+  Personal Team account would clear it or whether it's paid-tier-only —
+  that requires someone to add an Apple ID in Xcode → Settings →
+  Accounts and retry (account sign-in, so not something done from here).
+  Interactive verification against live relying parties in Safari/Chrome
+  is a further, separate blocker once the extension can actually be
+  enabled.
 - **2.8 Custom protocol verified against a minimal test client** —
   **done and verified.** `uniffi-verify/agent_test_client.py` runs fully
   non-interactively (~0.7s) against the real running `VaultSignerAgent`

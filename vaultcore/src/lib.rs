@@ -19,6 +19,7 @@
 
 pub mod aead;
 pub mod container;
+pub mod ctap2;
 pub mod error;
 pub mod kdf;
 pub mod keyblob;

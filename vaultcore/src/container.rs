@@ -174,6 +174,14 @@ impl Container {
         let entries = read_all(path)?;
         Self::parse_entries(entries)
     }
+
+    /// Parse a container entirely from an in-memory byte string (no
+    /// filesystem access) — the entry point the container-parser fuzz
+    /// target drives with arbitrary bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        let entries = parse_archive_bytes(bytes)?;
+        Self::parse_entries(entries)
+    }
 }
 
 /// Write `entries` as a zip archive to `path`, atomically. This is the
@@ -227,13 +235,32 @@ fn temp_path_in(dir: &Path, target: &Path) -> PathBuf {
 
 /// Read every entry out of the zip archive at `path`.
 pub fn read_all(path: &Path) -> Result<HashMap<String, Vec<u8>>> {
-    let file = File::open(path)?;
-    let mut archive = ZipArchive::new(file).map_err(|e| VaultError::Archive(e.to_string()))?;
-    let mut out = HashMap::with_capacity(archive.len());
+    parse_archive_bytes(&fs::read(path)?)
+}
+
+/// A local header's declared uncompressed size is attacker-controlled
+/// (or, on a real crash, simply corrupt) and is not validated against
+/// the actual compressed data before we'd otherwise pre-reserve a
+/// buffer for it — reserving that size verbatim turns a malformed or
+/// hostile archive into an unbounded-allocation DoS. Cap what we
+/// pre-reserve; `read_to_end` still grows past this for a legitimately
+/// large entry, just without a single attacker-chosen up-front jump.
+const MAX_PREALLOCATED_ENTRY_SIZE: usize = 16 * 1024 * 1024;
+
+/// Parse a zip archive already in memory into its `name -> bytes`
+/// entries. Split out from [`read_all`] so it can run entirely
+/// in-memory — exercised directly by the container-parser fuzz target
+/// (`fuzz/fuzz_targets/container_parser.rs`) against arbitrary,
+/// untrusted byte strings, per spec §10's "malformed or truncated
+/// inputs must fail closed, never crash."
+pub fn parse_archive_bytes(bytes: &[u8]) -> Result<HashMap<String, Vec<u8>>> {
+    let cursor = std::io::Cursor::new(bytes);
+    let mut archive = ZipArchive::new(cursor).map_err(|e| VaultError::Archive(e.to_string()))?;
+    let mut out = HashMap::with_capacity(archive.len().min(1024));
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| VaultError::Archive(e.to_string()))?;
         let name = entry.name().to_string();
-        let mut bytes = Vec::with_capacity(entry.size() as usize);
+        let mut bytes = Vec::with_capacity((entry.size() as usize).min(MAX_PREALLOCATED_ENTRY_SIZE));
         entry.read_to_end(&mut bytes)?;
         out.insert(name, bytes);
     }

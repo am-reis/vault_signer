@@ -12,9 +12,10 @@
 //! container format + atomic writes, the Argon2id KDF wrapper, AEAD,
 //! the manifest schema, Ed25519/P-256 key generation, the retention
 //! cache, passphrase throttling, the per-key and per-compartment blob
-//! codecs, and the three-way master-key merge logic are implemented and
-//! unit-tested. CTAP2 handling, the custom-protocol JSON-RPC server, and
-//! UniFFI bindings are not yet implemented.
+//! codecs, the three-way master-key merge logic, and the custom local
+//! signing protocol's JSON-RPC message handling are implemented and
+//! unit-tested. CTAP2 handling and UniFFI bindings are not yet
+//! implemented.
 
 pub mod aead;
 pub mod container;
@@ -25,6 +26,7 @@ pub mod keys;
 pub mod manifest;
 pub mod master_blob;
 pub mod merge;
+pub mod protocol;
 pub mod retention;
 pub mod throttle;
 

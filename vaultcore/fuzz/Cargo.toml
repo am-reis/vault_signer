@@ -1,0 +1,31 @@
+[package]
+name = "vaultcore-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+uuid = "1.26"
+
+[dependencies.vaultcore]
+path = ".."
+
+[[bin]]
+name = "container-parser"
+path = "fuzz_targets/container_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jsonrpc-parser"
+path = "fuzz_targets/jsonrpc_parser.rs"
+test = false
+doc = false
+bench = false

@@ -244,7 +244,57 @@ Phase 1.
 
 ## Phase 2 — macOS (first fully shipped platform)
 
-Not started. See spec §12 for the full item list (2.1–2.10).
+In progress. See spec §12 for the full item list (2.1–2.10) and
+`apps/macos/README.md` for the detailed per-item status this section
+summarizes — that file is the one to keep current as this phase
+continues, since it also covers macOS-specific setup that doesn't belong
+here.
+
+- [ ] 2.1 SwiftUI management UI. **Partial.** Real `Vault`-backed screens
+      exist (create/open vault, multi-compartment unlock, key list,
+      create key, key detail with change-passphrase/reveal-raw-key/
+      discard) in `apps/macos/VaultSigner/`; builds and launches without
+      crashing. Not yet visually verified — this session's terminal
+      lacks the Screen Recording/Accessibility permissions needed to
+      screenshot or UI-script the running app (see the macOS README).
+- [x] 2.2 Screen-capture blocking. `CaptureProtected.swift` sets
+      `NSWindow.sharingType = .none` per spec §5.0, applied to the main
+      window and every sheet. Same visual-verification caveat as 2.1.
+- [ ] 2.3 Export flows — not started (blocked on the §5.2 packet format,
+      which doesn't exist in `vaultcore` yet; see macOS README).
+- [ ] 2.4 Import flow — not started (same blocker; `vaultcore::merge` and
+      `Vault::merge_*` are already done and waiting for a packet module).
+- [ ] 2.5 Backup — not started (same blocker).
+- [ ] 2.6 `launchd` background service. **Partial.** `VaultSignerAgent`
+      (`apps/macos/VaultSignerAgent/`) is a real process owning a `Vault`
+      + its retention cache/throttle state, serving the custom-protocol
+      socket (verified — see 2.8). Not done: `SMAppService` login-item
+      registration, the two autostart/auto-unlock toggles, the Keychain-
+      backed auto-unlock disclosure, restart-on-failure config. Testing
+      surfaced a real bug not yet fixed: the passphrase-prompt `NSAlert`
+      doesn't reliably present when the agent runs as a bare unbundled
+      executable from a shell (looks like a missing-bundle issue, not a
+      logic bug) — needs re-verification once the agent is bundled and
+      launched properly. Full details and the known UI-vs-agent
+      architecture gap (management UI should route mutations through the
+      agent, not hold its own `Vault`) are in the macOS README.
+- [ ] 2.7 `ASCredentialProviderExtension` — not started; needs real Apple
+      Developer signing/provisioning and live Safari/Chrome verification
+      this environment can't do unattended.
+- [x] 2.8 Custom protocol verified against a minimal test client.
+      `apps/macos/uniffi-verify/agent_test_client.py` connects to a real
+      running `VaultSignerAgent` over its Unix socket and verifies:
+      `list_public_keys` leaks nothing beyond the spec-allowed fields; an
+      unknown key returns `key_not_found`; a never-unlocked key's `sign`
+      is rejected; and a real `vaultsigner.sign` call (after unlocking via
+      the agent's `internal.unlock_key` bootstrap method) returns a
+      signature that independently verifies via PyNaCl against the key's
+      actual Ed25519 public key. Caller identity for the confirmation
+      text is resolved via `LOCAL_PEERPID`/`proc_pidpath` (OS-level peer
+      credentials, per spec §7 — never the self-reported JSON payload).
+- [ ] 2.9 i18n scaffolding — not started.
+- [ ] 2.10 Full Phase 10 test/fuzz suite pass — not started; depends on
+      the above.
 
 ## Phase 3 — Windows
 

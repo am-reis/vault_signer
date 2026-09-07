@@ -1,0 +1,53 @@
+name: VaultSigner
+options:
+  bundleIdPrefix: com.vaultsigner
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+
+configs:
+  Debug: debug
+  Release: release
+
+targets:
+  VaultSigner:
+    type: application
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: VaultSigner/Sources
+      - path: Generated
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vaultsigner.app
+        PRODUCT_NAME: VaultSigner
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        LIBRARY_SEARCH_PATHS: "$(SRCROOT)/../../target/release"
+        OTHER_LDFLAGS: "-lvaultcore"
+        OTHER_SWIFT_FLAGS: "-Xcc -fmodule-map-file=$(SRCROOT)/Generated/vaultcoreFFI.modulemap"
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"
+    info:
+      path: Generated-Info.plist
+      properties:
+        LSUIElement: false
+        NSHumanReadableCopyright: "VaultSigner"
+
+  VaultSignerAgent:
+    type: tool
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: VaultSignerAgent/Sources
+      - path: Generated
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vaultsigner.agent
+        PRODUCT_NAME: VaultSignerAgent
+        LIBRARY_SEARCH_PATHS: "$(SRCROOT)/../../target/release"
+        OTHER_LDFLAGS: "-lvaultcore"
+        OTHER_SWIFT_FLAGS: "-Xcc -fmodule-map-file=$(SRCROOT)/Generated/vaultcoreFFI.modulemap"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_VERSION: "5.0"

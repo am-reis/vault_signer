@@ -73,13 +73,23 @@ Phase 1.
       key, or per master-key compartment); only a successful unlock or
       elapsed backoff clears a lockout — there is intentionally no
       caller-facing reset. (`eaa66fd`)
-- [ ] 1.10 Three-way merge logic (§5.3) implemented and unit-tested
-      against synthetic multi-compartment vaults. **Not started.** The
-      container format (1.1) already supports multiple compartments
-      (`ContainerHeader.compartments`, `Container.master_blobs` keyed by
-      compartment id) as groundwork, but the merge/import decision logic
-      itself (the three options, duplicate detection) is not
-      implemented.
+- [x] 1.10 Three-way merge logic (§5.3) implemented and unit-tested
+      against synthetic multi-compartment vaults.
+      `vaultcore/src/merge.rs`, on top of two new supporting codecs:
+      `vaultcore/src/keyblob.rs` (the `.kblob` format — AEAD-seals a
+      private key under a passphrase-derived key, with a fingerprint
+      binding it to `key_id`/`key_type`/`label` so a manifest/blob
+      desync fails closed) and `vaultcore/src/master_blob.rs`
+      (encrypt/decrypt a compartment's manifest + key_index, kept in
+      sync by construction). `merge.rs` implements all three options
+      (re-encrypt & discard incoming, keep-both side-by-side, replace
+      local with incoming) as pure manifest/compartment logic — no
+      passphrase or ciphertext handling, so it has no platform-specific
+      surface for a UI to accidentally fork. Duplicate detection (by
+      `key_id`, or FIDO2 `rp_id`+`credential_id_b64`) defaults to
+      keep-both-rename-incoming, covers collisions against *any* local
+      compartment (not just the import target), and option 3 hard-fails
+      without the spec's exact confirmation phrase. (`a54643e`)
 - [ ] 1.11 UniFFI bindings generated and verified callable from a
       minimal Swift, Kotlin, and C# test harness. **Not started.** No
       Swift/Kotlin/C# toolchain is available in the environment this
@@ -89,10 +99,11 @@ Phase 1.
       guesswork. Do this once a macOS (Swift) or Android (Kotlin)
       toolchain is available, likely at the start of Phase 2.
 - [x] 1.12 Full unit test suite green, including crash-safety
-      (mid-write kill) tests. `cargo test --workspace` (44 tests) and
+      (mid-write kill) tests. `cargo test --workspace` (64 tests) and
       `cargo test --workspace -- --ignored` (the real-benchmark KDF test
       and the crash-safety chaos test, both slow/deliberately excluded
-      from the default run) all pass as of `eaa66fd`. Fuzz testing of
+      from the default run) all pass, clean under `cargo clippy
+      --workspace --all-targets`, as of `a54643e`. Fuzz testing of
       the container parser and JSON-RPC parser (also called for by
       Phase 1 in spec §10) is deferred: the JSON-RPC parser doesn't
       exist yet (1.8), and container-parser fuzzing needs a fuzzing

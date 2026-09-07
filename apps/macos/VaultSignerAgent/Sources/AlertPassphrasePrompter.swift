@@ -10,23 +10,17 @@ import AppKit
 /// correct here — the calling app's `vaultsigner.sign` request is
 /// supposed to block until the user answers the prompt.
 ///
-/// **Known gap, verified by testing (not yet fixed):** when
-/// `VaultSignerAgent` is launched as a bare, unbundled Mach-O executable
-/// from a shell (exactly how it was smoke-tested for spec §12 item 2.8),
-/// `NSAlert.runModal()` returns immediately with `.alertFirstButtonReturn`
-/// and an empty field value instead of actually presenting a modal — no
-/// window appears, nothing blocks, and the prompt silently behaves as "an
-/// empty passphrase was submitted." This looks like a consequence of
-/// running without a proper `.app` bundle/Info.plist (no confirmed
-/// WindowServer connection for an unbundled binary launched by a plain
-/// shell background job), not a logic bug in this class. Needs
-/// re-verification once the agent is either (a) bundled as a tiny
-/// `LSUIElement` `.app` and launched via `open`/`SMAppService`/`launchd`
-/// (spec §8's actual deployment shape) rather than a bare shell job, or
-/// (b) confirmed to need a different presentation API entirely for a
-/// background agent. Do not treat this class as "done" until that
-/// re-verification happens — the socket/vault/protocol wiring around it
-/// (item 2.8) is independently verified and unaffected.
+/// Verified interactively end-to-end (not just built): running as a
+/// bundled `.app` launched via `open`, a real `vaultsigner.sign` request
+/// for a key with no cached material shows this alert, blocks until
+/// answered, and — given the correct key passphrase — returns a
+/// signature that independently verifies against the key's real public
+/// key. (An earlier pass mistakenly concluded this path was broken,
+/// having misread a fast automated-test response as "the alert never
+/// appeared"; it was actually a human typing an answer — the vault's
+/// master passphrase, not the key's own — into a real, working dialog.
+/// The automated test in `uniffi-verify/agent_test_client.py` avoids
+/// this alert entirely, by design, via `internal.unlock_key`.)
 final class AlertPassphrasePrompter: PassphrasePrompter {
     func prompt(callerIdentity: String, keyId: String) -> String? {
         DispatchQueue.main.sync {

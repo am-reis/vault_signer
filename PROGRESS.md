@@ -266,28 +266,30 @@ here.
       `Vault::merge_*` are already done and waiting for a packet module).
 - [ ] 2.5 Backup — not started (same blocker).
 - [ ] 2.6 `launchd` background service. **Partial.** `VaultSignerAgent`
-      (`apps/macos/VaultSignerAgent/`) is a real process owning a `Vault`
-      + its retention cache/throttle state, serving the custom-protocol
-      socket (verified — see 2.8). Not done: `SMAppService` login-item
-      registration, the two autostart/auto-unlock toggles, the Keychain-
-      backed auto-unlock disclosure, restart-on-failure config. Testing
-      surfaced a real bug not yet fixed: the passphrase-prompt `NSAlert`
-      doesn't reliably present when the agent runs as a bare unbundled
-      executable from a shell (looks like a missing-bundle issue, not a
-      logic bug) — needs re-verification once the agent is bundled and
-      launched properly. Full details and the known UI-vs-agent
-      architecture gap (management UI should route mutations through the
-      agent, not hold its own `Vault`) are in the macOS README.
+      (`apps/macos/VaultSignerAgent/`), bundled as a tiny `LSUIElement`
+      `.app`, is a real process owning a `Vault` + its retention
+      cache/throttle state, serving the custom-protocol socket (verified
+      — see 2.8). Its `AlertPassphrasePrompter` (the real `NSAlert`
+      passphrase prompt) was verified interactively end-to-end with a
+      human present: a `vaultsigner.sign` call for a never-unlocked key
+      showed the dialog, blocked until answered, and returned a signature
+      that verified against the key's real public key. Not done:
+      `SMAppService` login-item registration, the two autostart/auto-
+      unlock toggles, the Keychain-backed auto-unlock disclosure,
+      restart-on-failure config. The known UI-vs-agent architecture gap
+      (management UI should route mutations through the agent, not hold
+      its own `Vault`) is in the macOS README.
 - [ ] 2.7 `ASCredentialProviderExtension` — not started; needs real Apple
       Developer signing/provisioning and live Safari/Chrome verification
       this environment can't do unattended.
 - [x] 2.8 Custom protocol verified against a minimal test client.
-      `apps/macos/uniffi-verify/agent_test_client.py` connects to a real
-      running `VaultSignerAgent` over its Unix socket and verifies:
-      `list_public_keys` leaks nothing beyond the spec-allowed fields; an
-      unknown key returns `key_not_found`; a never-unlocked key's `sign`
-      is rejected; and a real `vaultsigner.sign` call (after unlocking via
-      the agent's `internal.unlock_key` bootstrap method) returns a
+      `apps/macos/uniffi-verify/agent_test_client.py` runs fully
+      non-interactively (~0.7s) against a real running `VaultSignerAgent`
+      over its Unix socket and verifies: `list_public_keys` leaks nothing
+      beyond the spec-allowed fields; an unknown key returns
+      `key_not_found`; and a real `vaultsigner.sign` call (after unlocking
+      via the agent's `internal.unlock_key` bootstrap method, deliberately
+      avoiding the interactive passphrase-prompt path — see 2.6) returns a
       signature that independently verifies via PyNaCl against the key's
       actual Ed25519 public key. Caller identity for the confirmation
       text is resolved via `LOCAL_PEERPID`/`proc_pidpath` (OS-level peer

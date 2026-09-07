@@ -36,7 +36,13 @@ targets:
         NSHumanReadableCopyright: "VaultSigner"
 
   VaultSignerAgent:
-    type: tool
+    # A proper .app bundle, not a bare `tool` executable: testing found
+    # that NSAlert.runModal() doesn't reliably present a real modal for
+    # an unbundled Mach-O binary launched from a shell (no confirmed
+    # WindowServer connection) — see AlertPassphrasePrompter's doc
+    # comment. `LSUIElement: true` keeps it out of the Dock/Cmd-Tab like
+    # a real background agent (spec §8) while still being a real bundle.
+    type: application
     platform: macOS
     deploymentTarget: "13.0"
     sources:
@@ -49,5 +55,11 @@ targets:
         LIBRARY_SEARCH_PATHS: "$(SRCROOT)/../../target/release"
         OTHER_LDFLAGS: "-lvaultcore"
         OTHER_SWIFT_FLAGS: "-Xcc -fmodule-map-file=$(SRCROOT)/Generated/vaultcoreFFI.modulemap"
+        ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Automatic
         SWIFT_VERSION: "5.0"
+    info:
+      path: Generated-Agent-Info.plist
+      properties:
+        LSUIElement: true
+        NSHumanReadableCopyright: "VaultSigner"

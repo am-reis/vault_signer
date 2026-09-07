@@ -7,8 +7,16 @@ public `vaultsigner.*` methods (spec §7), verifying:
   - vaultsigner.list_public_keys never returns private material.
   - vaultsigner.sign returns a real, verifiable Ed25519 signature.
   - an unknown key_id is rejected with key_not_found.
-  - a locked (never-unlocked) key's sign attempt is rejected rather than
-    silently succeeding.
+
+Deliberately NOT covered here, because it cannot be without a human
+present: signing a key that exists but was never unlocked triggers
+AlertPassphrasePrompter's real NSAlert and blocks until someone answers
+it — there is no fake/scriptable prompter wired up for a headless test
+mode. That path was verified manually instead (see the doc comment on
+`AlertPassphrasePrompter.prompt`), including confirming the returned
+signature is cryptographically valid. This script always unlocks the key
+via `internal.unlock_key` first specifically so it never needs to trigger
+that alert, keeping the whole run non-interactive and repeatable.
 
 Usage: python3 agent_test_client.py <socket_path> <compartment_id>
     <key_id> <master_passphrase> <key_passphrase> <public_key_hex>
@@ -56,9 +64,6 @@ def main():
 
         resp = send(sock, {"method": "vaultsigner.sign", "params": {"key_id": "00000000-0000-0000-0000-000000000000", "message_b64": "aGVsbG8=", "algorithm": "ed25519"}, "id": 3})
         expect(resp.get("error", {}).get("code") == "key_not_found", f"expected key_not_found for unknown key, got {resp}")
-
-        resp = send(sock, {"method": "vaultsigner.sign", "params": {"key_id": key_id, "message_b64": "aGVsbG8=", "algorithm": "ed25519"}, "id": 4})
-        expect(resp.get("error", {}).get("code") == "passphrase_incorrect" or "error" in resp, f"expected a never-unlocked key to be rejected without a passphrase, got {resp}")
 
         resp = send(sock, {"method": "internal.unlock_key", "params": {"compartment_id": compartment_id, "key_id": key_id, "passphrase": key_passphrase, "retention_secs": 30}, "id": 5})
         expect("result" in resp, f"internal.unlock_key failed: {resp}")

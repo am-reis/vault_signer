@@ -60,23 +60,19 @@ xcodebuild -project VaultSigner.xcodeproj -scheme VaultSignerAgent -configuratio
   implemented and facade-wrapped (`Vault::merge_*`), so once a `packet`
   module exists in `vaultcore`, the UI layer here is the remaining piece.
 - **2.6 `launchd` background service** — **partial.** `VaultSignerAgent`
-  is a real process that opens a `Vault`, owns its retention
-  cache/throttle state, and serves the custom-protocol socket at
-  `~/Library/Application Support/VaultSigner/agent.sock` (owner-only
-  permissions, verified — see item 2.8 below). **Not done:** `SMAppService`
+  is a real process, bundled as a tiny `LSUIElement` `.app` (no Dock
+  icon), that opens a `Vault`, owns its retention cache/throttle state,
+  and serves the custom-protocol socket at `~/Library/Application
+  Support/VaultSigner/agent.sock` (owner-only permissions, verified — see
+  item 2.8 below). `AlertPassphrasePrompter`'s real `NSAlert` passphrase
+  prompt was verified interactively end to end: a `vaultsigner.sign`
+  request for a never-unlocked key showed the dialog, blocked until
+  answered, and returned a signature that independently verifies against
+  the key's real public key (see the doc comment on
+  `AlertPassphrasePrompter.prompt`). **Not done:** `SMAppService`
   login-item registration, the two autostart/auto-unlock toggles, the
   Keychain-backed auto-unlock disclosure, and `KeepAlive`/restart-on-
   failure configuration — none of this OS-lifecycle wiring exists yet.
-  **Known bug, found by testing, not yet fixed:** `AlertPassphrasePrompter`
-  (the passphrase-prompt UI a real `vaultsigner.sign` call triggers) does
-  not reliably present a real modal when the agent runs as a bare
-  unbundled executable launched from a shell — `NSAlert.runModal()`
-  returns immediately as if an empty passphrase were submitted, with no
-  window ever appearing. This looks like a consequence of running without
-  a proper `.app` bundle/Info.plist rather than a logic bug; needs
-  re-verification once the agent is bundled as a tiny `LSUIElement` `.app`
-  and launched via `open`/`SMAppService`/`launchd` instead. See the
-  doc comment on `AlertPassphrasePrompter.prompt` for the full note.
   **Known architectural gap:** `VaultSigner.app` (the management UI)
   currently holds its own in-process `Vault` rather than routing every
   mutation through the agent over IPC the way spec §8 describes ("the
@@ -92,16 +88,17 @@ xcodebuild -project VaultSigner.xcodeproj -scheme VaultSignerAgent -configuratio
   wording — this is not something to fake or partially build without
   that verification path available.
 - **2.8 Custom protocol verified against a minimal test client** —
-  **done and verified.** `uniffi-verify/agent_test_client.py` connects to
-  the real running `VaultSignerAgent` over its Unix socket and checks:
-  `vaultsigner.list_public_keys` never leaks anything beyond
-  `key_id`/`label`/`public_key_b64`/`resource`; an unknown `key_id`
-  returns `key_not_found`; a never-unlocked key's `sign` attempt is
-  rejected; and — after unlocking the key via the `internal.unlock_key`
-  bootstrap method — `vaultsigner.sign` returns a signature that
-  independently verifies (via PyNaCl) against the key's real Ed25519
-  public key. Peer identity for the confirmation-text caller name is
-  resolved via `LOCAL_PEERPID`/`proc_pidpath` (OS-level, per spec §7 —
-  never a self-reported name from the request payload).
+  **done and verified.** `uniffi-verify/agent_test_client.py` runs fully
+  non-interactively (~0.7s) against the real running `VaultSignerAgent`
+  over its Unix socket and checks: `vaultsigner.list_public_keys` never
+  leaks anything beyond `key_id`/`label`/`public_key_b64`/`resource`; an
+  unknown `key_id` returns `key_not_found`; and — after unlocking the key
+  via the `internal.unlock_key` bootstrap method (deliberately avoiding
+  the interactive `AlertPassphrasePrompter` path, which needs a human —
+  see 2.6) — `vaultsigner.sign` returns a signature that independently
+  verifies (via PyNaCl) against the key's real Ed25519 public key. Peer
+  identity for the confirmation-text caller name is resolved via
+  `LOCAL_PEERPID`/`proc_pidpath` (OS-level, per spec §7 — never a
+  self-reported name from the request payload).
 - **2.9 i18n, 2.10 full test/fuzz pass** — not started; depend on the
   above.

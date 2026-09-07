@@ -16,7 +16,11 @@ targets:
     deploymentTarget: "13.0"
     sources:
       - path: VaultSigner/Sources
+      - path: Shared
       - path: Generated
+    dependencies:
+      - target: VaultSignerAgent
+      - sdk: ServiceManagement.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vaultsigner.app
@@ -34,19 +38,31 @@ targets:
       properties:
         LSUIElement: false
         NSHumanReadableCopyright: "VaultSigner"
+    postCompileScripts:
+      - name: "Embed VaultSignerAgent + its LaunchAgents plist (spec §8)"
+        script: |
+          set -euo pipefail
+          # SMAppService's `.agent(plistName:)` needs the LaunchAgents
+          # plist AND the helper it points to (BundleProgram) embedded in
+          # this app's own bundle, not built by a separate Copy Files
+          # phase that would run after codesigning invalidates it — a
+          # `postCompileScripts` phase runs before the Sign step instead.
+          mkdir -p "$CODESIGNING_FOLDER_PATH/Contents/Library/LaunchAgents"
+          cp "$SRCROOT/VaultSigner/Resources/com.vaultsigner.agent.plist" \
+             "$CODESIGNING_FOLDER_PATH/Contents/Library/LaunchAgents/com.vaultsigner.agent.plist"
+          rm -rf "$CODESIGNING_FOLDER_PATH/Contents/Resources/VaultSignerAgent.app"
+          mkdir -p "$CODESIGNING_FOLDER_PATH/Contents/Resources"
+          ditto "$BUILT_PRODUCTS_DIR/VaultSignerAgent.app" \
+                "$CODESIGNING_FOLDER_PATH/Contents/Resources/VaultSignerAgent.app"
+        basedOnDependencyAnalysis: false
 
   VaultSignerAgent:
-    # A proper .app bundle, not a bare `tool` executable: testing found
-    # that NSAlert.runModal() doesn't reliably present a real modal for
-    # an unbundled Mach-O binary launched from a shell (no confirmed
-    # WindowServer connection) — see AlertPassphrasePrompter's doc
-    # comment. `LSUIElement: true` keeps it out of the Dock/Cmd-Tab like
-    # a real background agent (spec §8) while still being a real bundle.
     type: application
     platform: macOS
     deploymentTarget: "13.0"
     sources:
       - path: VaultSignerAgent/Sources
+      - path: Shared
       - path: Generated
     settings:
       base:

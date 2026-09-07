@@ -265,20 +265,35 @@ here.
 - [ ] 2.4 Import flow — not started (same blocker; `vaultcore::merge` and
       `Vault::merge_*` are already done and waiting for a packet module).
 - [ ] 2.5 Backup — not started (same blocker).
-- [ ] 2.6 `launchd` background service. **Partial.** `VaultSignerAgent`
-      (`apps/macos/VaultSignerAgent/`), bundled as a tiny `LSUIElement`
-      `.app`, is a real process owning a `Vault` + its retention
-      cache/throttle state, serving the custom-protocol socket (verified
-      — see 2.8). Its `AlertPassphrasePrompter` (the real `NSAlert`
-      passphrase prompt) was verified interactively end-to-end with a
-      human present: a `vaultsigner.sign` call for a never-unlocked key
-      showed the dialog, blocked until answered, and returned a signature
-      that verified against the key's real public key. Not done:
-      `SMAppService` login-item registration, the two autostart/auto-
-      unlock toggles, the Keychain-backed auto-unlock disclosure,
-      restart-on-failure config. The known UI-vs-agent architecture gap
-      (management UI should route mutations through the agent, not hold
-      its own `Vault`) is in the macOS README.
+- [x] 2.6 `launchd` background service. **Done and verified, one caveat
+      disclosed.** `VaultSignerAgent` (`apps/macos/VaultSignerAgent/`),
+      embedded inside `VaultSigner.app`, is a real process owning a
+      `Vault` + its retention cache/throttle state, serving the
+      custom-protocol socket (verified — see 2.8), registered as a real
+      `launchd` agent via `SMAppService.agent(plistName:)` with
+      `RunAtLoad`/`KeepAlive` — confirmed with `launchctl print` (a real
+      job managed by `com.apple.xpc.ServiceManagement`) and
+      `launchctl kickstart` (killed it, watched launchd revive it). Both
+      spec §8 toggles are real and wired into `VaultSignerAgent` actually
+      consuming them: "start at login" (`LoginItemManager`) and
+      "auto-unlock on startup" (`AutoUnlockStore`, Keychain-backed, off by
+      default, gated behind a confirmation screen that verifies the
+      passphrase against the vault before ever writing it to the
+      Keychain) — a freshly-launched agent listed a real key over the
+      socket with zero unlock calls ever sent to it, confirming auto-
+      unlock end-to-end. `AlertPassphrasePrompter` (the real `NSAlert`
+      passphrase prompt) was separately verified interactively: a
+      `vaultsigner.sign` call for a never-unlocked key showed the dialog,
+      blocked until answered, and returned a signature that verified
+      against the key's real public key. **Disclosed caveat, observed
+      while verifying:** the first cross-app Keychain read triggers a
+      real macOS `SecurityAgent` access-confirmation dialog (no shared
+      Team ID between the two ad-hoc-signed binaries yet), and denying it
+      fails silently (agent just starts locked) rather than surfacing an
+      error — full detail in the macOS README, same underlying
+      constraint as item 2.7's signing requirement. The known UI-vs-agent
+      architecture gap (management UI should route mutations through the
+      agent, not hold its own `Vault`) is also in the macOS README.
 - [ ] 2.7 `ASCredentialProviderExtension` — not started; needs real Apple
       Developer signing/provisioning and live Safari/Chrome verification
       this environment can't do unattended.

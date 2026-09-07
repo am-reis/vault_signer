@@ -6,6 +6,7 @@ import SwiftUI
 struct KeyListView: View {
     @EnvironmentObject private var state: AppState
     @State private var showingCreateKey = false
+    @State private var showingSettings = false
 
     var body: some View {
         NavigationStack {
@@ -43,6 +44,9 @@ struct KeyListView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingCreateKey = true } label: { Label("New Key", systemImage: "plus") }
                 }
+                ToolbarItem(placement: .automatic) {
+                    Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Lock") { state.lockAll() }
                 }
@@ -51,6 +55,9 @@ struct KeyListView: View {
         .preventsScreenCapture()
         .sheet(isPresented: $showingCreateKey) {
             CreateKeyView().environmentObject(state)
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
         }
         .onAppear { state.refreshKeys() }
     }

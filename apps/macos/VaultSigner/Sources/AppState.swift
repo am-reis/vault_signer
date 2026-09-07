@@ -42,6 +42,7 @@ final class AppState: ObservableObject {
         guard let created = await run({ try Vault.create(path: path, compartmentLabel: label, masterPassphrase: masterPassphrase, profile: profile) }) else { return }
         vault = created
         vaultPath = path
+        VaultConfig.save(vaultPath: path)
         refreshCompartments()
         if let first = compartments.first {
             unlockedCompartmentId = first.compartmentId
@@ -53,6 +54,7 @@ final class AppState: ObservableObject {
         guard let opened = await run({ try Vault.open(path: path) }) else { return }
         vault = opened
         vaultPath = path
+        VaultConfig.save(vaultPath: path)
         unlockedCompartmentId = nil
         keys = []
         refreshCompartments()

@@ -65,11 +65,30 @@ func runAutoUnlockTestHookIfRequested() {
     exit(0)
 }
 
+/// `--test-i18n <locale> <key>`: resolves `key` directly against the
+/// named `.lproj` bundle (bypassing the system/app language entirely),
+/// to verify a locale's Localizable.strings loads and resolves correctly
+/// without needing to actually switch languages and read the screen.
+func runI18nTestHookIfRequested() {
+    let arguments = CommandLine.arguments
+    guard let flagIndex = arguments.firstIndex(of: "--test-i18n"), arguments.count > flagIndex + 2 else { return }
+    let locale = arguments[flagIndex + 1]
+    let key = arguments[flagIndex + 2]
+    guard let lprojPath = Bundle.main.path(forResource: locale, ofType: "lproj"), let localeBundle = Bundle(path: lprojPath) else {
+        print("no .lproj bundle found for locale '\(locale)'")
+        exit(1)
+    }
+    let resolved = localeBundle.localizedString(forKey: key, value: "<<MISSING>>", table: nil)
+    print(resolved)
+    exit(0)
+}
+
 @main
 struct VaultSignerApp: App {
     init() {
         runLoginItemTestHookIfRequested()
         runAutoUnlockTestHookIfRequested()
+        runI18nTestHookIfRequested()
     }
 
     var body: some Scene {

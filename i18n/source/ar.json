@@ -1,0 +1,40 @@
+{
+  "_comment": "Arabic (RTL) — spec §9 explicitly requires verifying right-to-left layout on the import/export decision screens, so this locale intentionally covers exactly the same key set as en.json's import/duality screens rather than the whole app.",
+
+  "welcome.subtitle": "أنشئ خزنة جديدة أو افتح خزنة موجودة لديك بالفعل.",
+  "welcome.create_button": "إنشاء خزنة جديدة…",
+  "welcome.open_button": "فتح خزنة موجودة…",
+  "welcome.open_panel_message": "اختر ملف خزنة بامتداد ‎.vlt",
+
+  "import.title": "استيراد حزمة",
+  "import.subtitle": "اختر ملفًا بامتداد ‎.vltkey أو ‎.vltpack.",
+  "import.cancel_button": "إلغاء",
+  "import.choose_file_button": "اختيار ملف…",
+  "import.complete_title": "اكتمل الاستيراد",
+  "import.done_button": "تم",
+  "import.transfer_password_prompt": "هذه الحزمة محمية بكلمة مرور نقل.",
+  "import.transfer_password_field": "كلمة مرور النقل",
+  "import.continue_button": "متابعة",
+
+  "duality.header": "يتضمن هذا الاستيراد المفتاح الرئيسي لخزنة أخرى",
+  "duality.subtitle": "قبل دمج أي مفاتيح، اختر ما يجب فعله بالمفتاح الرئيسي الوارد. لا يمكن تخطي هذا الاختيار.",
+  "duality.cancel_button": "إلغاء الاستيراد",
+  "duality.recommended_badge": "موصى به",
+  "duality.use_this_option_button": "استخدام هذا الخيار",
+
+  "duality.option1.title": "إعادة التشفير والتخلص من المفتاح الرئيسي الوارد",
+  "duality.option1.description": "ستحتاج مفاتيحك فقط إلى كلمة المرور الرئيسية الحالية. لن يتم الاحتفاظ بكلمة المرور الرئيسية للخزنة المستوردة.",
+  "duality.option1.no_unlocked_compartment": "لا يوجد قسم مفتوح حاليًا للدمج فيه.",
+  "duality.option1.merge_into_picker": "الدمج في",
+
+  "duality.option2.title": "الاحتفاظ بكلا المفتاحين الرئيسيين جنبًا إلى جنب",
+  "duality.option2.description": "ستحتفظ بكلمتي مرور رئيسيتين منفصلتين لهذه الخزنة، واحدة لكل مجموعة من المفاتيح. لن يتم دمج أي شيء.",
+  "duality.option2.label_field": "تسمية القسم",
+  "duality.option2.passphrase_field": "كلمة المرور الرئيسية الجديدة لهذا القسم",
+
+  "duality.option3.title": "استبدال المفتاح الرئيسي المحلي بالمفتاح الرئيسي الوارد",
+  "duality.option3.description": "سيؤدي هذا إلى استبدال كلمة المرور التي تحمي جميع مفاتيحك الحالية، بما فيها المفاتيح التي لم تستوردها للتو، بكلمة مرور مختلفة. إذا لم تكن كلتا كلمتي المرور متوفرتين لديك الآن، فتوقف.",
+  "duality.option3.replace_picker": "استبدال",
+  "duality.option3.passphrase_field": "كلمة المرور الرئيسية للخزنة الواردة",
+  "duality.option3.confirmation_field_format": "اكتب \"%@\" للتأكيد"
+}

@@ -28,9 +28,9 @@ struct MasterKeyDualityView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Label("This import includes another vault's master key", systemImage: "exclamationmark.triangle.fill")
+                Label("duality.header", systemImage: "exclamationmark.triangle.fill")
                     .font(.title3.bold())
-                Text("Before any keys are merged, choose what to do with the incoming master key. This choice cannot be skipped.")
+                Text("duality.subtitle")
                     .foregroundStyle(.secondary)
 
                 option1Card
@@ -41,7 +41,7 @@ struct MasterKeyDualityView: View {
                     Text(errorMessage).font(.caption).foregroundStyle(.red)
                 }
 
-                Button("Cancel Import") { onCancel() }
+                Button("duality.cancel_button") { onCancel() }
             }
             .padding(24)
         }
@@ -54,18 +54,18 @@ struct MasterKeyDualityView: View {
     @State private var option1TargetCompartmentId: String?
 
     private var option1Card: some View {
-        DualityCard(title: "Re-encrypt & discard incoming master key", isRecommended: true) {
-            Text("Your keys will only need your existing master password. The imported vault's master password will not be kept.")
+        DualityCard(titleKey: "duality.option1.title", isRecommended: true) {
+            Text("duality.option1.description")
                 .font(.caption)
             if unlockedCompartments.isEmpty {
-                Text("No compartment is currently unlocked to merge into.").font(.caption).foregroundStyle(.red)
+                Text("duality.option1.no_unlocked_compartment").font(.caption).foregroundStyle(.red)
             } else {
-                Picker("Merge into", selection: $option1TargetCompartmentId) {
+                Picker("duality.option1.merge_into_picker", selection: $option1TargetCompartmentId) {
                     ForEach(unlockedCompartments, id: \.compartmentId) { c in
                         Text(c.label).tag(Optional(c.compartmentId))
                     }
                 }
-                Button("Use This Option") {
+                Button("duality.use_this_option_button") {
                     guard let target = option1TargetCompartmentId ?? unlockedCompartments.first?.compartmentId else { return }
                     runOption1(targetCompartmentId: target)
                 }
@@ -97,12 +97,12 @@ struct MasterKeyDualityView: View {
     @State private var option2Passphrase = ""
 
     private var option2Card: some View {
-        DualityCard(title: "Keep both master keys side by side", isRecommended: false) {
-            Text("You'll keep two separate master passwords for this vault, one for each set of keys. Nothing is merged.")
+        DualityCard(titleKey: "duality.option2.title", isRecommended: false) {
+            Text("duality.option2.description")
                 .font(.caption)
-            TextField("Compartment label", text: $option2Label)
-            SecureField("New master passphrase for this compartment", text: $option2Passphrase)
-            Button("Use This Option") { runOption2() }
+            TextField("duality.option2.label_field", text: $option2Label)
+            SecureField("duality.option2.passphrase_field", text: $option2Passphrase)
+            Button("duality.use_this_option_button") { runOption2() }
                 .buttonStyle(.borderedProminent)
                 .disabled(option2Passphrase.isEmpty)
         }
@@ -134,19 +134,23 @@ struct MasterKeyDualityView: View {
     @State private var option3Passphrase = ""
     @State private var option3Confirmation = ""
 
+    private var option3ConfirmationFieldLabel: String {
+        String(format: String(localized: "duality.option3.confirmation_field_format"), replaceConfirmationPhrase)
+    }
+
     private var option3Card: some View {
-        DualityCard(title: "Replace local master key with incoming master key", isRecommended: false, isDangerous: true) {
-            Text("This will replace the password protecting ALL your existing keys, including ones you did not just import, with a different password. If you don't have both passwords available right now, stop.")
+        DualityCard(titleKey: "duality.option3.title", isRecommended: false, isDangerous: true) {
+            Text("duality.option3.description")
                 .font(.caption)
             if !unlockedCompartments.isEmpty {
-                Picker("Replace", selection: $option3TargetCompartmentId) {
+                Picker("duality.option3.replace_picker", selection: $option3TargetCompartmentId) {
                     ForEach(unlockedCompartments, id: \.compartmentId) { c in
                         Text(c.label).tag(Optional(c.compartmentId))
                     }
                 }
-                SecureField("Incoming vault's master passphrase", text: $option3Passphrase)
-                TextField("Type \"\(replaceConfirmationPhrase)\" to confirm", text: $option3Confirmation)
-                Button("Use This Option") {
+                SecureField("duality.option3.passphrase_field", text: $option3Passphrase)
+                TextField(option3ConfirmationFieldLabel, text: $option3Confirmation)
+                Button("duality.use_this_option_button") {
                     guard let target = option3TargetCompartmentId ?? unlockedCompartments.first?.compartmentId else { return }
                     runOption3(targetCompartmentId: target)
                 }
@@ -179,7 +183,7 @@ struct MasterKeyDualityView: View {
 }
 
 private struct DualityCard<Content: View>: View {
-    let title: String
+    let titleKey: LocalizedStringKey
     let isRecommended: Bool
     var isDangerous: Bool = false
     @ViewBuilder let content: Content
@@ -187,9 +191,9 @@ private struct DualityCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title).font(.headline)
+                Text(titleKey).font(.headline)
                 if isRecommended {
-                    Text("Recommended").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 2)
+                    Text("duality.recommended_badge").font(.caption2.bold()).padding(.horizontal, 6).padding(.vertical, 2)
                         .background(.blue.opacity(0.2), in: Capsule())
                 }
             }

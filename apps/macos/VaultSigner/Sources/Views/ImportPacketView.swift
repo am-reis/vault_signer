@@ -42,14 +42,14 @@ struct ImportPacketView: View {
 
     private var pickingFileView: some View {
         VStack(spacing: 16) {
-            Text("Import Packet").font(.title2.bold())
-            Text("Choose a .vltkey or .vltpack file.").foregroundStyle(.secondary)
+            Text("import.title").font(.title2.bold())
+            Text("import.subtitle").foregroundStyle(.secondary)
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
             }
             HStack {
-                Button("Cancel") { dismiss() }
-                Button("Choose File…") { pickFile() }.buttonStyle(.borderedProminent)
+                Button("import.cancel_button") { dismiss() }
+                Button("import.choose_file_button") { pickFile() }.buttonStyle(.borderedProminent)
             }
         }
         .padding(40)
@@ -59,14 +59,17 @@ struct ImportPacketView: View {
     private func doneView(warnings: [DuplicateWarningInfo]) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.circle.fill").font(.system(size: 40)).foregroundStyle(.green)
-            Text("Import Complete").font(.title2.bold())
+            Text("import.complete_title").font(.title2.bold())
             if !warnings.isEmpty {
+                // Not yet migrated to the ICU plural-aware form (spec §9
+                // scaffolding covers the static strings around it first
+                // — see i18n/README.md).
                 Text("\(warnings.count) key(s) collided with existing entries and were kept side-by-side, renamed.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-            Button("Done") { dismiss() }.buttonStyle(.borderedProminent)
+            Button("import.done_button") { dismiss() }.buttonStyle(.borderedProminent)
         }
         .padding(40)
         .frame(width: 380)
@@ -74,7 +77,7 @@ struct ImportPacketView: View {
 
     private func pickFile() {
         let panel = NSOpenPanel()
-        panel.title = "Import Packet"
+        panel.title = String(localized: "import.title")
         panel.allowedContentTypes = []
         panel.allowsOtherFileTypes = true
         panel.canChooseDirectories = false
@@ -132,12 +135,12 @@ private struct TransferPasswordView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("This packet is protected by a transfer password.").font(.headline)
-            SecureField("Transfer passphrase", text: $password)
+            Text("import.transfer_password_prompt").font(.headline)
+            SecureField("import.transfer_password_field", text: $password)
             HStack {
                 Spacer()
-                Button("Cancel") { onCancel() }
-                Button("Continue") { onSubmit(password) }.buttonStyle(.borderedProminent).disabled(password.isEmpty)
+                Button("import.cancel_button") { onCancel() }
+                Button("import.continue_button") { onSubmit(password) }.buttonStyle(.borderedProminent).disabled(password.isEmpty)
             }
         }
         .padding(24)

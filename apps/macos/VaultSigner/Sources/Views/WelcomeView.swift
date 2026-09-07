@@ -10,15 +10,17 @@ struct WelcomeView: View {
             Image(systemName: "lock.shield")
                 .font(.system(size: 56))
                 .foregroundStyle(.secondary)
-            Text("VaultSigner")
+            // The product name is deliberately not localized (spec §9's
+            // exception, standard i18n practice for brand names).
+            Text(verbatim: "VaultSigner")
                 .font(.largeTitle.bold())
-            Text("Create a new vault, or open one you already have.")
+            Text("welcome.subtitle")
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 16) {
-                Button("Create New Vault…") { showingCreate = true }
+                Button("welcome.create_button") { showingCreate = true }
                     .buttonStyle(.borderedProminent)
-                Button("Open Existing Vault…") { openExistingVault() }
+                Button("welcome.open_button") { openExistingVault() }
                     .buttonStyle(.bordered)
             }
         }
@@ -35,7 +37,7 @@ struct WelcomeView: View {
         panel.allowsOtherFileTypes = true
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
-        panel.message = "Choose a .vlt vault file"
+        panel.message = String(localized: "welcome.open_panel_message")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task { await state.openVault(path: url.path) }
     }

@@ -1,0 +1,40 @@
+{
+  "_comment": "Single source-of-truth for VaultSigner's user-facing strings (spec §9). Keys are semantic (not raw English text) so ICU MessageFormat features like plurals/gender can be added per-key without renaming call sites. Generate platform-native formats from this file with i18n/generate-apple-strings.py (and future per-platform equivalents) rather than hand-editing .strings/.xml/.resx directly. This file currently covers only the screens migrated so far (Welcome, Import Packet, the master-key-duality screen) — see /PROGRESS.md item 2.9 for what's not yet migrated. Product/brand names (\"VaultSigner\") are deliberately excluded, per standard i18n practice.",
+
+  "welcome.subtitle": "Create a new vault, or open one you already have.",
+  "welcome.create_button": "Create New Vault…",
+  "welcome.open_button": "Open Existing Vault…",
+  "welcome.open_panel_message": "Choose a .vlt vault file",
+
+  "import.title": "Import Packet",
+  "import.subtitle": "Choose a .vltkey or .vltpack file.",
+  "import.cancel_button": "Cancel",
+  "import.choose_file_button": "Choose File…",
+  "import.complete_title": "Import Complete",
+  "import.done_button": "Done",
+  "import.transfer_password_prompt": "This packet is protected by a transfer password.",
+  "import.transfer_password_field": "Transfer passphrase",
+  "import.continue_button": "Continue",
+
+  "duality.header": "This import includes another vault's master key",
+  "duality.subtitle": "Before any keys are merged, choose what to do with the incoming master key. This choice cannot be skipped.",
+  "duality.cancel_button": "Cancel Import",
+  "duality.recommended_badge": "Recommended",
+  "duality.use_this_option_button": "Use This Option",
+
+  "duality.option1.title": "Re-encrypt & discard incoming master key",
+  "duality.option1.description": "Your keys will only need your existing master password. The imported vault's master password will not be kept.",
+  "duality.option1.no_unlocked_compartment": "No compartment is currently unlocked to merge into.",
+  "duality.option1.merge_into_picker": "Merge into",
+
+  "duality.option2.title": "Keep both master keys side by side",
+  "duality.option2.description": "You'll keep two separate master passwords for this vault, one for each set of keys. Nothing is merged.",
+  "duality.option2.label_field": "Compartment label",
+  "duality.option2.passphrase_field": "New master passphrase for this compartment",
+
+  "duality.option3.title": "Replace local master key with incoming master key",
+  "duality.option3.description": "This will replace the password protecting ALL your existing keys, including ones you did not just import, with a different password. If you don't have both passwords available right now, stop.",
+  "duality.option3.replace_picker": "Replace",
+  "duality.option3.passphrase_field": "Incoming vault's master passphrase",
+  "duality.option3.confirmation_field_format": "Type \"%@\" to confirm"
+}

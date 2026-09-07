@@ -4,6 +4,7 @@ options:
   deploymentTarget:
     macOS: "13.0"
   createIntermediateGroups: true
+  developmentLanguage: en
 
 configs:
   Debug: debug
@@ -16,6 +17,7 @@ targets:
     deploymentTarget: "13.0"
     sources:
       - path: VaultSigner/Sources
+      - path: VaultSigner/Resources
       - path: Shared
       - path: Generated
     dependencies:
@@ -38,6 +40,8 @@ targets:
       properties:
         LSUIElement: false
         NSHumanReadableCopyright: "VaultSigner"
+        CFBundleLocalizations: [en, ar]
+        CFBundleDevelopmentRegion: en
     postCompileScripts:
       - name: "Embed VaultSignerAgent + its LaunchAgents plist (spec §8)"
         script: |

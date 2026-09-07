@@ -345,7 +345,28 @@ here.
       actual Ed25519 public key. Caller identity for the confirmation
       text is resolved via `LOCAL_PEERPID`/`proc_pidpath` (OS-level peer
       credentials, per spec §7 — never the self-reported JSON payload).
-- [ ] 2.9 i18n scaffolding — not started.
+- [x] 2.9 i18n resource-file scaffolding, at least one locale populated.
+      **Done for the scaffolding itself; most of the app's strings are
+      not yet migrated (see `i18n/README.md`).** `i18n/source/en.json`
+      and `i18n/source/ar.json` (Arabic — chosen specifically because
+      spec §9 requires RTL verification "specifically on the
+      import/export decision screens") are the ICU-MessageFormat-shaped
+      sources of truth; `i18n/generate-apple-strings.py` generates real
+      `.lproj/Localizable.strings` from them (wired into
+      `apps/macos/project.yml`, `CFBundleLocalizations: [en, ar]`).
+      Three screens actually migrated — `WelcomeView`,
+      `ImportPacketView`, `MasterKeyDualityView` (the import/export
+      decision screens spec §9 calls out) — verified via a headless
+      `--test-i18n <locale> <key>` hook that resolves a key directly
+      against a named `.lproj` bundle: confirmed both locales resolve
+      real translated text (not the raw key) and a missing key falls
+      back cleanly instead of crashing. `i18n/lint-hardcoded-strings.py`
+      is spec §9's "CI lint that fails the build on hardcoded UI literal
+      strings" — runnable locally now (`--strict` is clean for the 3
+      migrated files; `--report` lists the 88 remaining hardcoded
+      literals across the rest of the app), not yet wired to an actual
+      CI service since none exists in this repo. Both app targets build
+      clean with the localization changes.
 - [ ] 2.10 Full Phase 10 test/fuzz suite pass — not started; depends on
       the above.
 

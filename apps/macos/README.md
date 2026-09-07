@@ -42,26 +42,55 @@ xcodebuild -project VaultSigner.xcodeproj -scheme VaultSigner -configuration Deb
 xcodebuild -project VaultSigner.xcodeproj -scheme VaultSignerAgent -configuration Debug -destination 'platform=macOS' build
 ```
 
+## Verifying the UI without screenshots
+
+This app's own screen-capture blocking (spec §5.0, `CaptureProtected.swift`
+— `NSWindow.sharingType = .none`, applied to the main window and every
+sheet) means `screencapture`/`CGWindowListCreateImage`-based screenshots
+of it are *expected* to come back blank — that is the feature working
+correctly, not a permissions problem, and every other platform's
+equivalent will have the same property once built. **Verify this app's
+UI via the macOS Accessibility API instead** (`osascript`'s `tell
+application "System Events" to tell process "VaultSigner" ...`, or any
+other AXUIElement-based tool) — a completely different OS subsystem from
+screen capture/recording, unaffected by `sharingType`, and it needs only
+Accessibility permission (System Settings → Privacy & Security →
+Accessibility), not Screen Recording. This reads the real element tree
+(button labels, field values, window titles) and can drive it (click,
+set focus, keystroke) exactly like a real user. Two things learned doing
+this:
+- Query buttons by `description` (their accessibility label, i.e. this
+  project's `Label`/`Button` title text), not by index — toolbar item
+  order in the accessibility tree does not match source-code placement
+  order (`.cancellationAction` items surface before `.primaryAction`
+  ones here, for example).
+- `set value of <secure field> to "..."` does not reliably deliver text
+  into a SwiftUI `SecureField` the way it does for a plain `TextField`.
+  Use `set focused of <field> to true` then `keystroke "..."` instead.
+
 ## Status against spec §12 Phase 2
 
-- **2.1 SwiftUI management UI** — real, `Vault`-backed screens exist:
-  create/open a vault, the multi-compartment unlock selector, key list,
-  create key, and key detail (change passphrase / reveal raw key /
-  discard with two-step confirmation). Builds and launches cleanly (no
-  crash). **Not yet visually verified**: this development environment's
-  terminal (running under the Claude desktop app) has neither Screen
-  Recording nor Accessibility permission granted in System Settings →
-  Privacy & Security, so screenshots of the running app come back
-  showing the desktop instead of window content, and AppleScript/System
-  Events UI-driving is refused outright. Grant both to `Claude.app` to
-  unblock real visual verification of every screen in this app.
+- **2.1 SwiftUI management UI** — **done and interactively verified**
+  for the core flow: launched the real app and drove it via the
+  Accessibility API (see above) through create-vault (including a real
+  `NSSavePanel` and the busy-indicator overlay during the real ~1s
+  Argon2id derivation) → empty key list → create-key → populated key
+  list → key detail → reveal-raw-key (a real decrypt with the correct
+  key passphrase, returning a real 64-hex-char private key) → lock →
+  unlock. Every screen's rendered content and structure matched source
+  exactly. **Not yet driven this way:** change-passphrase, discard-key,
+  the export/import/settings screens (2.3-2.5, below) — same method,
+  just not yet done.
 - **2.2 Screen-capture blocking** — `CaptureProtected.swift` sets
   `NSWindow.sharingType = .none` (spec §5.0) and is applied to the main
   window plus every sheet (sheets are separate `NSWindow`s on macOS, so
-  the main window's setting doesn't propagate to them). Same visual-
-  verification caveat as 2.1 — the *mechanism* is exercised by every
-  build, but "screenshots of this window come back blank" hasn't been
-  independently confirmed the way it should be before calling this done.
+  the main window's setting doesn't propagate to them). The mechanism
+  itself is exercised by every build; independent confirmation that a
+  real screenshot/recording tool sees nothing is implied by this
+  session's own screenshot attempts coming back blank against this exact
+  app, but wasn't a deliberate, isolated test — worth doing once
+  explicitly (screenshot, confirm blank, done) rather than resting on
+  that indirect evidence.
 - **2.3 Export flows, 2.4 Import flow, 2.5 Backup** — **UI built, not
   interactively verified.** The `vaultcore` blocker is gone
   (`vaultcore/src/packet.rs`, verified independently from Swift — see

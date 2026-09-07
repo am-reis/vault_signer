@@ -53,6 +53,12 @@ struct KeyListView: View {
                     } label: {
                         Label("Import/Export", systemImage: "tray.and.arrow.up")
                     }
+                    // Without this, VoiceOver/Accessibility-tree tools
+                    // read this control as "Outbox" (inferred from the
+                    // SF Symbol) instead of the actual label above —
+                    // found while UI-testing 2.3/2.4 via the
+                    // Accessibility API (see the macOS README).
+                    .accessibilityLabel("Import/Export")
                 }
                 ToolbarItem(placement: .automatic) {
                     Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }

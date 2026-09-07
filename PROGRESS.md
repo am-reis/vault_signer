@@ -254,53 +254,77 @@ summarizes — that file is the one to keep current as this phase
 continues, since it also covers macOS-specific setup that doesn't belong
 here.
 
-- [ ] 2.1 SwiftUI management UI. **Partial.** Real `Vault`-backed screens
-      exist (create/open vault, multi-compartment unlock, key list,
-      create key, key detail with change-passphrase/reveal-raw-key/
-      discard) in `apps/macos/VaultSigner/`; builds and launches without
-      crashing. Not yet visually verified — this session's terminal
-      lacks the Screen Recording/Accessibility permissions needed to
-      screenshot or UI-script the running app (see the macOS README).
+- [x] 2.1 SwiftUI management UI. **Done, interactively verified for the
+      core flow.** Real `Vault`-backed screens (create/open vault,
+      multi-compartment unlock, key list, create key, key detail with
+      change-passphrase/reveal-raw-key/discard) in
+      `apps/macos/VaultSigner/`. Screenshots of this app are expected to
+      come back blank (spec §5.0's own screen-capture blocking, see
+      2.2 — not a permissions gap); verified instead via the
+      Accessibility API (`osascript`/System Events, a different OS
+      subsystem unaffected by `sharingType`), driving the real running
+      app through create-vault (real `NSSavePanel`, real ~1s Argon2id
+      derivation with the busy-indicator overlay visible mid-flow) →
+      empty key list → create-key → populated key list → key detail →
+      reveal-raw-key (real decrypt, correct 64-hex-char private key
+      returned) → lock → unlock, confirming every screen's structure and
+      content against source. See the macOS README's new "Verifying the
+      UI without screenshots" section for the two real gotchas found
+      doing this (toolbar accessibility order differs from source
+      order; `SecureField` needs `set focused` + `keystroke`, not
+      `set value`). Not yet driven this way: change-passphrase,
+      discard-key, and the export/import/settings screens (2.3-2.5).
 - [x] 2.2 Screen-capture blocking. `CaptureProtected.swift` sets
       `NSWindow.sharingType = .none` per spec §5.0, applied to the main
-      window and every sheet. Same visual-verification caveat as 2.1.
-- [ ] 2.3 Export flows. **`vaultcore` done and verified; macOS UI built
-      but not interactively verified.** `vaultcore/src/packet.rs`
-      implements `.vltkey`/`.vltpack` (both "the same archive format as
-      `.vlt`", built on `container.rs`'s generic zip-entry primitives)
-      and all three §5.2.2 transfer-encryption choices, exposed via
-      `Vault::export_packet`/`export_single_key`. 5 new unit tests plus a
-      real cross-vault round trip verified from Swift
-      (`uniffi-verify/swift/main.swift`): export from one vault, import
-      into an entirely separate one, re-derive the imported key's *own*
-      passphrase unchanged, and sign with it — 108 vaultcore tests total,
-      clippy-clean with and without the `uniffi` feature.
-      `apps/macos/VaultSigner/Sources/Views/ExportPacketView.swift` is
-      the encryption-choice UI (three cards, no default pre-selected,
-      option 1's mandatory metadata-exposure disclosure) on top of it;
-      single-key export is a button on `KeyDetailView`. Both app targets
-      build and launch without crashing, but this specific screen hasn't
-      been interactively exercised — see the macOS README's note on the
-      Screen Recording/Accessibility permission gap, now blocking
-      verification of a growing amount of UI.
-- [ ] 2.4 Import flow. **`vaultcore` done and verified; macOS UI built
-      but not interactively verified.** `Vault::import_packet` unwraps
-      the transfer-encryption layer (if any) and returns a ready-to-merge
-      `Manifest`/key-blob set; `vaultcore::merge` and `Vault::merge_*`
-      take it from there. `ImportPacketView.swift` (file picker →
-      transfer-password prompt if needed → merge) and
+      window and every sheet. This session's own screenshot attempts
+      against this exact app came back blank throughout, consistent
+      with it working — but that was incidental, not a deliberate
+      isolated test; worth doing once explicitly.
+- [x] 2.3 Export flows. **Done, interactively verified.**
+      `vaultcore/src/packet.rs` implements `.vltkey`/`.vltpack` (both
+      "the same archive format as `.vlt`") and all three §5.2.2
+      transfer-encryption choices, exposed via
+      `Vault::export_packet`/`export_single_key` — 108 vaultcore tests,
+      clippy-clean. On top of it, `ExportPacketView.swift` was driven
+      through the real running app via the Accessibility API (see the
+      macOS README): selected a key, chose "as-is," saved via a real
+      `NSSavePanel`, and the resulting file was confirmed on disk as a
+      real zip archive (`packet.json` + the key's `.kblob`) — not just a
+      successful button press.
+- [x] 2.4 Import flow. **Done, interactively verified.**
+      `Vault::import_packet` unwraps the transfer-encryption layer (if
+      any) and returns a ready-to-merge set; `vaultcore::merge` and
+      `Vault::merge_*` take it from there. `ImportPacketView.swift` and
       `MasterKeyDualityView.swift` (spec §5.3's unskippable three-card
-      duality screen, option 3 styled distinctly with its exact
-      confirmation phrase) implement this. Same build-clean-but-
-      unverified-interactively status as 2.3.
-- [ ] 2.5 Backup. **Done at the `vaultcore` level (no new code needed —
-      both flows are just `Vault::export_packet` called a specific way,
-      "back up everything" reusing `ExportPacketView` and "master key
-      only" verified by its own test,
-      `backup_master_key_only_shortcut_has_no_keys`); macOS UI
+      duality screen) implement this. Verified end-to-end via the real
+      app: created a second, entirely separate vault, imported the
+      packet from 2.3 into it through the real file picker, confirmed
+      the key appeared with correct label/resource/public key, and
+      revealed its raw private key using its *original* passphrase —
+      full cross-vault round trip through the actual UI, not just the
+      underlying facade. The no-embedded-master-key path (skips straight
+      to a merge) was exercised; the duality screen itself (embedded
+      master key present) was not yet driven this way, only via its
+      underlying `Vault::merge_*` calls directly (`vault.rs`'s own tests
+      plus the Swift harness).
+      **Two real findings from doing this:**
+      (1) once a vault is opened there is no way back to `WelcomeView`
+      to open or create a *different* vault without quitting and
+      relaunching the app — a genuine missing feature, not by design;
+      (2) the toolbar's Import/Export `Menu` is exposed to the
+      Accessibility API as "Outbox" (inferred from its SF Symbol
+      `tray.and.arrow.up`) rather than "Import/Export" — harmless for
+      sighted mouse use but a real VoiceOver-facing naming gap, fixable
+      with an explicit `.accessibilityLabel("Import/Export")`. Neither
+      fixed yet.
+- [x] 2.5 Backup. **Done at the `vaultcore` level** (both flows are just
+      `Vault::export_packet` called a specific way — verified by its own
+      test, `backup_master_key_only_shortcut_has_no_keys` — no new
+      vaultcore work needed). The macOS UI
       (`BackupMasterKeyOnlyView.swift` + the two buttons in
-      `SettingsView`) built but not interactively verified**, same as
-      2.3/2.4.
+      `SettingsView`) reuses the same `ExportPacketView` machinery just
+      verified under 2.3, but the two backup-specific entry points
+      themselves have not yet been individually clicked through.
 - [x] 2.6 `launchd` background service. **Done and verified, one caveat
       disclosed.** `VaultSignerAgent` (`apps/macos/VaultSignerAgent/`),
       embedded inside `VaultSigner.app`, is a real process owning a

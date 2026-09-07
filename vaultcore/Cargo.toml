@@ -30,10 +30,16 @@ ctap-types = { version = "0.5", features = ["std"] }
 cosey = "0.4"
 time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
 uniffi = { version = "0.29", optional = true, features = ["cli"] }
+# Was dev-only (test CBOR fixtures); now also used in vault.rs to build
+# CTAP2 request CBOR from the decomposed fields a platform's *native*
+# passkey API hands an extension (e.g. macOS's ASPasskeyCredentialRequest)
+# — those platforms never have raw CTAP2 bytes to begin with, so this
+# encoding has to happen somewhere, and per spec §2 it belongs in
+# vaultcore, not reimplemented per platform.
+ciborium = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
-ciborium = "0.2"
 
 [[bin]]
 name = "kdf-bench"

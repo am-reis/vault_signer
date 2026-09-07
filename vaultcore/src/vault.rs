@@ -768,8 +768,8 @@ impl Vault {
 
     /// `authenticatorMakeCredential` (spec §6.6), fully wired: generates
     /// the keypair, seals it under `key_passphrase`, persists it into
-    /// `compartment_id`'s manifest, and returns the CBOR response to hand
-    /// back over whatever transport received the request.
+    /// `compartment_id`'s manifest, and returns everything a transport
+    /// or a platform passkey-registration API needs.
     #[allow(clippy::too_many_arguments)]
     pub fn handle_fido2_make_credential(
         &self,
@@ -781,7 +781,7 @@ impl Vault {
         label: String,
         description: String,
         resource: String,
-    ) -> FacadeResult<Vec<u8>> {
+    ) -> FacadeResult<Fido2MakeCredentialResult> {
         let compartment_id_uuid = parse_uuid(&compartment_id)?;
         let request = parse_make_credential(&request_cbor)?;
         let backend = VaultCtap2Backend { vault: self, prompter: None };
@@ -807,7 +807,7 @@ impl Vault {
             key_type: outcome.generated_key.key_type,
             purpose: Purpose::Fido2,
             fido2: Some(Fido2Info {
-                rp_id: outcome.rp_id,
+                rp_id: outcome.rp_id.clone(),
                 credential_id_b64: base64_encode(&outcome.credential_id),
                 user_handle_b64: base64_encode(&outcome.user_handle),
                 sign_count: 0,
@@ -830,21 +830,29 @@ impl Vault {
         state.container.key_blobs.insert(key_id, blob_bytes);
         self.persist_locked(&mut state, compartment_id_uuid)?;
 
-        Ok(outcome.response_cbor)
+        Ok(Fido2MakeCredentialResult {
+            response_cbor: outcome.response_cbor,
+            attestation_object: outcome.attestation_object,
+            credential_id: outcome.credential_id,
+            rp_id: outcome.rp_id,
+            user_handle: outcome.user_handle,
+            key_id: key_id.to_string(),
+        })
     }
 
     /// `authenticatorGetAssertion` (spec §6.6): matches a credential
     /// across every unlocked compartment, signs (prompting via `prompter`
     /// if the key isn't already cached, throttled like every other
     /// passphrase surface per §5.5), persists the incremented
-    /// `sign_count`, and returns the CBOR response.
+    /// `sign_count`, and returns everything a transport or a platform
+    /// passkey-assertion API needs.
     pub fn handle_fido2_get_assertion(
         &self,
         request_cbor: Vec<u8>,
         user_present: bool,
         user_verified: bool,
         prompter: std::sync::Arc<dyn PassphrasePrompter>,
-    ) -> FacadeResult<Vec<u8>> {
+    ) -> FacadeResult<Fido2AssertionResult> {
         let request = parse_get_assertion(&request_cbor)?;
         let backend = VaultCtap2Backend { vault: self, prompter: Some(prompter) };
         let outcome = ctap2::handle_get_assertion(&backend, &request, user_present, user_verified)
@@ -862,7 +870,71 @@ impl Vault {
             self.persist_locked(&mut state, compartment_id)?;
         }
 
-        Ok(outcome.response_cbor)
+        Ok(Fido2AssertionResult {
+            response_cbor: outcome.response_cbor,
+            credential_id: outcome.credential_id,
+            user_handle: outcome.user_handle,
+            rp_id: outcome.rp_id,
+            authenticator_data: outcome.authenticator_data,
+            signature: outcome.signature,
+        })
+    }
+
+    /// [`Vault::handle_fido2_make_credential`], for a caller whose OS
+    /// integration hands it decomposed request fields rather than raw
+    /// CTAP2 bytes — e.g. macOS's `ASPasskeyCredentialRequest` inside an
+    /// `ASCredentialProviderExtension` (spec §6.1). Builds the equivalent
+    /// CTAP2 request CBOR (`ctap2::build_make_credential_request_cbor`)
+    /// and delegates to the exact same, already-tested path — this
+    /// method exists so that encoding never has to happen in platform
+    /// code (spec §2).
+    #[allow(clippy::too_many_arguments)]
+    pub fn handle_fido2_make_credential_native(
+        &self,
+        compartment_id: String,
+        rp_id: String,
+        user_id: Vec<u8>,
+        client_data_hash: Vec<u8>,
+        algorithms: Vec<i32>,
+        exclude_credential_ids: Vec<Vec<u8>>,
+        discoverable: bool,
+        user_verification_requested: bool,
+        user_present: bool,
+        user_verified: bool,
+        key_passphrase: String,
+        label: String,
+        description: String,
+        resource: String,
+    ) -> FacadeResult<Fido2MakeCredentialResult> {
+        let algorithms_i64: Vec<i64> = algorithms.iter().map(|&a| a as i64).collect();
+        let request_cbor = ctap2::build_make_credential_request_cbor(
+            &rp_id,
+            &user_id,
+            &client_data_hash,
+            &algorithms_i64,
+            &exclude_credential_ids,
+            discoverable,
+            user_verification_requested,
+        );
+        self.handle_fido2_make_credential(compartment_id, request_cbor, user_present, user_verified, key_passphrase, label, description, resource)
+    }
+
+    /// [`Vault::handle_fido2_get_assertion`]'s decomposed-fields
+    /// counterpart — see
+    /// [`Vault::handle_fido2_make_credential_native`]'s doc comment.
+    #[allow(clippy::too_many_arguments)]
+    pub fn handle_fido2_get_assertion_native(
+        &self,
+        rp_id: String,
+        client_data_hash: Vec<u8>,
+        allow_credential_ids: Vec<Vec<u8>>,
+        user_verification_requested: bool,
+        user_present: bool,
+        user_verified: bool,
+        prompter: std::sync::Arc<dyn PassphrasePrompter>,
+    ) -> FacadeResult<Fido2AssertionResult> {
+        let request_cbor = ctap2::build_get_assertion_request_cbor(&rp_id, &client_data_hash, &allow_credential_ids, user_verification_requested);
+        self.handle_fido2_get_assertion(request_cbor, user_present, user_verified, prompter)
     }
 
     /// Spec §5.3 option 1: merge `incoming_manifest_json`'s keys into
@@ -1157,6 +1229,37 @@ fn parse_get_assertion(bytes: &[u8]) -> FacadeResult<get_assertion::Request<'_>>
         Ok(_) => Err(FacadeError::msg("expected an authenticatorGetAssertion request")),
         Err(_) => Err(FacadeError::msg("malformed CTAP2 request")),
     }
+}
+
+/// What [`Vault::handle_fido2_make_credential`] hands back — every field
+/// a platform's passkey-registration completion API needs, already
+/// decomposed (spec §2: no platform re-derives these by parsing
+/// `response_cbor` itself). `attestation_object` is exactly what macOS's
+/// `ASPasskeyRegistrationCredential.attestationObject` (and the
+/// equivalent field on other platforms' passkey APIs) wants.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct Fido2MakeCredentialResult {
+    pub response_cbor: Vec<u8>,
+    pub attestation_object: Vec<u8>,
+    pub credential_id: Vec<u8>,
+    pub rp_id: String,
+    pub user_handle: Vec<u8>,
+    pub key_id: String,
+}
+
+/// What [`Vault::handle_fido2_get_assertion`] hands back — see
+/// [`Fido2MakeCredentialResult`]'s doc comment for why these are
+/// decomposed rather than leaving the caller to parse `response_cbor`.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct Fido2AssertionResult {
+    pub response_cbor: Vec<u8>,
+    pub credential_id: Vec<u8>,
+    pub user_handle: Vec<u8>,
+    pub rp_id: String,
+    pub authenticator_data: Vec<u8>,
+    pub signature: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -1660,7 +1763,7 @@ mod tests {
         let (vault, compartment_id) = create_test_vault(&dir);
 
         let make_req = cbor_make_credential_request("example.com", b"user-1", ES256 as i64);
-        let response_cbor = vault
+        let make_result = vault
             .handle_fido2_make_credential(
                 compartment_id.clone(),
                 make_req,
@@ -1672,18 +1775,64 @@ mod tests {
                 "example.com".into(),
             )
             .unwrap();
-        assert_eq!(response_cbor[0], 0x00);
+        assert_eq!(make_result.response_cbor[0], 0x00);
+        // attestation_object must be exactly response_cbor without its
+        // leading status byte (spec §2: decomposed once here, not
+        // re-derived by platform code).
+        assert_eq!(make_result.attestation_object, make_result.response_cbor[1..]);
+        assert_eq!(make_result.rp_id, "example.com");
+        assert!(!make_result.credential_id.is_empty());
+        assert_eq!(make_result.user_handle, b"user-1");
 
         let keys = vault.list_keys(compartment_id).unwrap();
         assert_eq!(keys.len(), 1);
         assert!(keys[0].fido2.is_some());
+        assert_eq!(keys[0].key_id, make_result.key_id);
 
         let get_req = cbor_get_assertion_request("example.com");
-        let assertion_cbor = vault
+        let assertion_result = vault
             .handle_fido2_get_assertion(get_req, true, true, prompter_with("passkey pw"))
             .unwrap();
-        assert_eq!(assertion_cbor[0], 0x00);
+        assert_eq!(assertion_result.response_cbor[0], 0x00);
+        assert_eq!(assertion_result.rp_id, "example.com");
+        assert_eq!(assertion_result.credential_id, make_result.credential_id);
+        assert!(!assertion_result.authenticator_data.is_empty());
+        assert!(!assertion_result.signature.is_empty());
         assert!(vault.is_key_unlocked(keys[0].key_id.clone()));
+    }
+
+    #[test]
+    fn fido2_native_make_credential_then_get_assertion_roundtrip() {
+        use ctap_types::webauthn::ES256;
+        let dir = tempdir().unwrap();
+        let (vault, compartment_id) = create_test_vault(&dir);
+
+        let make_result = vault
+            .handle_fido2_make_credential_native(
+                compartment_id.clone(),
+                "example.com".into(),
+                b"user-1".to_vec(),
+                vec![9u8; 32],
+                vec![ES256],
+                vec![],
+                true,
+                true,
+                true,
+                true,
+                "passkey pw".into(),
+                "example.com passkey".into(),
+                "".into(),
+                "example.com".into(),
+            )
+            .unwrap();
+        assert_eq!(make_result.rp_id, "example.com");
+        assert_eq!(make_result.user_handle, b"user-1");
+
+        let assertion_result = vault
+            .handle_fido2_get_assertion_native("example.com".into(), vec![3u8; 32], vec![], false, true, true, prompter_with("passkey pw"))
+            .unwrap();
+        assert_eq!(assertion_result.credential_id, make_result.credential_id);
+        assert!(!assertion_result.signature.is_empty());
     }
 
     #[test]

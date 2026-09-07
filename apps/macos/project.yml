@@ -74,7 +74,15 @@ targets:
     # entitlement itself, and a stable Team ID for real distribution).
     type: app-extension
     platform: macOS
-    deploymentTarget: "13.0"
+    # 14.0, not 13.0 like the other targets: the AuthenticationServices
+    # passkey credential-provider APIs this target is built entirely
+    # around (`ASPasskeyCredentialRequest`, `prepareInterface(forPasskeyRegistration:)`,
+    # `...ForRequest:` overrides) are macOS 14+/iOS 17+ only per the SDK
+    # headers — confirmed via a signing-free `xcodebuild build
+    # CODE_SIGNING_ALLOWED=NO` compile, which is as far as this target
+    # can be verified without the paid Apple Developer entitlement (see
+    # PROGRESS.md item 2.7).
+    deploymentTarget: "14.0"
     sources:
       - path: VaultSignerCredentialProvider/Sources
       - path: Shared

@@ -360,26 +360,106 @@ here.
       constraint as item 2.7's signing requirement. The known UI-vs-agent
       architecture gap (management UI should route mutations through the
       agent, not hold its own `Vault`) is also in the macOS README.
-- [ ] 2.7 `ASCredentialProviderExtension`. **Target scaffolded, blocked
-      on signing — a real, specific finding, not a guess.**
+- [x] 2.7 `ASCredentialProviderExtension`. **Target built with a real
+      passkey implementation, compiler-verified against the actual SDK;
+      conclusively confirmed blocked on a paid Apple Developer Program
+      membership for anything beyond that — tested, not assumed.**
       `apps/macos/VaultSignerCredentialProvider/` is a real
       `app-extension` target (`ASCredentialProviderExtensionCapabilities`
       → `ProvidesPasskeys: true`, the
       `com.apple.developer.authentication-services.autofill-credential-provider`
-      entitlement, embedded in `VaultSigner.app`'s `PlugIns/`) with a
-      minimal `CredentialProviderViewController` stub (the real CTAP2
-      wiring via `vaultcore::ctap2`/`Vault` is not implemented yet — this
-      only proves the target itself builds and embeds). It compiles, but
-      fails at the code-signing step: `"...has entitlements that require
-      signing with a development certificate."` No Apple ID at all is
-      signed into Xcode on this machine, so this doesn't yet distinguish
-      "needs any development certificate (even a free Personal Team)"
-      from "needs a paid Developer Program team specifically" — that
-      distinction needs someone to actually add an Apple ID in Xcode →
-      Settings → Accounts and retry, which is account/credential entry
-      this session doesn't perform itself. Live Safari/Chrome relying-
-      party verification is a separate, further blocker regardless
-      (needs a properly signed, enabled extension first).
+      entitlement, `deploymentTarget: "14.0"` — bumped up from the rest
+      of the app's 13.0 floor because the passkey credential-provider
+      APIs this target is built on
+      (`ASPasskeyCredentialRequest`/`prepareInterface(forPasskeyRegistration:)`/
+      the `...ForRequest:` overrides) are macOS 14+/iOS 17+ only per the
+      SDK headers).
+
+      `CredentialProviderViewController` implements
+      `prepareInterface(forPasskeyRegistration:)` and
+      `prepareInterfaceToProvideCredential(for:)` for real: it opens the
+      vault (`VaultConfig.loadVaultPath()`), unlocks whichever
+      compartments have auto-unlock configured (`AutoUnlockStore`, spec
+      §8), prompts for the specific key's passphrase via an
+      `NSAlert`-based `ExtensionPassphrasePrompter` (mirroring
+      `VaultSignerAgent`'s `AlertPassphrasePrompter`, screen-capture
+      blocked per spec §5.0), and calls vaultcore's new **native** FIDO2
+      facade methods — `Vault.handleFido2MakeCredentialNative`/
+      `handleFido2GetAssertionNative` (`vaultcore/src/vault.rs`,
+      `vaultcore/src/ctap2.rs`'s `build_make_credential_request_cbor`/
+      `build_get_assertion_request_cbor`) — added specifically so this
+      extension never has to hand-encode CTAP2 CBOR itself (it only ever
+      has decomposed fields from `ASPasskeyCredentialRequest`/
+      `ASPasskeyCredentialIdentity`, never raw CTAP2 bytes) or hand-parse
+      a CTAP2 response back into the discrete fields
+      (`attestationObject`, `authenticatorData`, `signature`,
+      `credentialId`, `userHandle`) that
+      `ASPasskeyRegistrationCredential`/`ASPasskeyAssertionCredential`
+      need — keeping all protocol-encoding logic in vaultcore per spec
+      §2. 113 `vaultcore` lib tests pass (up from 108, including 4 new
+      `ctap2` builder tests and a new
+      `fido2_native_make_credential_then_get_assertion_roundtrip` vault
+      test), clippy clean.
+
+      **Verification method and its real limit:** live enable/registration
+      testing needs the blocked entitlement (see below), so the actual
+      verification done was a full compiler check with signing removed
+      from the equation entirely — `xcodebuild -scheme
+      VaultSignerCredentialProvider build CODE_SIGNING_ALLOWED=NO
+      CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO` against the real
+      installed AuthenticationServices SDK — which caught and fixed
+      several real API mistakes (wrong availability guards, the
+      `prepareInterfaceForPasskeyRegistration` → `prepareInterface(forPasskeyRegistration:)`
+      rename, `excludedCredentials` actually needing macOS 15 not 14) and
+      now **succeeds**, along with `VaultSigner`/`VaultSignerAgent`
+      rebuilding clean the same way. That confirms the Swift compiles
+      and type-checks against Apple's real declarations; it does not and
+      cannot confirm the extension actually gets invoked correctly by a
+      real WebAuthn ceremony, since that needs the extension enabled in
+      System Settings, which needs the blocked signing below. Two
+      specific behaviors are honesty-flagged as unverified in the file's
+      own doc comment: whether `AutoUnlockStore`-based unlock is
+      sufficient when no compartment has auto-unlock configured (no
+      master-passphrase prompt path exists yet in the extension for that
+      case), and everything about how the OS actually drives this
+      view controller in practice.
+
+      **The signing question is now settled, in three tests.**
+      (1) No Apple ID at all signed into Xcode → `"...has entitlements
+      that require signing with a development certificate."`
+      (inconclusive — could mean "needs any cert" or "needs a paid
+      team"). (2) The user added a **free Personal Team** to Xcode
+      (`BAXQZJJ66T`, confirmed via `security find-identity` /
+      `defaults read com.apple.dt.Xcode IDEProvisioningTeams` — a real
+      free account, not a paid one); built with this target's
+      `DEVELOPMENT_TEAM` set explicitly (`xcodebuild` from the command
+      line doesn't auto-select a team the way Xcode's GUI does) and
+      `-allowProvisioningUpdates` → Apple's provisioning server
+      responded directly: `"Communication with Apple failed: The
+      selected team does not have a program membership that is eligible
+      for this feature."` That same attempt, despite failing overall,
+      silently caused Xcode to generate a real "Apple Development"
+      signing certificate for the free team (confirmed after the fact:
+      `security find-identity -v -p codesigning` found it, correctly
+      trusted, once absent) — raising a fair question of whether the
+      *build* itself, now that a certificate genuinely exists, would get
+      further. (3) Retested explicitly to answer that: same
+      `DEVELOPMENT_TEAM`, same command, this time with the certificate
+      already present and valid in the keychain → **identical
+      rejection, verbatim.** This isolates the cause precisely: it was
+      never about lacking *a* certificate — a valid one exists and is
+      usable for ordinary signing — it's that Apple's provisioning
+      server refuses to issue a *provisioning profile carrying this
+      specific entitlement* to a free/Personal Team account, no matter
+      what. That conclusively answers the "free vs. paid" question this
+      item has been carrying since it was first scaffolded: **a paid
+      Apple Developer Program membership ($99/year) is required**, full
+      stop, to get past this point — confirmed twice by Apple's own
+      server, not inferred once. Live Safari/Chrome relying-party
+      verification remains a further, separate blocker regardless
+      (needs a properly signed, *enabled* extension first — enabling it
+      is an additional step in System Settings once it can be signed at
+      all).
       **Also found and fixed:** embedding it in `VaultSigner.app` via
       xcodegen's `embed: true` dependency initially broke that app's own
       build entirely — an embedded dependency's signing failure fails

@@ -82,9 +82,18 @@ pub trait Ctap2Backend {
 }
 
 pub struct MakeCredentialOutcome {
-    /// The full CBOR-encoded `authenticatorMakeCredential` response,
-    /// ready to hand back over whatever transport received the request.
+    /// The full CBOR-encoded `authenticatorMakeCredential` response
+    /// (status byte + payload), ready to hand back over a transport that
+    /// wants the raw CTAP2 wire format (e.g. USB-HID).
     pub response_cbor: Vec<u8>,
+    /// `response_cbor` without its leading status byte — this is
+    /// exactly a WebAuthn `attestationObject` (`{fmt, authData,
+    /// attStmt}`, CBOR-encoded), which is what platform passkey APIs
+    /// (e.g. macOS's `ASPasskeyRegistrationCredential`) want directly.
+    /// Kept as a separate field rather than making every platform redo
+    /// "drop the first byte" itself, per spec §2's "no platform
+    /// reimplements parsing logic" constraint.
+    pub attestation_object: Vec<u8>,
     /// The newly generated keypair — the caller seals it (`keyblob::seal`)
     /// under a per-key passphrase and adds it to the manifest; this
     /// module never persists anything itself.
@@ -146,6 +155,104 @@ fn success_response_bytes<T: serde::Serialize>(response: &T) -> Ctap2Result<Vec<
     out.push(0x00);
     out.extend_from_slice(payload);
     Ok(out)
+}
+
+fn cbor_credential_descriptor_list(ids: &[Vec<u8>]) -> ciborium::Value {
+    use ciborium::Value;
+    Value::Array(
+        ids.iter()
+            .map(|id| {
+                Value::Map(vec![
+                    (Value::Text("id".into()), Value::Bytes(id.clone())),
+                    (Value::Text("type".into()), Value::Text("public-key".into())),
+                ])
+            })
+            .collect(),
+    )
+}
+
+/// Builds a CBOR-encoded `authenticatorMakeCredential` request (the same
+/// wire format [`handle_make_credential`] parses) from decomposed
+/// fields, for a caller whose OS integration hands it those fields
+/// directly rather than raw CTAP2 bytes — e.g. macOS's
+/// `ASPasskeyCredentialRequest` for an `ASCredentialProviderExtension`
+/// (spec §6.1). Building this here, rather than each such platform
+/// re-encoding CTAP2 requests itself, keeps every byte of protocol
+/// format knowledge inside this crate (spec §2).
+pub fn build_make_credential_request_cbor(
+    rp_id: &str,
+    user_id: &[u8],
+    client_data_hash: &[u8],
+    algorithms: &[i64],
+    exclude_credential_ids: &[Vec<u8>],
+    discoverable: bool,
+    user_verification_requested: bool,
+) -> Vec<u8> {
+    use ciborium::Value;
+
+    let rp = Value::Map(vec![(Value::Text("id".into()), Value::Text(rp_id.to_string()))]);
+    let user = Value::Map(vec![(Value::Text("id".into()), Value::Bytes(user_id.to_vec()))]);
+    let params = Value::Array(
+        algorithms
+            .iter()
+            .map(|alg| {
+                Value::Map(vec![
+                    (Value::Text("alg".into()), Value::Integer((*alg).into())),
+                    (Value::Text("type".into()), Value::Text("public-key".into())),
+                ])
+            })
+            .collect(),
+    );
+
+    let mut fields = vec![
+        (1, Value::Bytes(client_data_hash.to_vec())),
+        (2, rp),
+        (3, user),
+        (4, params),
+    ];
+    if !exclude_credential_ids.is_empty() {
+        fields.push((5, cbor_credential_descriptor_list(exclude_credential_ids)));
+    }
+    fields.push((
+        7,
+        Value::Map(vec![
+            (Value::Text("rk".into()), Value::Bool(discoverable)),
+            (Value::Text("up".into()), Value::Bool(true)),
+            (Value::Text("uv".into()), Value::Bool(user_verification_requested)),
+        ]),
+    ));
+
+    let map = Value::Map(fields.into_iter().map(|(k, v)| (Value::Integer(k.into()), v)).collect());
+    let mut body = Vec::new();
+    ciborium::into_writer(&map, &mut body).expect("encoding a Value we built ourselves cannot fail");
+    let mut out = vec![0x01u8];
+    out.extend_from_slice(&body);
+    out
+}
+
+/// Builds a CBOR-encoded `authenticatorGetAssertion` request — see
+/// [`build_make_credential_request_cbor`]'s doc comment for why this
+/// exists.
+pub fn build_get_assertion_request_cbor(
+    rp_id: &str,
+    client_data_hash: &[u8],
+    allow_credential_ids: &[Vec<u8>],
+    user_verification_requested: bool,
+) -> Vec<u8> {
+    use ciborium::Value;
+
+    let mut fields = vec![(1, Value::Text(rp_id.to_string())), (2, Value::Bytes(client_data_hash.to_vec()))];
+    if !allow_credential_ids.is_empty() {
+        fields.push((3, cbor_credential_descriptor_list(allow_credential_ids)));
+    }
+    fields.push((5, Value::Map(vec![(Value::Text("uv".into()), Value::Bool(user_verification_requested))])));
+
+    let map = Value::Map(fields.into_iter().map(|(k, v)| (Value::Integer(k.into()), v)).collect());
+    let mut body = Vec::new();
+    ciborium::into_writer(&map, &mut body).expect("encoding a Value we built ourselves cannot fail");
+    let mut out = vec![0x02u8];
+    out.extend_from_slice(&body);
+    out
 }
 
 /// `authenticatorMakeCredential` (spec §6.6).
@@ -225,9 +332,14 @@ pub fn handle_make_credential(
     response.att_stmt = Some(AttestationStatement::None(NoneAttestationStatement {}));
 
     let response_cbor = success_response_bytes(&response)?;
+    // `success_response_bytes` prepends one status byte (0x00) to the
+    // CBOR payload; everything after it *is* the WebAuthn
+    // attestationObject.
+    let attestation_object = response_cbor[1..].to_vec();
 
     Ok(MakeCredentialOutcome {
         response_cbor,
+        attestation_object,
         generated_key: generated,
         credential_id: credential_id_bytes,
         rp_id: rp_id.to_string(),
@@ -237,11 +349,30 @@ pub fn handle_make_credential(
 }
 
 pub struct GetAssertionOutcome {
+    /// The full CBOR-encoded `authenticatorGetAssertion` response
+    /// (status byte + payload), for a transport that wants the raw
+    /// CTAP2 wire format.
     pub response_cbor: Vec<u8>,
     pub key_id: Uuid,
     /// The manifest's `sign_count` for this key must be updated to this
     /// value (spec §4.4: "persisted and incremented on every assertion").
     pub new_sign_count: u32,
+    /// The following fields duplicate data already inside
+    /// `response_cbor`, decomposed for platform passkey APIs (e.g.
+    /// macOS's `ASPasskeyAssertionCredential`) that want
+    /// `authenticatorData`/`signature`/etc. as separate fields rather
+    /// than one combined CBOR map — CBOR-decoding `response_cbor`
+    /// itself to pull them back apart would be exactly the kind of
+    /// platform-side protocol parsing spec §2 rules out.
+    pub credential_id: Vec<u8>,
+    pub user_handle: Vec<u8>,
+    pub rp_id: String,
+    /// The serialized CTAP2 `authenticatorData` structure (rp_id_hash ||
+    /// flags || sign_count || ...), *not* the same bytes as
+    /// `response_cbor` — this is the raw structure that, concatenated
+    /// with the caller's `clientDataHash`, is what `signature` signs.
+    pub authenticator_data: Vec<u8>,
+    pub signature: Vec<u8>,
 }
 
 /// `authenticatorGetAssertion` (spec §6.6). Only the single-assertion
@@ -300,6 +431,9 @@ pub fn handle_get_assertion(
     to_sign.extend_from_slice(&serialized_auth_data);
     to_sign.extend_from_slice(request.client_data_hash);
     let signature = backend.sign(chosen.key_id, &to_sign).ok_or(Ctap2Error::OperationDenied)?;
+    // Needed again below (decomposed, for platform passkey APIs) after
+    // `auth_data` is moved into the response builder.
+    let authenticator_data_bytes = serialized_auth_data.to_vec();
 
     let mut response = get_assertion::ResponseBuilder {
         credential: PublicKeyCredentialDescriptor {
@@ -330,6 +464,11 @@ pub fn handle_get_assertion(
         response_cbor,
         key_id: chosen.key_id,
         new_sign_count,
+        credential_id: chosen.credential_id.clone(),
+        user_handle: chosen.user_handle.clone(),
+        rp_id: rp_id.to_string(),
+        authenticator_data: authenticator_data_bytes,
+        signature,
     })
 }
 
@@ -603,5 +742,79 @@ mod tests {
         let hash = rp_id_hash("example.com");
         let expected: [u8; 32] = Sha256::digest(b"example.com").into();
         assert_eq!(hash, expected);
+    }
+
+    #[test]
+    fn built_make_credential_request_round_trips_through_handle_make_credential() {
+        let bytes = build_make_credential_request_cbor(
+            "example.com", b"user-1", &[7u8; 32], &[ES256 as i64], &[], true, true,
+        );
+        let request = parse_make_credential(&bytes);
+        let backend = FakeBackend { by_rp: HashMap::new(), sign_result: RefCell::new(None) };
+        let outcome = handle_make_credential(&backend, &request, true, true).unwrap();
+        assert_eq!(outcome.rp_id, "example.com");
+        assert_eq!(outcome.user_handle, b"user-1");
+        assert!(outcome.discoverable);
+    }
+
+    #[test]
+    fn built_make_credential_request_honors_exclude_list() {
+        let existing_cred_id = vec![9u8; 16];
+        let bytes = build_make_credential_request_cbor(
+            "example.com", b"user-1", &[0u8; 32], &[ES256 as i64], std::slice::from_ref(&existing_cred_id), false, false,
+        );
+        let request = parse_make_credential(&bytes);
+        let mut by_rp = HashMap::new();
+        by_rp.insert(
+            "example.com".to_string(),
+            vec![CredentialCandidate {
+                key_id: Uuid::new_v4(),
+                credential_id: existing_cred_id,
+                user_handle: b"user-1".to_vec(),
+                discoverable: true,
+                sign_count: 0,
+            }],
+        );
+        let backend = FakeBackend { by_rp, sign_result: RefCell::new(None) };
+        let result = handle_make_credential(&backend, &request, true, true);
+        assert!(matches!(result, Err(Ctap2Error::CredentialExcluded)));
+    }
+
+    #[test]
+    fn built_get_assertion_request_round_trips_through_handle_get_assertion() {
+        let cred_id = vec![1u8; 16];
+        let key_id = Uuid::new_v4();
+        let bytes = build_get_assertion_request_cbor("example.com", &[3u8; 32], std::slice::from_ref(&cred_id), false);
+        let request = parse_get_assertion(&bytes);
+        let mut by_rp = HashMap::new();
+        by_rp.insert(
+            "example.com".to_string(),
+            vec![CredentialCandidate { key_id, credential_id: cred_id, user_handle: b"user-1".to_vec(), discoverable: false, sign_count: 5 }],
+        );
+        let backend = FakeBackend { by_rp, sign_result: RefCell::new(Some(vec![0xAB; 8])) };
+        let outcome = handle_get_assertion(&backend, &request, true, true).unwrap();
+        assert_eq!(outcome.key_id, key_id);
+        assert_eq!(outcome.new_sign_count, 6);
+        assert_eq!(outcome.rp_id, "example.com");
+    }
+
+    #[test]
+    fn built_get_assertion_request_with_no_allow_list_only_matches_discoverable() {
+        let bytes = build_get_assertion_request_cbor("example.com", &[0u8; 32], &[], false);
+        let request = parse_get_assertion(&bytes);
+        let mut by_rp = HashMap::new();
+        by_rp.insert(
+            "example.com".to_string(),
+            vec![CredentialCandidate {
+                key_id: Uuid::new_v4(),
+                credential_id: vec![1u8; 16],
+                user_handle: b"a".to_vec(),
+                discoverable: false,
+                sign_count: 0,
+            }],
+        );
+        let backend = FakeBackend { by_rp, sign_result: RefCell::new(None) };
+        let result = handle_get_assertion(&backend, &request, true, true);
+        assert!(matches!(result, Err(Ctap2Error::NoCredentials)));
     }
 }

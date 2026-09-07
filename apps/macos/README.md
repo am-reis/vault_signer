@@ -23,8 +23,10 @@ known architectural gaps not worth restating there.
   build time (see `project.yml`'s `postCompileScripts`) so
   `SMAppService` can register it as a real login item.
 - `VaultSignerCredentialProvider/` — the `ASCredentialProviderExtension`
-  (spec §6.1, item 2.7): builds and embeds, blocked on signing — see
-  item 2.7 below.
+  (spec §6.1, item 2.7): a real passkey implementation, compiler-verified
+  against the SDK, not embedded in `VaultSigner.app` (see the comment in
+  `project.yml`), blocked on signing for live testing — see item 2.7
+  below.
 - `Shared/` — `VaultConfig.swift` (the vault path + which compartment
   auto-unlocks), `AutoUnlockStore.swift` (the Keychain wrapper), and
   `KnownVaultsStore.swift` (spec §5.6's remembered-vaults list); the
@@ -170,19 +172,35 @@ this:
   (`unlock_compartment`, `unlock_key`, `list_compartments`) — extending it
   to the full management surface and switching the UI app to talk to the
   agent instead of vaultcore directly is real follow-up work, not done.
-- **2.7 `ASCredentialProviderExtension`** — **scaffolded, blocked on
-  signing.** `VaultSignerCredentialProvider/` is a real `app-extension`
-  target with the `ProvidesPasskeys` capability and the required
-  entitlement, embedded in `VaultSigner.app`. It builds but fails at
-  code-signing: Xcode reports the entitlement "require[s] signing with a
-  development certificate," and since no Apple ID is signed into Xcode
-  on this machine at all, this doesn't yet tell us whether a **free**
-  Personal Team account would clear it or whether it's paid-tier-only —
-  that requires someone to add an Apple ID in Xcode → Settings →
-  Accounts and retry (account sign-in, so not something done from here).
-  Interactive verification against live relying parties in Safari/Chrome
-  is a further, separate blocker once the extension can actually be
-  enabled.
+- **2.7 `ASCredentialProviderExtension`** — **real implementation,
+  compiler-verified; conclusively confirmed blocked on a paid Apple
+  Developer Program membership for anything beyond that.**
+  `VaultSignerCredentialProvider/` is a real `app-extension` target
+  (`ProvidesPasskeys` capability, the autofill-credential-provider
+  entitlement, `deploymentTarget: "14.0"` — the passkey APIs it's built
+  on are macOS 14+/iOS 17+ only) — deliberately **not** embedded in
+  `VaultSigner.app` (see the comment in `project.yml`: an embedded
+  dependency's signing failure previously broke the whole app's build).
+  `CredentialProviderViewController` opens the vault, unlocks
+  auto-unlock-configured compartments, prompts for the key passphrase via
+  an `NSAlert` (screen-capture-blocked per spec §5.0), and calls
+  vaultcore's `handleFido2MakeCredentialNative`/
+  `handleFido2GetAssertionNative` — added specifically so this extension
+  works from `ASPasskeyCredentialRequest`'s decomposed fields and never
+  hand-rolls CTAP2 CBOR itself (spec §2). Verified as far as possible
+  without the blocked entitlement: `xcodebuild build
+  CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO`
+  against the real AuthenticationServices SDK succeeds for all three
+  targets. **Known gap:** no master-passphrase prompt path exists yet
+  for compartments without auto-unlock configured — see the file's own
+  doc comment. Signing itself: tested three times (see PROGRESS.md item
+  2.7 for the full narrative) — with no Apple ID, with a free Personal
+  Team before a real signing certificate existed, and again with that
+  certificate present and valid — and Apple's provisioning server
+  rejected the entitlement identically every time a team was involved,
+  conclusively confirming a **paid** Apple Developer Program membership
+  is required; nothing about live enablement or Safari/Chrome interop
+  can be tested locally without it.
 - **2.8 Custom protocol verified against a minimal test client** —
   **done and verified.** `uniffi-verify/agent_test_client.py` runs fully
   non-interactively (~0.7s) against the real running `VaultSignerAgent`

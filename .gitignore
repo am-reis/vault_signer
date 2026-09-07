@@ -1,4 +1,33 @@
-# Logs
+# --- Rust (vaultcore) ---
+/target/
+**/target/
+Cargo.lock.bak
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- macOS / iOS (Xcode) ---
+apps/macos/**/DerivedData/
+apps/macos/**/*.xcuserstate
+apps/macos/**/xcuserdata/
+apps/ios/**/DerivedData/
+apps/ios/**/*.xcuserstate
+apps/ios/**/xcuserdata/
+
+# --- Windows (.NET / MSBuild) ---
+apps/windows/**/bin/
+apps/windows/**/obj/
+
+# --- Android / Gradle ---
+apps/android/**/.gradle/
+apps/android/**/build/
+apps/android/local.properties
+
+# --- Logs (Node.js tooling used by i18n / browser-extension-fallback) ---
 logs
 *.log
 npm-debug.log*

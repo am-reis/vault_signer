@@ -62,9 +62,30 @@ Phase 1.
       implemented — this needs real per-platform unsafe FFI against a
       non-relocating allocation and is deliberately left as a TODO
       rather than faked; see the module doc comment. (`eaa66fd`)
-- [ ] 1.7 CTAP2 message handling (`authenticatorMakeCredential`,
+- [x] 1.7 CTAP2 message handling (`authenticatorMakeCredential`,
       `authenticatorGetAssertion`) as a platform-agnostic library
-      function. **Not started.**
+      function. `vaultcore/src/ctap2.rs`, built directly on the
+      `ctap-types` crate's own Request/Response types and its `Error`
+      enum as the CTAP2 status-code vocabulary — per spec §2's
+      directive, no parallel parsing/error model was invented.
+      `handle_make_credential` covers excludeList checking (against
+      every locally-known credential for the rp_id, not just a caller-
+      chosen subset), algorithm selection from the caller's preference
+      order (`ctap-types` itself filters this to exactly this project's
+      v1 pair, ES256/EdDSA), and "none"-only attestation.
+      `handle_get_assertion` covers allowList / discoverable-credential
+      matching, user-verification gating, and `sign_count` increment.
+      Both take a minimal `Ctap2Backend` trait (credential lookup +
+      passphrase-gated signing) and persist nothing themselves, same
+      separation of protocol logic from persistence as `merge.rs` and
+      `protocol.rs`. Needed two additions to `keys.rs` first: `sign()`
+      for both key types, and switching P-256 public key storage from
+      SEC1-compressed to uncompressed `x||y` so COSE key encoding needs
+      no decompression step. Out of scope, matching spec §6.6 exactly:
+      `hmac-secret`, any attestation format but "none", every other
+      CTAP2 command, and the transport (USB HID/NFC/BLE framing, or an
+      OS credential-provider integration) — each platform phase wires
+      up its own transport onto these two functions. (`d86c412`)
 - [x] 1.8 Custom protocol JSON-RPC handling (§7) as a platform-agnostic
       library function. `vaultcore/src/protocol.rs`: parses/dispatches
       `vaultsigner.sign` and `vaultsigner.list_public_keys`, backed by a
@@ -107,11 +128,11 @@ Phase 1.
       guesswork. Do this once a macOS (Swift) or Android (Kotlin)
       toolchain is available, likely at the start of Phase 2.
 - [x] 1.12 Full unit test suite green, including crash-safety
-      (mid-write kill) tests. `cargo test --workspace` (72 tests) and
+      (mid-write kill) tests. `cargo test --workspace` (86 tests) and
       `cargo test --workspace -- --ignored` (the real-benchmark KDF test
       and the crash-safety chaos test, both slow/deliberately excluded
       from the default run) all pass, clean under `cargo clippy
-      --workspace --all-targets`, as of `68b4b53`. Fuzz testing of the
+      --workspace --all-targets`, as of `d86c412`. Fuzz testing of the
       container parser and JSON-RPC parser (spec §10) is also done:
       `vaultcore/fuzz/` (a `cargo-fuzz` harness, excluded from the main
       workspace per the standard cargo-fuzz convention) has two targets,

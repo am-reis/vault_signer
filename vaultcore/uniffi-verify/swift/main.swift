@@ -93,4 +93,35 @@ guard mergeOutcome.warnings.isEmpty else { fail("expected no duplicate warnings,
 let keysAfterMerge = try! vault.listKeys(compartmentId: compartmentId)
 guard keysAfterMerge.count == 2 else { fail("expected 2 keys after import, got \(keysAfterMerge.count)") }
 
-print("PASS: Vault create/createKey/sign/handleProtocolRequest/merge all verified from Swift")
+// 6. Export/import packet (spec §5.2/§5.3) across two separate vaults.
+let destPath = tmpDir.appendingPathComponent("dest.vlt").path
+let destVault = try! Vault.create(path: destPath, compartmentLabel: "Personal", masterPassphrase: "dest master pw", profile: .desktop)
+let destCompartmentId = destVault.listCompartments()[0].compartmentId
+
+let packetBytes = try! vault.exportPacket(
+    compartmentId: compartmentId, keyIds: [key.keyId], includeMasterKey: false, encryption: .asIs
+)
+let imported = try! destVault.importPacket(packetBytes: packetBytes, transferPassword: nil)
+guard imported.embeddedMasterCompartmentId == nil else { fail("expected no embedded master key") }
+guard imported.keyBlobs.count == 1 else { fail("expected 1 key blob in the imported packet") }
+let importMergeOutcome = try! destVault.mergeReencryptDiscardIncoming(
+    targetCompartmentId: destCompartmentId, incomingManifestJson: imported.manifestJson, incomingKeyBlobs: imported.keyBlobs
+)
+guard importMergeOutcome.warnings.isEmpty else { fail("expected no duplicate warnings on packet import") }
+// The imported key's own passphrase must survive the cross-vault trip unchanged.
+try! destVault.unlockKey(compartmentId: destCompartmentId, keyId: key.keyId, passphrase: "key pw", retentionSecs: 30)
+let importedKeySignature = try! destVault.sign(keyId: key.keyId, message: "cross-vault packet import works".data(using: .utf8)!)
+guard importedKeySignature.count == 64 else { fail("expected a 64-byte signature from the imported key") }
+
+// 7. Transfer-password-wrapped packet (spec §5.2.2 option 3) must require the password on import.
+let wrappedPacket = try! vault.exportPacket(
+    compartmentId: compartmentId, keyIds: [key.keyId], includeMasterKey: false,
+    encryption: .oneTimeTransferPassword(password: "one-time secret")
+)
+do {
+    _ = try destVault.importPacket(packetBytes: wrappedPacket, transferPassword: nil)
+    fail("expected import without a transfer password to fail")
+} catch {}
+_ = try! destVault.importPacket(packetBytes: wrappedPacket, transferPassword: "one-time secret")
+
+print("PASS: Vault create/createKey/sign/handleProtocolRequest/merge/exportPacket/importPacket all verified from Swift")

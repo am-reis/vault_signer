@@ -133,14 +133,18 @@ Phase 1.
       (§7) and CTAP2 (§6.6) request handlers wired to real vault state
       (not the test-only fakes in `protocol.rs`/`ctap2.rs`), and the
       §5.3 three-way import merge against an already-decrypted incoming
-      manifest. Deliberately out of scope: the §5.2 export-packet
-      transfer-encryption layer (`.vltpack`'s three wrapping options) —
-      no packet format or transfer-layer crypto exists anywhere in this
-      crate yet, so a facade method on top of it would be the same kind
-      of unverified guesswork this item itself was previously deferred
-      for; `merge_*` take the incoming manifest/key-blob bytes already
-      in hand so a future `packet` module slots in ahead of them
-      unchanged. Added two small supporting fixes discovered while
+      manifest. At the time this item was completed, the §5.2
+      export-packet transfer-encryption layer (`.vltpack`'s three
+      wrapping options) was deliberately left out of scope — no packet
+      format existed yet, so a facade method on top of it would have been
+      unverified guesswork; `merge_*` was built to take the incoming
+      manifest/key-blob bytes already in hand specifically so a future
+      `packet` module could slot in ahead of it unchanged. That module
+      now exists: see `vaultcore/src/packet.rs` and
+      `Vault::export_packet`/`export_single_key`/`import_packet` below,
+      under Phase 2's item 2.3 entry (where the macOS UI consuming it
+      lives) rather than renumbering this already-closed item. Added two
+      small supporting fixes discovered while
       building the facade: `manifest.rs`'s `KeyEntry` gained a
       `public_key_hex` field (spec §4.4's JSON tree doesn't list one,
       but §7's `list_public_keys` cannot return a key's public key
@@ -211,8 +215,8 @@ Phase 1.
       not been checked — do this as its own follow-up rather than
       guessing at version compatibility.
 - [x] 1.12 Full unit test suite green, including crash-safety
-      (mid-write kill) tests. `cargo test --workspace` (98 tests, after
-      `vault.rs` was added in item 1.11) and
+      (mid-write kill) tests. `cargo test --workspace` (108 tests, after
+      `vault.rs` (item 1.11) and `packet.rs` (item 2.3) were added) and
       `cargo test --workspace -- --ignored` (the real-benchmark KDF test
       and the crash-safety chaos test, both slow/deliberately excluded
       from the default run) all pass, clean under `cargo clippy
@@ -260,11 +264,35 @@ here.
 - [x] 2.2 Screen-capture blocking. `CaptureProtected.swift` sets
       `NSWindow.sharingType = .none` per spec §5.0, applied to the main
       window and every sheet. Same visual-verification caveat as 2.1.
-- [ ] 2.3 Export flows — not started (blocked on the §5.2 packet format,
-      which doesn't exist in `vaultcore` yet; see macOS README).
-- [ ] 2.4 Import flow — not started (same blocker; `vaultcore::merge` and
-      `Vault::merge_*` are already done and waiting for a packet module).
-- [ ] 2.5 Backup — not started (same blocker).
+- [ ] 2.3 Export flows. **Unblocked, UI not built yet.** The §5.2 packet
+      format that blocked this now exists and is verified:
+      `vaultcore/src/packet.rs` implements `.vltkey`/`.vltpack` (both
+      "the same archive format as `.vlt`", built on `container.rs`'s
+      generic zip-entry primitives) and all three §5.2.2 transfer-
+      encryption choices, exposed via `Vault::export_packet`/
+      `export_single_key`. 5 new unit tests plus a real cross-vault
+      round trip verified from Swift (`uniffi-verify/swift/main.swift`):
+      export from one vault, import into an entirely separate one,
+      re-derive the imported key's *own* passphrase unchanged, and sign
+      with it — 108 vaultcore tests total, clippy-clean with and without
+      the `uniffi` feature. What's left is macOS-specific: the actual
+      export UI (encryption-choice picker with the mandatory §5.2.2
+      metadata-exposure disclosure for option 1, and a save panel).
+- [ ] 2.4 Import flow. **Unblocked, UI not built yet.** `Vault::import_packet`
+      unwraps the transfer-encryption layer (if any) and returns a
+      ready-to-merge `Manifest`/key-blob set; `vaultcore::merge` and
+      `Vault::merge_*` (already done) take it from there. What's left is
+      macOS-specific: the unskippable master-key-duality screen (spec
+      §5.3 step 2) when `ImportedPacketInfo.embedded_master_compartment_id`
+      is present, the three-card duality choice UI, and the multi-
+      compartment unlock-selector wiring for option 2.
+- [ ] 2.5 Backup. **Unblocked, UI not built yet.** Spec §5.4's two
+      flows are both just `Vault::export_packet` called a specific way —
+      "back up everything" (every key_id + `include_master_key: true`)
+      and "back up master key only" (no key_ids + `include_master_key:
+      true`, verified by its own test,
+      `backup_master_key_only_shortcut_has_no_keys`) — no new vaultcore
+      work needed, only the macOS UI entry points and their warning copy.
 - [x] 2.6 `launchd` background service. **Done and verified, one caveat
       disclosed.** `VaultSignerAgent` (`apps/macos/VaultSignerAgent/`),
       embedded inside `VaultSigner.app`, is a real process owning a

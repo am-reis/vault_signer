@@ -16,20 +16,12 @@
 //! operations (list/create/discard/change-passphrase/reveal), a
 //! retention-cache-backed signing primitive, the custom local-signing
 //! protocol (§7) and CTAP2 (§6.6) request handlers wired to real vault
-//! state instead of the test-only fakes in `protocol.rs`/`ctap2.rs`, and
-//! the §5.3 three-way import merge applied against an *already-decrypted*
-//! incoming manifest.
-//!
-//! Deliberately **not** in scope: the §5.2 export-packet wrapping layer
-//! (`.vltpack`'s three transfer-encryption options) and the corresponding
-//! transfer-password-protected import path. No packet format or
-//! transfer-layer crypto exists anywhere in this crate yet — building a
-//! facade method on top of a format that doesn't exist would be
-//! unverified guesswork, the same reason UniFFI itself was deferred until
-//! a toolchain existed. `merge_*` below take the incoming manifest and
-//! key-blob bytes already in hand (exactly the input shape `merge.rs`
-//! itself expects), so a future `packet` module slots in ahead of these
-//! methods without changing them.
+//! state instead of the test-only fakes in `protocol.rs`/`ctap2.rs`, the
+//! §5.3 three-way import merge applied against an *already-decrypted*
+//! incoming manifest, and — via `packet.rs` — §5.2's export/import
+//! packets (`.vltkey`/`.vltpack`, all three transfer-encryption options)
+//! and §5.4's backup flows (which are just `export_packet` called with
+//! every key, or with none for the "master key only" shortcut).
 //!
 //! ## Passphrase prompting crosses the FFI boundary
 //!
@@ -62,6 +54,7 @@ use crate::keys::{self};
 use crate::manifest::{Fido2Info, KeyEntry, KeyType, Manifest, Purpose};
 use crate::master_blob;
 use crate::merge::{self, DuplicateReason, DuplicateWarning, VaultCompartment};
+use crate::packet::{self, EmbeddedMasterKey, ExportEncryption};
 use crate::protocol::{self, PublicKeyInfo, SignOutcome, SigningBackend};
 use crate::retention::RetentionCache;
 use crate::throttle::{SecretId, ThrottleTracker};
@@ -284,6 +277,45 @@ pub struct MergeOutcomeInfo {
 pub struct IncomingKeyBlob {
     pub key_id: String,
     pub blob_bytes: Vec<u8>,
+}
+
+/// Spec §5.2.2's three export-encryption choices, as a UniFFI-exportable
+/// type (mirrors [`ExportEncryption`], which borrows its password to
+/// avoid an extra clone internally — this owned version is what crosses
+/// the FFI boundary).
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
+pub enum FacadeExportEncryption {
+    /// Option 1: "Just package the keys as-is" — the manifest fragment
+    /// travels in the clear; the UI must disclose this (spec §5.2.2).
+    AsIs,
+    /// Option 2: "Re-encrypt for the destination vault's master
+    /// password" — the exporter already knows it (spec §5.2.2: "choose
+    /// this only if you know the master password of the vault you're
+    /// importing into").
+    DestinationMasterPassword { password: String },
+    /// Option 3: "Protect with a one-time transfer password".
+    OneTimeTransferPassword { password: String },
+}
+
+/// What [`Vault::import_packet`] found, before any merge decision is
+/// made — spec §5.3 step 2's "inspect the packet's manifest fragment."
+/// `manifest_json` is a full, validatable [`Manifest`] (a fresh
+/// `vault_id`/`created_at` synthesized around the packet's key list) so
+/// it can be passed directly to `Vault::merge_*` unchanged.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct ImportedPacketInfo {
+    pub manifest_json: String,
+    pub key_blobs: Vec<IncomingKeyBlob>,
+    /// Present iff the packet was exported with "include master key"
+    /// on (spec §5.2.1) — triggers spec §5.3's unskippable
+    /// master-key-duality screen. Only the KDF params are surfaced
+    /// (not the still-encrypted blob bytes): `Vault::merge_*` re-derives
+    /// rather than decrypting this blob, so that's all a caller needs to
+    /// drive the three duality options.
+    pub embedded_master_compartment_id: Option<String>,
+    pub embedded_master_kdf_params_json: Option<String>,
 }
 
 /// A platform-supplied UI hook for prompting the user for a per-key
@@ -937,6 +969,100 @@ impl Vault {
         self.copy_incoming_blobs(&mut state, &result.id_remap, incoming_key_blobs);
         state.container.write_atomic(&self.path)?;
         Ok(outcome)
+    }
+
+    /// Spec §5.2's packet export, and §5.4's backup flows (which are
+    /// just this with every key_id, or with none at all for the
+    /// "master key only" shortcut). `key_ids` may be empty. Every
+    /// selected key's `.kblob` is copied byte-for-byte from the
+    /// container — this never re-encrypts a key, only the optional
+    /// outer transfer-encryption layer (spec §5.2.2) is new crypto.
+    pub fn export_packet(
+        &self,
+        compartment_id: String,
+        key_ids: Vec<String>,
+        include_master_key: bool,
+        encryption: FacadeExportEncryption,
+    ) -> FacadeResult<Vec<u8>> {
+        let compartment_id = parse_uuid(&compartment_id)?;
+        let state = self.state.lock().unwrap();
+        let unlocked = unlocked_compartment(&state, compartment_id)?;
+
+        let mut keys = Vec::with_capacity(key_ids.len());
+        let mut key_blobs = HashMap::with_capacity(key_ids.len());
+        for key_id_str in &key_ids {
+            let key_id = parse_uuid(key_id_str)?;
+            let entry = find_key(&unlocked.manifest, key_id)?.clone();
+            let blob = state.container.key_blobs.get(&key_id).cloned().ok_or_else(|| FacadeError::msg("no such key blob"))?;
+            keys.push(entry);
+            key_blobs.insert(key_id, blob);
+        }
+
+        let embedded_master = if include_master_key {
+            let header = state
+                .container
+                .header
+                .compartments
+                .iter()
+                .find(|c| c.compartment_id == compartment_id)
+                .ok_or_else(|| FacadeError::msg("no such compartment"))?;
+            let blob = state
+                .container
+                .master_blobs
+                .get(&compartment_id)
+                .cloned()
+                .ok_or_else(|| FacadeError::msg("compartment has no master blob"))?;
+            Some((EmbeddedMasterKey { compartment_id, kdf_params_master: header.kdf_params_master.clone() }, blob))
+        } else {
+            None
+        };
+        drop(state);
+
+        let inner = packet::build_inner_packet(keys, &key_blobs, embedded_master)?;
+        let export_encryption = match &encryption {
+            FacadeExportEncryption::AsIs => ExportEncryption::AsIs,
+            FacadeExportEncryption::DestinationMasterPassword { password } => ExportEncryption::DestinationMasterPassword(password.as_bytes()),
+            FacadeExportEncryption::OneTimeTransferPassword { password } => ExportEncryption::OneTimeTransferPassword(password.as_bytes()),
+        };
+        Ok(packet::export_packet(inner, export_encryption)?)
+    }
+
+    /// Spec §5.2's single-key export (`.vltkey`): always "as-is" — a
+    /// standalone key is already protected by its own passphrase, so the
+    /// §5.2.2 transfer-encryption choice doesn't apply to it.
+    pub fn export_single_key(&self, compartment_id: String, key_id: String) -> FacadeResult<Vec<u8>> {
+        self.export_packet(compartment_id, vec![key_id], false, FacadeExportEncryption::AsIs)
+    }
+
+    /// Spec §5.3 step 1: unwrap a `.vltkey`/`.vltpack`'s transfer-
+    /// encryption layer (if any) and surface what it contains, ready for
+    /// one of the `merge_*` methods above. Does not itself merge or copy
+    /// anything into this vault — that is a separate, explicit call once
+    /// the caller has decided which of the three duality options to use
+    /// (spec §5.3 step 3 requires that to be an unskippable, deliberate
+    /// choice when an embedded master key is present).
+    pub fn import_packet(&self, packet_bytes: Vec<u8>, transfer_password: Option<String>) -> FacadeResult<ImportedPacketInfo> {
+        let inner = packet::import_packet(&packet_bytes, transfer_password.as_deref().map(str::as_bytes))?;
+
+        let mut manifest = Manifest::new(Uuid::new_v4());
+        manifest.keys = inner.keys;
+        let manifest_json = String::from_utf8(manifest.to_json()?).map_err(|e| FacadeError::msg(e.to_string()))?;
+
+        let key_blobs = inner
+            .key_blobs
+            .into_iter()
+            .map(|(key_id, blob_bytes)| IncomingKeyBlob { key_id: key_id.to_string(), blob_bytes })
+            .collect();
+
+        let (embedded_master_compartment_id, embedded_master_kdf_params_json) = match inner.embedded_master {
+            Some(meta) => {
+                let kdf_json = serde_json::to_string(&meta.kdf_params_master).map_err(|e| FacadeError::msg(e.to_string()))?;
+                (Some(meta.compartment_id.to_string()), Some(kdf_json))
+            }
+            None => (None, None),
+        };
+
+        Ok(ImportedPacketInfo { manifest_json, key_blobs, embedded_master_compartment_id, embedded_master_kdf_params_json })
     }
 }
 
@@ -1610,5 +1736,112 @@ mod tests {
         let keys = vault.list_keys(compartment_id).unwrap();
         assert_eq!(keys.len(), 1);
         assert_eq!(keys[0].label, "Imported key");
+    }
+
+    fn create_key_in(vault: &Vault, compartment_id: &str, label: &str, key_passphrase: &str) -> KeyInfo {
+        vault
+            .create_key(
+                compartment_id.to_string(),
+                FacadeKeyType::Ed25519,
+                FacadePurpose::CustomSigning,
+                label.into(),
+                "".into(),
+                "example.com".into(),
+                vec![],
+                key_passphrase.into(),
+                None,
+                None,
+            )
+            .unwrap()
+    }
+
+    #[test]
+    fn export_as_is_then_import_into_another_vault_preserves_key_passphrase() {
+        let source_dir = tempdir().unwrap();
+        let (source, source_compartment) = create_test_vault(&source_dir);
+        let key = create_key_in(&source, &source_compartment, "Deploy key", "key pw");
+
+        let packet_bytes = source
+            .export_packet(source_compartment, vec![key.key_id.clone()], false, FacadeExportEncryption::AsIs)
+            .unwrap();
+
+        let dest_dir = tempdir().unwrap();
+        let (dest, dest_compartment) = create_test_vault(&dest_dir);
+        let imported = dest.import_packet(packet_bytes, None).unwrap();
+        assert!(imported.embedded_master_compartment_id.is_none());
+        assert_eq!(imported.key_blobs.len(), 1);
+
+        let outcome = dest
+            .merge_reencrypt_discard_incoming(dest_compartment.clone(), imported.manifest_json, imported.key_blobs)
+            .unwrap();
+        assert!(outcome.warnings.is_empty());
+
+        // The imported key's *own* passphrase (independent of either
+        // vault's master password) must still work unchanged.
+        dest.unlock_key(dest_compartment, key.key_id.clone(), "key pw".into(), 30).unwrap();
+        let signature = dest.sign(key.key_id, b"cross-vault import works".to_vec()).unwrap();
+        assert_eq!(signature.len(), 64);
+    }
+
+    #[test]
+    fn export_with_transfer_password_requires_it_on_import() {
+        let dir = tempdir().unwrap();
+        let (vault, compartment_id) = create_test_vault(&dir);
+        let key = create_key_in(&vault, &compartment_id, "k", "key pw");
+
+        let packet_bytes = vault
+            .export_packet(
+                compartment_id,
+                vec![key.key_id],
+                false,
+                FacadeExportEncryption::OneTimeTransferPassword { password: "transfer secret".into() },
+            )
+            .unwrap();
+
+        assert!(vault.import_packet(packet_bytes.clone(), None).is_err());
+        assert!(vault.import_packet(packet_bytes.clone(), Some("wrong".into())).is_err());
+        let imported = vault.import_packet(packet_bytes, Some("transfer secret".into())).unwrap();
+        assert_eq!(imported.key_blobs.len(), 1);
+    }
+
+    #[test]
+    fn export_including_master_key_surfaces_kdf_params_for_option3() {
+        let dir = tempdir().unwrap();
+        let (vault, compartment_id) = create_test_vault(&dir);
+        let key = create_key_in(&vault, &compartment_id, "k", "key pw");
+
+        let packet_bytes = vault
+            .export_packet(compartment_id.clone(), vec![key.key_id], true, FacadeExportEncryption::AsIs)
+            .unwrap();
+        let imported = vault.import_packet(packet_bytes, None).unwrap();
+        assert_eq!(imported.embedded_master_compartment_id.as_deref(), Some(compartment_id.as_str()));
+        assert!(imported.embedded_master_kdf_params_json.is_some());
+        // Sanity: it must actually be well-formed KdfParams JSON.
+        let _: KdfParams = serde_json::from_str(&imported.embedded_master_kdf_params_json.unwrap()).unwrap();
+    }
+
+    #[test]
+    fn backup_master_key_only_shortcut_has_no_keys() {
+        let dir = tempdir().unwrap();
+        let (vault, compartment_id) = create_test_vault(&dir);
+        create_key_in(&vault, &compartment_id, "k", "key pw");
+
+        // Spec §5.4's "back up master key only" shortcut: no key_ids.
+        let packet_bytes = vault.export_packet(compartment_id, vec![], true, FacadeExportEncryption::AsIs).unwrap();
+        let imported = vault.import_packet(packet_bytes, None).unwrap();
+        assert!(imported.key_blobs.is_empty());
+        assert!(imported.embedded_master_compartment_id.is_some());
+    }
+
+    #[test]
+    fn export_single_key_produces_an_as_is_importable_packet() {
+        let dir = tempdir().unwrap();
+        let (vault, compartment_id) = create_test_vault(&dir);
+        let key = create_key_in(&vault, &compartment_id, "Solo key", "key pw");
+
+        let vltkey_bytes = vault.export_single_key(compartment_id, key.key_id).unwrap();
+        let imported = vault.import_packet(vltkey_bytes, None).unwrap();
+        assert_eq!(imported.key_blobs.len(), 1);
+        assert!(imported.embedded_master_compartment_id.is_none());
     }
 }

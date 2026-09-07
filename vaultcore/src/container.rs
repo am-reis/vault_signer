@@ -184,6 +184,28 @@ impl Container {
     }
 }
 
+/// Build `entries` into an in-memory zip archive. The generic primitive
+/// both [`write_entries_atomic`] and the `packet` module (spec §5.2's
+/// `.vltkey`/`.vltpack` — "same archive format as `.vlt`") build on, for
+/// callers that want the archive bytes themselves rather than a file on
+/// disk (a packet gets written wherever the platform's save panel says,
+/// or handed off some other way entirely — this module has no opinion).
+pub fn build_archive_bytes(entries: &[(String, Vec<u8>)]) -> Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    {
+        let cursor = std::io::Cursor::new(&mut buf);
+        let mut zip = ZipWriter::new(cursor);
+        let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        for (name, bytes) in entries {
+            zip.start_file(name, options)
+                .map_err(|e| VaultError::Archive(e.to_string()))?;
+            zip.write_all(bytes)?;
+        }
+        zip.finish().map_err(|e| VaultError::Archive(e.to_string()))?;
+    }
+    Ok(buf)
+}
+
 /// Write `entries` as a zip archive to `path`, atomically. This is the
 /// generic primitive `Container::write_atomic` builds on; it is also
 /// exercised directly by the crash-safety chaos test since it is the
@@ -195,17 +217,11 @@ pub fn write_entries_atomic(path: &Path, entries: &[(String, Vec<u8>)]) -> Resul
         .unwrap_or_else(|| Path::new("."));
     fs::create_dir_all(dir)?;
 
+    let bytes = build_archive_bytes(entries)?;
     let tmp_path = temp_path_in(dir, path);
     {
-        let tmp_file = File::create(&tmp_path)?;
-        let mut zip = ZipWriter::new(tmp_file);
-        let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-        for (name, bytes) in entries {
-            zip.start_file(name, options)
-                .map_err(|e| VaultError::Archive(e.to_string()))?;
-            zip.write_all(bytes)?;
-        }
-        let tmp_file = zip.finish().map_err(|e| VaultError::Archive(e.to_string()))?;
+        let mut tmp_file = File::create(&tmp_path)?;
+        tmp_file.write_all(&bytes)?;
         tmp_file.sync_all()?;
     }
 

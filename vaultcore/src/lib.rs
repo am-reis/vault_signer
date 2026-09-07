@@ -34,6 +34,7 @@ pub mod keys;
 pub mod manifest;
 pub mod master_blob;
 pub mod merge;
+pub mod packet;
 pub mod protocol;
 pub mod retention;
 pub mod throttle;

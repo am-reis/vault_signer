@@ -480,6 +480,21 @@ here.
       actual Ed25519 public key. Caller identity for the confirmation
       text is resolved via `LOCAL_PEERPID`/`proc_pidpath` (OS-level peer
       credentials, per spec §7 — never the self-reported JSON payload).
+      **Also manually verified interactively, end-to-end, via a real
+      third-party GUI app** — `demos/rpc-demo-client/` (Python +
+      Tkinter, deliberately not Swift, see its own README) — the
+      opposite case from the automated test above: it deliberately
+      *doesn't* avoid the passphrase prompt. Driven live: the demo
+      called `vaultsigner.list_public_keys`, then `vaultsigner.sign` for
+      a cold key; VaultSignerAgent's real `NSAlert` appeared reading
+      `"python3.11 wants to sign with a VaultSigner key"` — proving the
+      caller-identity resolution against a genuine, unrelated OS
+      process, not a hardcoded test value — and after entering the
+      key's passphrase and clicking Allow, the demo received a
+      signature that PyNaCl independently verified against the returned
+      public key. `vaultcore/examples/demo_vault_setup.rs` (kept, not a
+      one-off) builds a disposable vault for this so it never needs a
+      real vault's passphrase.
 - [x] 2.9 i18n resource-file scaffolding, at least one locale populated.
       **Done for the scaffolding itself; most of the app's strings are
       not yet migrated (see `i18n/README.md`).** `i18n/source/en.json`

@@ -11,6 +11,10 @@ Cargo.lock.bak
 # from this rule.
 /vaultcore/bindings/
 
+# --- Python (demos/, i18n/ scripts) ---
+__pycache__/
+*.pyc
+
 # --- OS / editor cruft ---
 .DS_Store
 Thumbs.db

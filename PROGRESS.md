@@ -264,35 +264,43 @@ here.
 - [x] 2.2 Screen-capture blocking. `CaptureProtected.swift` sets
       `NSWindow.sharingType = .none` per spec §5.0, applied to the main
       window and every sheet. Same visual-verification caveat as 2.1.
-- [ ] 2.3 Export flows. **Unblocked, UI not built yet.** The §5.2 packet
-      format that blocked this now exists and is verified:
-      `vaultcore/src/packet.rs` implements `.vltkey`/`.vltpack` (both
-      "the same archive format as `.vlt`", built on `container.rs`'s
-      generic zip-entry primitives) and all three §5.2.2 transfer-
-      encryption choices, exposed via `Vault::export_packet`/
-      `export_single_key`. 5 new unit tests plus a real cross-vault
-      round trip verified from Swift (`uniffi-verify/swift/main.swift`):
-      export from one vault, import into an entirely separate one,
-      re-derive the imported key's *own* passphrase unchanged, and sign
-      with it — 108 vaultcore tests total, clippy-clean with and without
-      the `uniffi` feature. What's left is macOS-specific: the actual
-      export UI (encryption-choice picker with the mandatory §5.2.2
-      metadata-exposure disclosure for option 1, and a save panel).
-- [ ] 2.4 Import flow. **Unblocked, UI not built yet.** `Vault::import_packet`
-      unwraps the transfer-encryption layer (if any) and returns a
-      ready-to-merge `Manifest`/key-blob set; `vaultcore::merge` and
-      `Vault::merge_*` (already done) take it from there. What's left is
-      macOS-specific: the unskippable master-key-duality screen (spec
-      §5.3 step 2) when `ImportedPacketInfo.embedded_master_compartment_id`
-      is present, the three-card duality choice UI, and the multi-
-      compartment unlock-selector wiring for option 2.
-- [ ] 2.5 Backup. **Unblocked, UI not built yet.** Spec §5.4's two
-      flows are both just `Vault::export_packet` called a specific way —
-      "back up everything" (every key_id + `include_master_key: true`)
-      and "back up master key only" (no key_ids + `include_master_key:
-      true`, verified by its own test,
-      `backup_master_key_only_shortcut_has_no_keys`) — no new vaultcore
-      work needed, only the macOS UI entry points and their warning copy.
+- [ ] 2.3 Export flows. **`vaultcore` done and verified; macOS UI built
+      but not interactively verified.** `vaultcore/src/packet.rs`
+      implements `.vltkey`/`.vltpack` (both "the same archive format as
+      `.vlt`", built on `container.rs`'s generic zip-entry primitives)
+      and all three §5.2.2 transfer-encryption choices, exposed via
+      `Vault::export_packet`/`export_single_key`. 5 new unit tests plus a
+      real cross-vault round trip verified from Swift
+      (`uniffi-verify/swift/main.swift`): export from one vault, import
+      into an entirely separate one, re-derive the imported key's *own*
+      passphrase unchanged, and sign with it — 108 vaultcore tests total,
+      clippy-clean with and without the `uniffi` feature.
+      `apps/macos/VaultSigner/Sources/Views/ExportPacketView.swift` is
+      the encryption-choice UI (three cards, no default pre-selected,
+      option 1's mandatory metadata-exposure disclosure) on top of it;
+      single-key export is a button on `KeyDetailView`. Both app targets
+      build and launch without crashing, but this specific screen hasn't
+      been interactively exercised — see the macOS README's note on the
+      Screen Recording/Accessibility permission gap, now blocking
+      verification of a growing amount of UI.
+- [ ] 2.4 Import flow. **`vaultcore` done and verified; macOS UI built
+      but not interactively verified.** `Vault::import_packet` unwraps
+      the transfer-encryption layer (if any) and returns a ready-to-merge
+      `Manifest`/key-blob set; `vaultcore::merge` and `Vault::merge_*`
+      take it from there. `ImportPacketView.swift` (file picker →
+      transfer-password prompt if needed → merge) and
+      `MasterKeyDualityView.swift` (spec §5.3's unskippable three-card
+      duality screen, option 3 styled distinctly with its exact
+      confirmation phrase) implement this. Same build-clean-but-
+      unverified-interactively status as 2.3.
+- [ ] 2.5 Backup. **Done at the `vaultcore` level (no new code needed —
+      both flows are just `Vault::export_packet` called a specific way,
+      "back up everything" reusing `ExportPacketView` and "master key
+      only" verified by its own test,
+      `backup_master_key_only_shortcut_has_no_keys`); macOS UI
+      (`BackupMasterKeyOnlyView.swift` + the two buttons in
+      `SettingsView`) built but not interactively verified**, same as
+      2.3/2.4.
 - [x] 2.6 `launchd` background service. **Done and verified, one caveat
       disclosed.** `VaultSignerAgent` (`apps/macos/VaultSignerAgent/`),
       embedded inside `VaultSigner.app`, is a real process owning a

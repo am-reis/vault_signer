@@ -1,8 +1,10 @@
 import SwiftUI
+import AppKit
 
 /// §5.1 key detail: change-passphrase action, reveal-raw-key danger
-/// zone, and discard (two-step confirmation). Screen-capture-blocked
-/// (§5.0: manifest detail + raw-key reveal + passphrase entry).
+/// zone, discard (two-step confirmation), and single-key export (§5.2's
+/// `.vltkey`). Screen-capture-blocked (§5.0: manifest detail + raw-key
+/// reveal + passphrase entry).
 struct KeyDetailView: View {
     let key: KeyInfo
     @EnvironmentObject private var state: AppState
@@ -11,6 +13,7 @@ struct KeyDetailView: View {
     @State private var showingChangePassphrase = false
     @State private var showingReveal = false
     @State private var showingDiscardConfirm = false
+    @State private var exportErrorMessage: String?
 
     var body: some View {
         Form {
@@ -26,6 +29,10 @@ struct KeyDetailView: View {
             Section("Actions") {
                 Button("Change Passphrase…") { showingChangePassphrase = true }
                 Button("Reveal Raw Key…", role: .destructive) { showingReveal = true }
+                Button("Export This Key…") { exportSingleKey() }
+                if let exportErrorMessage {
+                    Text(exportErrorMessage).font(.caption).foregroundStyle(.red)
+                }
             }
 
             Section {
@@ -43,6 +50,23 @@ struct KeyDetailView: View {
         }
         .sheet(isPresented: $showingDiscardConfirm) {
             DiscardKeyView(key: key) { dismiss() }.environmentObject(state)
+        }
+    }
+
+    private func exportSingleKey() {
+        guard let vault = state.vault, let compartmentId = state.unlockedCompartmentId else { return }
+        let panel = NSSavePanel()
+        panel.title = "Export Key"
+        panel.nameFieldStringValue = "\(key.label).vltkey"
+        panel.allowedContentTypes = []
+        panel.allowsOtherFileTypes = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let bytes = try vault.exportSingleKey(compartmentId: compartmentId, keyId: key.keyId)
+            try bytes.write(to: url, options: .atomic)
+            exportErrorMessage = nil
+        } catch {
+            exportErrorMessage = "Export failed: \(error)"
         }
     }
 }

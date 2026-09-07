@@ -7,6 +7,8 @@ struct KeyListView: View {
     @EnvironmentObject private var state: AppState
     @State private var showingCreateKey = false
     @State private var showingSettings = false
+    @State private var showingExport = false
+    @State private var showingImport = false
 
     var body: some View {
         NavigationStack {
@@ -45,6 +47,14 @@ struct KeyListView: View {
                     Button { showingCreateKey = true } label: { Label("New Key", systemImage: "plus") }
                 }
                 ToolbarItem(placement: .automatic) {
+                    Menu {
+                        Button("Export Packet…") { showingExport = true }
+                        Button("Import Packet…") { showingImport = true }
+                    } label: {
+                        Label("Import/Export", systemImage: "tray.and.arrow.up")
+                    }
+                }
+                ToolbarItem(placement: .automatic) {
                     Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 }
                 ToolbarItem(placement: .cancellationAction) {
@@ -58,6 +68,12 @@ struct KeyListView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
+        }
+        .sheet(isPresented: $showingExport) {
+            ExportPacketView().environmentObject(state)
+        }
+        .sheet(isPresented: $showingImport) {
+            ImportPacketView().environmentObject(state)
         }
         .onAppear { state.refreshKeys() }
     }

@@ -14,6 +14,8 @@ struct SettingsView: View {
     @State private var loginItemState = LoginItemManager.currentState
     @State private var autoUnlockEnabled = false
     @State private var showingAutoUnlockConfirmation = false
+    @State private var showingBackupEverything = false
+    @State private var showingBackupMasterKeyOnly = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -43,6 +45,18 @@ struct SettingsView: View {
                     }
             } footer: {
                 Text("Off by default. When on, this compartment's master passphrase is stored in the Keychain so it unlocks automatically at login, without you typing anything. This is weaker than the vault's normal design — see the confirmation dialog for what that means before turning it on.")
+                    .font(.caption)
+            }
+
+            Section {
+                Button("Back Up Everything…") { showingBackupEverything = true }
+                    .disabled(state.unlockedCompartmentId == nil)
+                Button("Back Up Master Key Only…") { showingBackupMasterKeyOnly = true }
+                    .disabled(state.unlockedCompartmentId == nil)
+            } header: {
+                Text("Backup")
+            } footer: {
+                Text("\"Back up everything\" protects all keys + the master key together (spec §5.4 recommends the one-time transfer password option for backups stored anywhere other than an already-encrypted local disk). \"Master key only\" is a shortcut for people who store key recovery material separately — on its own it does NOT protect anything, since the per-key blobs are also required.")
                     .font(.caption)
             }
 
@@ -77,6 +91,12 @@ struct SettingsView: View {
                     }
                 }
             )
+        }
+        .sheet(isPresented: $showingBackupEverything) {
+            ExportPacketView(lockSelectionToAllKeys: true, forceIncludeMasterKey: true).environmentObject(state)
+        }
+        .sheet(isPresented: $showingBackupMasterKeyOnly) {
+            BackupMasterKeyOnlyView().environmentObject(state)
         }
     }
 

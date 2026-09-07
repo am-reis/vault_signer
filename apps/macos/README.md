@@ -58,15 +58,25 @@ xcodebuild -project VaultSigner.xcodeproj -scheme VaultSignerAgent -configuratio
   verification caveat as 2.1 — the *mechanism* is exercised by every
   build, but "screenshots of this window come back blank" hasn't been
   independently confirmed the way it should be before calling this done.
-- **2.3 Export flows, 2.4 Import flow, 2.5 Backup** — **not started.**
-  These need the §5.2 export-packet transfer-encryption layer
-  (`.vltpack`'s three wrapping options), which doesn't exist anywhere in
-  `vaultcore` yet (see `PROGRESS.md` item 1.11's note on this same gap).
-  Building UI on top of a format that doesn't exist would be the same
-  kind of unverified guesswork this project has consistently avoided.
-  `vaultcore::merge` (the §5.3 three-way merge logic) is already fully
-  implemented and facade-wrapped (`Vault::merge_*`), so once a `packet`
-  module exists in `vaultcore`, the UI layer here is the remaining piece.
+- **2.3 Export flows, 2.4 Import flow, 2.5 Backup** — **UI built, not
+  interactively verified.** The `vaultcore` blocker is gone
+  (`vaultcore/src/packet.rs`, verified independently from Swift — see
+  `PROGRESS.md` item 2.3). On top of it: `ExportPacketView.swift` (the
+  three §5.2.2 encryption-choice cards, no default pre-selected, with
+  option 1's mandatory metadata-exposure disclosure, reused for §5.4's
+  "back up everything"), `BackupMasterKeyOnlyView.swift` (§5.4's other
+  shortcut), `ImportPacketView.swift` (file picker → transfer-password
+  prompt if needed → merge), and `MasterKeyDualityView.swift` (spec
+  §5.3's unskippable three-card duality screen, option 3 styled
+  distinctly with its exact confirmation phrase). Single-key export
+  (`.vltkey`) is a button on `KeyDetailView`. All of it builds cleanly
+  (`VaultSigner` and `VaultSignerAgent` both) and the app launches
+  without crashing, but none of these specific screens have been
+  interactively exercised — same Screen Recording/Accessibility
+  permission gap as 2.1/2.2, now blocking verification of noticeably
+  more UI than when that gap was first flagged. Worth prioritizing
+  granting it to `Claude.app` before trusting this flow with a real
+  vault.
 - **2.6 `launchd` background service** — **done and verified**, with one
   disclosed caveat. `VaultSignerAgent` is a real process, embedded inside
   `VaultSigner.app` (`Contents/Resources/VaultSignerAgent.app`) and

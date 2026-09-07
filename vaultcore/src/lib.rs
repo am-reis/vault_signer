@@ -11,16 +11,20 @@
 //! outstanding against the spec §12 execution plan. As of this writing:
 //! container format + atomic writes, the Argon2id KDF wrapper, AEAD,
 //! the manifest schema, Ed25519/P-256 key generation, the retention
-//! cache, and passphrase throttling are implemented and unit-tested.
-//! CTAP2 handling, the custom-protocol JSON-RPC server, the three-way
-//! master-key merge logic, and UniFFI bindings are not yet implemented.
+//! cache, passphrase throttling, the per-key and per-compartment blob
+//! codecs, and the three-way master-key merge logic are implemented and
+//! unit-tested. CTAP2 handling, the custom-protocol JSON-RPC server, and
+//! UniFFI bindings are not yet implemented.
 
 pub mod aead;
 pub mod container;
 pub mod error;
 pub mod kdf;
+pub mod keyblob;
 pub mod keys;
 pub mod manifest;
+pub mod master_blob;
+pub mod merge;
 pub mod retention;
 pub mod throttle;
 

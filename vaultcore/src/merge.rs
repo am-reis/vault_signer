@@ -273,6 +273,7 @@ mod tests {
             tags: vec![],
             blob_file: format!("key_blobs/{key_id}.kblob"),
             blob_sha256: "a".repeat(64),
+            public_key_hex: String::new(),
         }
     }
 

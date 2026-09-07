@@ -83,10 +83,8 @@ fn aad_for(compartment_id: Uuid) -> Vec<u8> {
 /// already-benchmarked `kdf_params` (see `kdf::benchmark`); this
 /// function never benchmarks itself.
 pub fn encrypt(compartment_id: Uuid, manifest: Manifest, passphrase: &[u8], kdf_params: &KdfParams) -> Result<Vec<u8>> {
-    let plaintext = MasterBlobPlaintext::new(manifest);
-    let json = plaintext.to_json()?;
     let derived = kdf::derive(passphrase, kdf_params)?;
-    aead::encrypt(&derived, &json, &aad_for(compartment_id))
+    encrypt_with_key(compartment_id, manifest, &derived)
 }
 
 /// Decrypt a compartment's master blob back into its plaintext manifest
@@ -99,7 +97,30 @@ pub fn decrypt(
     kdf_params: &KdfParams,
 ) -> Result<MasterBlobPlaintext> {
     let derived = kdf::derive(passphrase, kdf_params)?;
-    let json = aead::decrypt(&derived, nonce_and_ciphertext, &aad_for(compartment_id))?;
+    decrypt_with_key(compartment_id, nonce_and_ciphertext, &derived)
+}
+
+/// Same as [`encrypt`], but takes an already-derived Argon2id key
+/// directly instead of a passphrase. Lets a caller that keeps a
+/// compartment "unlocked" for a session (e.g. `vault.rs`'s facade) cache
+/// the *derived key* rather than the raw passphrase, and re-persist a
+/// manifest mutation (spec §4.6: every mutation must be written
+/// immediately) without re-prompting for the master password on every
+/// single key create/discard/rename.
+pub fn encrypt_with_key(compartment_id: Uuid, manifest: Manifest, derived_key: &[u8; kdf::DERIVED_KEY_LEN]) -> Result<Vec<u8>> {
+    let plaintext = MasterBlobPlaintext::new(manifest);
+    let json = plaintext.to_json()?;
+    aead::encrypt(derived_key, &json, &aad_for(compartment_id))
+}
+
+/// Same as [`decrypt`], but takes an already-derived Argon2id key
+/// directly instead of a passphrase. See [`encrypt_with_key`].
+pub fn decrypt_with_key(
+    compartment_id: Uuid,
+    nonce_and_ciphertext: &[u8],
+    derived_key: &[u8; kdf::DERIVED_KEY_LEN],
+) -> Result<MasterBlobPlaintext> {
+    let json = aead::decrypt(derived_key, nonce_and_ciphertext, &aad_for(compartment_id))?;
     MasterBlobPlaintext::from_json(&json)
 }
 

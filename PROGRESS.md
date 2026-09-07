@@ -13,9 +13,11 @@ Phase 1.
 
 ## Phase 0 — Decisions
 
-- [ ] 0.1 Confirm UniFFI binding generation setup for Swift/Kotlin/C#/C
-      targets. **Not started.** No UniFFI dependency has been added to
-      `vaultcore` yet — see the note under Phase 1 item 1.11 below.
+- [x] 0.1 Confirm UniFFI binding generation setup for Swift/Kotlin/C#/C
+      targets. **Decision:** `uniffi` 0.29 (proc-macro-only, no `.udl`),
+      gated behind an off-by-default `uniffi` Cargo feature on
+      `vaultcore`; see Phase 1 item 1.11 for what's verified for each
+      target language.
 - [ ] 0.2 Confirm minimum supported OS version per platform. The spec's
       assumed floors (macOS 13+, Windows 10 2004+/11, Android 14+, iOS
       17+) are carried forward as working assumptions; **no fixed floor
@@ -119,16 +121,98 @@ Phase 1.
       keep-both-rename-incoming, covers collisions against *any* local
       compartment (not just the import target), and option 3 hard-fails
       without the spec's exact confirmation phrase. (`a54643e`)
-- [ ] 1.11 UniFFI bindings generated and verified callable from a
-      minimal Swift, Kotlin, and C# test harness. **Not started.** No
-      Swift/Kotlin/C# toolchain is available in the environment this
-      work was done in, so no UniFFI dependency or `.udl`/proc-macro
-      scaffolding has been added yet — adding it without a way to
-      verify it compiles/binds for real would just be unverified
-      guesswork. Do this once a macOS (Swift) or Android (Kotlin)
-      toolchain is available, likely at the start of Phase 2.
+- [x] 1.11 (Swift and Kotlin verified; C# not attempted) UniFFI
+      bindings generated and verified callable, plus
+      the `Vault` facade (spec's own gap: vaultcore was a set of
+      composable primitives with nothing tying them into one API a
+      platform app actually calls) they're generated from.
+      `vaultcore/src/vault.rs`: create/open a vault, unlock/lock
+      compartments (spec §4.1's multi-compartment model), the §5.1 core
+      key operations (list/create/discard/change-passphrase/reveal), a
+      retention-cache-backed signing primitive, the custom-protocol
+      (§7) and CTAP2 (§6.6) request handlers wired to real vault state
+      (not the test-only fakes in `protocol.rs`/`ctap2.rs`), and the
+      §5.3 three-way import merge against an already-decrypted incoming
+      manifest. Deliberately out of scope: the §5.2 export-packet
+      transfer-encryption layer (`.vltpack`'s three wrapping options) —
+      no packet format or transfer-layer crypto exists anywhere in this
+      crate yet, so a facade method on top of it would be the same kind
+      of unverified guesswork this item itself was previously deferred
+      for; `merge_*` take the incoming manifest/key-blob bytes already
+      in hand so a future `packet` module slots in ahead of them
+      unchanged. Added two small supporting fixes discovered while
+      building the facade: `manifest.rs`'s `KeyEntry` gained a
+      `public_key_hex` field (spec §4.4's JSON tree doesn't list one,
+      but §7's `list_public_keys` cannot return a key's public key
+      without it, and a public key is non-secret metadata under §4.1's
+      "vault-unlock reveals metadata only" invariant — defaulted empty
+      for backward compatibility); `master_blob.rs` gained
+      `encrypt_with_key`/`decrypt_with_key` (take an already-derived
+      Argon2id key instead of a passphrase) so an unlocked compartment
+      can cache its *derived master key* for the session and persist a
+      mutation immediately (spec §4.6) without re-prompting for the
+      master password on every single key create/discard/rename, while
+      never caching the raw passphrase itself.
+
+      Passphrase prompting is inherently native UI (a window, screen-
+      capture-blocked per spec §5.0) and cannot live in this crate;
+      rather than reimplementing it once per platform, a
+      `PassphrasePrompter` UniFFI foreign-implemented trait lets a
+      platform supply just the native dialog, invoked only when a key
+      isn't already warm in the retention cache — every byte of crypto,
+      parsing, and protocol dispatch still stays in this crate either
+      way. 12 new unit tests in `vault.rs` (98 total for the crate)
+      cover create/reopen, wrong-passphrase throttling, key lifecycle,
+      protocol signing (including the prompt-once-then-cache path and
+      wrong-passphrase-returns-`passphrase_incorrect`), CTAP2
+      make-credential + get-assertion, and merge option 1.
+
+      UniFFI wiring: `uniffi = { version = "0.29", optional = true,
+      features = ["cli"] }`, gated behind a `uniffi` Cargo feature (off
+      by default, so `vaultcore` still builds/tests/lints exactly as
+      before with no new dependency for anyone not consuming the
+      bindings yet) — `cargo build -p vaultcore --features uniffi` and
+      `cargo clippy -p vaultcore --all-targets --features uniffi` are
+      both clean. `src/bin/uniffi_bindgen.rs` is the bindgen binary
+      (`cargo run --release --features uniffi --bin uniffi-bindgen --
+      generate --library <path-to-libvaultcore.dylib> --language swift
+      --out-dir <dir>`). **Swift is verified, not just generated:**
+      `vaultcore/uniffi-verify/swift/main.swift` is a real standalone
+      Swift program (see the exact build/run commands in its header
+      comment) compiled with `swiftc` against the generated
+      `vaultcore.swift` and linked against the real release `cdylib` on
+      this machine (macOS 15.7.4, Xcode 16.4, Swift 6.1.2) — it creates
+      a vault, creates a key, signs directly, signs again through
+      `handle_protocol_request` with a real Swift class implementing
+      `PassphrasePrompter` (proving the foreign-trait callback actually
+      crosses the FFI boundary both ways), and runs a §5.3 option-1
+      import merge, all successfully. **Kotlin is verified the same
+      way**: `vaultcore/uniffi-verify/kotlin/Main.kt` (see its header
+      comment for the exact commands) is a real Kotlin program, compiled
+      with `kotlinc` against the generated bindings plus JNA (fetched
+      directly from Maven Central — `net.java.dev.jna:jna:5.14.0`, the
+      generated Kotlin bindings call into it directly) and run with
+      `java -Djna.library.path=...` against the same release `cdylib` —
+      it passes the identical five-step scenario as the Swift harness
+      (`kotlinc 2.4.20`, JRE 26.0.2.1). Getting `kotlinc` itself working
+      on this host took two rounds: Homebrew's `kotlinc` install first
+      failed because the Xcode Command Line Tools were older than its
+      `json-c` dependency needed (fixed by the user updating CLT to
+      16.4), then Homebrew refused to install *anything* because of an
+      unrelated tap-trust gate on two pre-existing taps on this machine
+      (`dart-lang/dart`, `leoafarias/fvm`, from prior Flutter/Dart work)
+      — resolved by the user running `brew trust` themselves, since
+      changing Homebrew's tap-trust policy is a security-relevant
+      decision this session declined to make unilaterally. **C# was
+      not attempted**: the `uniffi` crate's own `uniffi-bindgen`
+      only supports `kotlin`/`swift`/`python`/`ruby` as of the pinned
+      0.29.5; C# needs the separate, third-party `uniffi-bindgen-cs`
+      crate, whose compatibility with this exact `uniffi` version has
+      not been checked — do this as its own follow-up rather than
+      guessing at version compatibility.
 - [x] 1.12 Full unit test suite green, including crash-safety
-      (mid-write kill) tests. `cargo test --workspace` (86 tests) and
+      (mid-write kill) tests. `cargo test --workspace` (98 tests, after
+      `vault.rs` was added in item 1.11) and
       `cargo test --workspace -- --ignored` (the real-benchmark KDF test
       and the crash-safety chaos test, both slow/deliberately excluded
       from the default run) all pass, clean under `cargo clippy

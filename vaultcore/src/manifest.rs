@@ -66,6 +66,18 @@ pub struct KeyEntry {
     pub tags: Vec<String>,
     pub blob_file: String,
     pub blob_sha256: String,
+    /// Hex-encoded public key (spec §4.4's JSON tree doesn't list this
+    /// field explicitly, but it is required non-secret metadata: spec §7's
+    /// `vaultsigner.list_public_keys` must return a key's public key
+    /// without prompting for its per-key passphrase, and a public key is
+    /// not "raw key material" under the §4.1 "opening the vault reveals
+    /// metadata only" invariant — only the private key is gated behind the
+    /// independent per-key secret. Defaulted to empty for backward
+    /// compatibility with any manifest written before this field existed;
+    /// [`validate`](Self::validate) only enforces its hex-ness/length when
+    /// non-empty so an old manifest still round-trips.
+    #[serde(default)]
+    pub public_key_hex: String,
 }
 
 impl KeyEntry {
@@ -82,6 +94,12 @@ impl KeyEntry {
         if self.blob_sha256.len() != 64 || !self.blob_sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err(VaultError::InvalidManifest(format!(
                 "key {}: blob_sha256 must be a 64-char hex digest",
+                self.key_id
+            )));
+        }
+        if !self.public_key_hex.is_empty() && !self.public_key_hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(VaultError::InvalidManifest(format!(
+                "key {}: public_key_hex must be hex-encoded",
                 self.key_id
             )));
         }
@@ -170,6 +188,7 @@ mod tests {
             tags: vec![],
             blob_file: "key_blobs/x.kblob".into(),
             blob_sha256: "a".repeat(64),
+            public_key_hex: String::new(),
         }
     }
 

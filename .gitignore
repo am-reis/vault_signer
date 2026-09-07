@@ -3,6 +3,14 @@
 **/target/
 Cargo.lock.bak
 
+# Generated UniFFI bindings (spec §12 item 1.11): regenerate per platform
+# build via `cargo run --features uniffi --bin uniffi-bindgen -- generate
+# ...` (see vaultcore/src/bin/uniffi_bindgen.rs), never hand-edited or
+# checked in. vaultcore/uniffi-verify/ is the checked-in verification
+# harness *source*, not generated output, so it is intentionally excluded
+# from this rule.
+/vaultcore/bindings/
+
 # --- OS / editor cruft ---
 .DS_Store
 Thumbs.db

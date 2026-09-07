@@ -29,6 +29,7 @@ base64 = "0.23"
 ctap-types = { version = "0.5", features = ["std"] }
 cosey = "0.4"
 time = { version = "0.3", features = ["formatting", "parsing", "serde"] }
+uniffi = { version = "0.29", optional = true, features = ["cli"] }
 
 [dev-dependencies]
 tempfile = "3"
@@ -41,3 +42,8 @@ path = "src/bin/kdf_bench.rs"
 [[bin]]
 name = "chaos-writer"
 path = "src/bin/chaos_writer.rs"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi_bindgen.rs"
+required-features = ["uniffi"]

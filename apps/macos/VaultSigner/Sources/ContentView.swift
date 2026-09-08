@@ -20,8 +20,8 @@ struct ContentView: View {
         .environmentObject(state)
         .frame(minWidth: 480, minHeight: 420)
         .preventsScreenCapture()
-        .alert("Error", isPresented: Binding(get: { state.errorMessage != nil }, set: { if !$0 { state.clearError() } })) {
-            Button("OK") { state.clearError() }
+        .alert("common.error_title", isPresented: Binding(get: { state.errorMessage != nil }, set: { if !$0 { state.clearError() } })) {
+            Button("common.ok_button") { state.clearError() }
         } message: {
             Text(state.errorMessage ?? "")
         }

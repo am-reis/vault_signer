@@ -17,15 +17,15 @@ struct BackupMasterKeyOnlyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Back Up Master Key Only", systemImage: "exclamationmark.triangle.fill")
+            Label("backupmasterkey.title", systemImage: "exclamationmark.triangle.fill")
                 .font(.title2.bold())
                 .foregroundStyle(.orange)
-            Text("This alone does NOT protect anything — your per-key blobs are also required to actually use any key. Store this only alongside a plan for recovering those separately (e.g. this vault file itself, backed up elsewhere).")
+            Text("backupmasterkey.warning_text")
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
 
-            SecureField("One-time transfer passphrase", text: $transferPassword)
-            SecureField("Confirm transfer passphrase", text: $confirmPassword)
+            SecureField("backupmasterkey.transfer_passphrase_field", text: $transferPassword)
+            SecureField("backupmasterkey.confirm_field", text: $confirmPassword)
 
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red)
@@ -33,8 +33,8 @@ struct BackupMasterKeyOnlyView: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Back Up…") { chooseDestinationAndExport() }
+                Button("common.cancel_button") { dismiss() }
+                Button("backupmasterkey.backup_button") { chooseDestinationAndExport() }
                     .buttonStyle(.borderedProminent)
                     .disabled(transferPassword.isEmpty || transferPassword != confirmPassword)
             }
@@ -47,7 +47,7 @@ struct BackupMasterKeyOnlyView: View {
     private func chooseDestinationAndExport() {
         guard state.unlockedCompartmentId != nil else { return }
         let panel = NSSavePanel()
-        panel.title = "Back Up Master Key"
+        panel.title = String(localized: "backupmasterkey.panel_title")
         panel.nameFieldStringValue = "MasterKeyBackup.vltpack"
         panel.allowedContentTypes = []
         panel.allowsOtherFileTypes = true
@@ -56,7 +56,7 @@ struct BackupMasterKeyOnlyView: View {
         let password = transferPassword
         Task {
             guard let bytes = await state.exportPacket(keyIds: [], includeMasterKey: true, encryption: .oneTimeTransferPassword(password: password)) else {
-                errorMessage = "Backup failed: \(state.errorMessage ?? "unknown error")"
+                errorMessage = String(format: String(localized: "backupmasterkey.backup_failed_format"), state.errorMessage ?? "unknown error")
                 state.clearError()
                 return
             }
@@ -64,7 +64,7 @@ struct BackupMasterKeyOnlyView: View {
                 try bytes.write(to: url, options: .atomic)
                 dismiss()
             } catch {
-                errorMessage = "Backup failed: \(error)"
+                errorMessage = String(format: String(localized: "backupmasterkey.backup_failed_format"), "\(error)")
             }
         }
     }

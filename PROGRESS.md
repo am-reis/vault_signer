@@ -625,27 +625,45 @@ here.
       one-off) builds a disposable vault for this so it never needs a
       real vault's passphrase.
 - [x] 2.9 i18n resource-file scaffolding, at least one locale populated.
-      **Done for the scaffolding itself; most of the app's strings are
-      not yet migrated (see `i18n/README.md`).** `i18n/source/en.json`
-      and `i18n/source/ar.json` (Arabic — chosen specifically because
-      spec §9 requires RTL verification "specifically on the
-      import/export decision screens") are the ICU-MessageFormat-shaped
-      sources of truth; `i18n/generate-apple-strings.py` generates real
-      `.lproj/Localizable.strings` from them (wired into
+      **Full English migration done this session — every screen, not
+      just the import/export ones.** `i18n/source/en.json` (162 keys)
+      and `i18n/source/ar.json` (45 keys — Arabic, deliberately scoped
+      to exactly the import/export/duality screens spec §9's RTL
+      requirement calls out, not the whole app; see that file's own
+      `_comment`) are the sources of truth; `i18n/generate-apple-strings.py`
+      generates real `.lproj/Localizable.strings` from them (wired into
       `apps/macos/project.yml`, `CFBundleLocalizations: [en, ar]`).
-      Three screens actually migrated — `WelcomeView`,
-      `ImportPacketView`, `MasterKeyDualityView` (the import/export
-      decision screens spec §9 calls out) — verified via a headless
-      `--test-i18n <locale> <key>` hook that resolves a key directly
-      against a named `.lproj` bundle: confirmed both locales resolve
-      real translated text (not the raw key) and a missing key falls
-      back cleanly instead of crashing. `i18n/lint-hardcoded-strings.py`
-      is spec §9's "CI lint that fails the build on hardcoded UI literal
-      strings" — runnable locally now (`--strict` is clean for the 3
-      migrated files; `--report` lists the 88 remaining hardcoded
-      literals across the rest of the app), not yet wired to an actual
-      CI service since none exists in this repo. Both app targets build
-      clean with the localization changes.
+      All 13 view files in the app are now migrated — the original 4
+      (`WelcomeView`, `ImportPacketView`, `MasterKeyDualityView`,
+      `ManageVaultsView`) plus `ContentView`,
+      `BackupMasterKeyOnlyView`, `CreateKeyView`, `CreateVaultView`,
+      `ExportPacketView`, `KeyDetailView`, `KeyListView`,
+      `SettingsView`, `UnlockView` — including several hardcoded
+      strings the lint script's own regex can't catch (`Toggle`,
+      `Section`, `LabeledContent`, `NSSavePanel.title`, ternary/interpolated
+      Text/Button titles) that got the same treatment for genuine
+      completeness rather than gaming the lint. `i18n/lint-hardcoded-strings.py --report`
+      now finds **zero** remaining hardcoded literals anywhere in the
+      app; `--strict` (spec §9's "CI lint that fails the build on
+      hardcoded UI literal strings," still not wired to an actual CI
+      service since none exists in this repo) passes clean for all 13
+      files.
+
+      **A real, non-obvious bug found and fixed along the way:**
+      `Text`/`Button` have two initializer overloads — one taking
+      `LocalizedStringKey` (localizes), one taking a plain
+      `StringProtocol` (verbatim, never localizes) — and a ternary
+      expression between two string literals passed directly to either
+      can resolve to the wrong one. Fixed by extracting such cases
+      (`ExportPacketView`'s title, `RevealRawKeyView`'s Cancel/Done
+      button) into a computed property explicitly typed
+      `LocalizedStringKey`, and by fixing `ExportPacketView.encryptionCard`'s
+      `title` parameter, which was typed `String` and so silently never
+      localized its `Text(title)` even before this session's changes.
+      Verified interactively (Accessibility API, not screenshots — this
+      app blocks screen capture, spec §5.0): `ExportPacketView`'s
+      ternary title correctly rendered "Export Keys", not the raw key
+      or literal English leaking past localization by accident.
 - [x] 2.10 Full Phase 10 test/fuzz suite pass, except interop. Spec §10's
       unit tests (KDF/AEAD/merge/sign_count), crash-safety test, fuzz
       tests (container parser, JSON-RPC parser), and throttling test are

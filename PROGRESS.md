@@ -696,7 +696,44 @@ here.
 
 ## Phase 3 — Windows
 
-Not started.
+Not started (none of items 3.1–3.8), but initial groundwork done and
+verified from macOS ahead of the actual Windows-side work, since the
+implementation itself needs a Windows machine this repo wasn't
+developed on. See `apps/windows/README.md` for the full detail; summary
+here:
+
+- **Confirmed uniffi (vaultcore's own dependency) does not generate C#
+  bindings** — `uniffi-bindgen generate --help` lists only
+  kotlin/swift/python/ruby. Installed and verified the separate
+  community tool `uniffi-bindgen-cs` (pinned to v0.10.0+v0.29.4,
+  matching vaultcore's exact uniffi 0.29.5), confirmed it supports
+  library mode (reads the compiled cdylib directly — no `.udl` file
+  needed, consistent with how every other platform uses vaultcore),
+  and generated a real, complete `vaultcore.cs` from vaultcore's actual
+  compiled library.
+- **Found and documented a real, non-obvious blocker**: the generated
+  C# uses C# 12 collection-expression syntax (`return [];`), which
+  fails to compile under the .NET 7 SDK (the only one available on
+  this Mac) with `error CS1525: Invalid expression term '['` —
+  confirmed by actually trying it, not assumed. **The Windows machine
+  needs .NET 8 SDK or newer**, not just "a recent .NET." This is now
+  documented as a hard prerequisite in `apps/windows/README.md` instead
+  of being discovered as a surprise later.
+- Added `apps/windows/Scripts/generate-csharp-bindings.ps1` (PowerShell,
+  since that's what actually runs on the target machine — mirrors
+  `apps/macos/Scripts/generate-bindings.sh`'s role).
+- Fixed a real, pre-existing inaccuracy found while checking this:
+  `vaultcore/src/bin/uniffi_bindgen.rs`'s own doc comment claimed C#
+  and Python support that was never actually true for C# (Python is
+  real; C# was always going to need the separate tool above).
+- **Explicitly not attempted, and said so plainly in
+  `apps/windows/README.md`** rather than guessed at: cross-compiling
+  vaultcore itself for `x86_64-pc-windows-msvc`, and anything about
+  WinUI 3, the Windows Service, DPAPI auto-unlock, or WebAuthn
+  plugin-authenticator registration (spec §6.2) — all of that needs a
+  real Windows machine.
+- Created the `platform/windows` branch (from `shared`, per
+  `CLAUDE.md`'s branch model) as the starting point for that work.
 
 ## Phase 4 — Android
 

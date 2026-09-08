@@ -39,8 +39,22 @@ targets:
         LIBRARY_SEARCH_PATHS: "$(SRCROOT)/../../target/release"
         OTHER_LDFLAGS: "-lvaultcore"
         OTHER_SWIFT_FLAGS: "-Xcc -fmodule-map-file=$(SRCROOT)/Generated/vaultcoreFFI.modulemap"
+        # Scripts/embed-vaultcore-dylib.sh repoints the linked
+        # libvaultcore.dylib at a copy embedded under Contents/Frameworks
+        # instead of the absolute build-machine path LIBRARY_SEARCH_PATHS
+        # bakes in by default — required for the app to run at all once
+        # actually code-signed with Hardened Runtime (see that script).
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Automatic
+        # A real, stable Development certificate (not Automatic's
+        # per-build ad-hoc identity) so this app and the
+        # VaultSignerAgent.app embedded inside it stay consistently
+        # signed across rebuilds — SMAppService's login-item validation
+        # (spec §8) needs that consistency to trust the registration.
+        # Set via env var, never hardcoded, since it's tied to whoever's
+        # Apple ID is signed into Xcode (see Scripts/build-staging.sh).
+        DEVELOPMENT_TEAM: $(VAULTSIGNER_TEAM_ID)
         SWIFT_VERSION: "5.0"
     info:
       path: Generated-Info.plist
@@ -50,6 +64,9 @@ targets:
         CFBundleLocalizations: [en, ar]
         CFBundleDevelopmentRegion: en
     postCompileScripts:
+      - name: "Embed libvaultcore.dylib"
+        path: Scripts/embed-vaultcore-dylib.sh
+        basedOnDependencyAnalysis: false
       - name: "Embed VaultSignerAgent + its LaunchAgents plist (spec §8)"
         script: |
           set -euo pipefail
@@ -61,10 +78,16 @@ targets:
           mkdir -p "$CODESIGNING_FOLDER_PATH/Contents/Library/LaunchAgents"
           cp "$SRCROOT/VaultSigner/Resources/com.vaultsigner.agent.plist" \
              "$CODESIGNING_FOLDER_PATH/Contents/Library/LaunchAgents/com.vaultsigner.agent.plist"
-          rm -rf "$CODESIGNING_FOLDER_PATH/Contents/Resources/VaultSignerAgent.app"
-          mkdir -p "$CODESIGNING_FOLDER_PATH/Contents/Resources"
+          rm -rf "$CODESIGNING_FOLDER_PATH/Contents/Library/LoginItems/VaultSignerAgent.app"
+          mkdir -p "$CODESIGNING_FOLDER_PATH/Contents/Library/LoginItems"
           ditto "$BUILT_PRODUCTS_DIR/VaultSignerAgent.app" \
-                "$CODESIGNING_FOLDER_PATH/Contents/Resources/VaultSignerAgent.app"
+                "$CODESIGNING_FOLDER_PATH/Contents/Library/LoginItems/VaultSignerAgent.app"
+          # Xcode's own dependency resolution additionally, automatically
+          # copies VaultSignerAgent's product into Contents/Resources on
+          # its own (independent of this script, and not disabled by
+          # VaultSignerAgent's SKIP_INSTALL) — remove that copy, since
+          # only the Contents/Library/LoginItems one above is real.
+          rm -rf "$CODESIGNING_FOLDER_PATH/Contents/Resources/VaultSignerAgent.app"
         basedOnDependencyAnalysis: false
 
   VaultSignerCredentialProvider:
@@ -94,8 +117,10 @@ targets:
         LIBRARY_SEARCH_PATHS: "$(SRCROOT)/../../target/release"
         OTHER_LDFLAGS: "-lvaultcore"
         OTHER_SWIFT_FLAGS: "-Xcc -fmodule-map-file=$(SRCROOT)/Generated/vaultcoreFFI.modulemap"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: $(VAULTSIGNER_TEAM_ID)
         CODE_SIGN_ENTITLEMENTS: VaultSignerCredentialProvider/VaultSignerCredentialProvider.entitlements
         SWIFT_VERSION: "5.0"
         SKIP_INSTALL: YES
@@ -110,6 +135,10 @@ targets:
             ASCredentialProviderExtensionCapabilities:
               ProvidesPasswords: false
               ProvidesPasskeys: true
+    postCompileScripts:
+      - name: "Embed libvaultcore.dylib"
+        path: Scripts/embed-vaultcore-dylib.sh
+        basedOnDependencyAnalysis: false
 
   VaultSignerAgent:
     type: application
@@ -126,11 +155,23 @@ targets:
         LIBRARY_SEARCH_PATHS: "$(SRCROOT)/../../target/release"
         OTHER_LDFLAGS: "-lvaultcore"
         OTHER_SWIFT_FLAGS: "-Xcc -fmodule-map-file=$(SRCROOT)/Generated/vaultcoreFFI.modulemap"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: $(VAULTSIGNER_TEAM_ID)
         SWIFT_VERSION: "5.0"
+        # Without this, Xcode's own dependency resolution additionally
+        # auto-copies this product into VaultSigner's Contents/Resources
+        # on its own — on top of, and separate from, the intentional
+        # Contents/Library/LoginItems copy in VaultSigner's own
+        # postCompileScripts below.
+        SKIP_INSTALL: YES
     info:
       path: Generated-Agent-Info.plist
       properties:
         LSUIElement: true
         NSHumanReadableCopyright: "VaultSigner"
+    postCompileScripts:
+      - name: "Embed libvaultcore.dylib"
+        path: Scripts/embed-vaultcore-dylib.sh
+        basedOnDependencyAnalysis: false

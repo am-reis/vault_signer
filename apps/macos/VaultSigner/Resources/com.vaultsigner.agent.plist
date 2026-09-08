@@ -7,9 +7,15 @@
     <!-- BundleProgram is relative to this app's own Contents/ directory
          (an SMAppService-specific key, unlike classic launchd's absolute
          Program/ProgramArguments) — see project.yml's postbuild script
-         for how VaultSignerAgent.app ends up embedded at this path. -->
+         for how VaultSignerAgent.app ends up embedded at this path.
+         Contents/Library/LoginItems/, not Contents/Resources/: a nested
+         .app placed under Resources spawned with OS_REASON_CODESIGNING
+         every time (confirmed via `log show` + `launchctl print`) —
+         LoginItems is the location Apple's own SMAppService/
+         SMLoginItemSetEnabled examples use for a full nested helper
+         bundle, and BTM's codesigning validation only accepts it there. -->
     <key>BundleProgram</key>
-    <string>Contents/Resources/VaultSignerAgent.app/Contents/MacOS/VaultSignerAgent</string>
+    <string>Contents/Library/LoginItems/VaultSignerAgent.app/Contents/MacOS/VaultSignerAgent</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>

@@ -331,17 +331,59 @@ here.
       `SettingsView`) reuses the same `ExportPacketView` machinery just
       verified under 2.3, but the two backup-specific entry points
       themselves have not yet been individually clicked through.
-- [x] 2.6 `launchd` background service. **Done and verified, one caveat
-      disclosed.** `VaultSignerAgent` (`apps/macos/VaultSignerAgent/`),
-      embedded inside `VaultSigner.app`, is a real process owning a
-      `Vault` + its retention cache/throttle state, serving the
-      custom-protocol socket (verified — see 2.8), registered as a real
-      `launchd` agent via `SMAppService.agent(plistName:)` with
-      `RunAtLoad`/`KeepAlive` — confirmed with `launchctl print` (a real
-      job managed by `com.apple.xpc.ServiceManagement`) and
-      `launchctl kickstart` (killed it, watched launchd revive it). Both
-      spec §8 toggles are real and wired into `VaultSignerAgent` actually
-      consuming them: "start at login" (`LoginItemManager`) and
+- [x] 2.6 `launchd` background service. **Done and verified — but the
+      earlier claim below that `launchctl kickstart` proved the login
+      item durable was wrong; that was only ever true for an in-place
+      Debug build run straight from the exact same DerivedData path.
+      The actual SMAppService registration was broken for real use and
+      has since been fixed; see the corrected account below.**
+      `VaultSignerAgent` (`apps/macos/VaultSignerAgent/`), embedded
+      inside `VaultSigner.app`, is a real process owning a `Vault` + its
+      retention cache/throttle state, serving the custom-protocol socket
+      (verified — see 2.8), registered as a real `launchd` agent via
+      `SMAppService.agent(plistName:)` with `RunAtLoad`/`KeepAlive`.
+
+      **What was actually broken (found after a real reboot, not
+      assumed):** `launchctl print` showed the registered job at
+      `exit 78: EX_CONFIG`, `job state = spawn failed`, 423 failed
+      attempts. Two independent, real bugs, both now fixed:
+      (1) every target links `libvaultcore.dylib` via the absolute
+      build-machine path `LIBRARY_SEARCH_PATHS` bakes in
+      (`-lvaultcore` resolving to `$(SRCROOT)/../../target/release`) —
+      this only ever "worked" by coincidence of Xcode's Debug launches
+      tolerating an unsigned dylib load from outside the app bundle; a
+      properly signed Release build refuses to load it under Hardened
+      Runtime (`dyld: ... Code has to be at least ad-hoc signed`).
+      Fixed by `Scripts/embed-vaultcore-dylib.sh` (new
+      `postCompileScripts` step on all three targets): embeds a
+      self-contained, `@rpath`-relocated, freshly re-signed copy of the
+      dylib under each bundle's own `Contents/Frameworks/`.
+      (2) `VaultSignerAgent.app` was embedded at
+      `Contents/Resources/VaultSignerAgent.app`, which spawned with
+      `OS_REASON_CODESIGNING` every time (confirmed via `log show` and
+      `launchctl print`) — a nested full `.app` bundle used as a
+      `BundleProgram` target isn't validated there. Moved to
+      `Contents/Library/LoginItems/VaultSignerAgent.app`, the location
+      Apple's own SMAppService/`SMLoginItemSetEnabled` examples use for
+      exactly this; fixed it.
+
+      Both bugs needed a **real, stable, consistent code signature**
+      to even surface correctly rather than being masked by Automatic's
+      per-build ad-hoc identity — `DEVELOPMENT_TEAM` is now set (via the
+      `VAULTSIGNER_TEAM_ID` env var, never hardcoded) on all three
+      targets, and `Scripts/build-staging.sh` builds a Release
+      configuration and installs it to `/Applications` — a stable path,
+      unlike ephemeral Xcode DerivedData. Verified after all of this:
+      `launchctl print gui/$(id -u)/com.vaultsigner.agent` shows
+      `job state = running` with a real PID, and a plain socket client
+      calling `vaultsigner.list_public_keys` against that
+      launchd-spawned process got a real response — not just "the
+      process exists," the actual service is reachable.
+      `codesign -dvvv` on both the app and the embedded agent shows the
+      identical `TeamIdentifier`, confirming the consistency fix took.
+
+      Both spec §8 toggles are real and wired into `VaultSignerAgent`
+      actually consuming them: "start at login" (`LoginItemManager`) and
       "auto-unlock on startup" (`AutoUnlockStore`, Keychain-backed, off by
       default, gated behind a confirmation screen that verifies the
       passphrase against the vault before ever writing it to the
@@ -352,14 +394,27 @@ here.
       `vaultsigner.sign` call for a never-unlocked key showed the dialog,
       blocked until answered, and returned a signature that verified
       against the key's real public key. **Disclosed caveat, observed
-      while verifying:** the first cross-app Keychain read triggers a
-      real macOS `SecurityAgent` access-confirmation dialog (no shared
-      Team ID between the two ad-hoc-signed binaries yet), and denying it
-      fails silently (agent just starts locked) rather than surfacing an
-      error — full detail in the macOS README, same underlying
-      constraint as item 2.7's signing requirement. The known UI-vs-agent
-      architecture gap (management UI should route mutations through the
-      agent, not hold its own `Vault`) is also in the macOS README.
+      while verifying (partially superseded — not yet re-verified):**
+      the first cross-app Keychain read used to trigger a real macOS
+      `SecurityAgent` access-confirmation dialog, attributed at the time
+      to the app and agent having no shared Team ID (each got its own
+      random ad-hoc identity per build). That premise is no longer true
+      — both now carry the same real `TeamIdentifier` (see above) — so
+      this may already be resolved, but it hasn't been specifically
+      re-tested since the signing fix. If it still happens, denying the
+      prompt still fails silently (agent just starts locked) rather than
+      surfacing an error — full detail in the macOS README. The known
+      UI-vs-agent architecture gap (management UI should route mutations
+      through the agent, not hold its own `Vault`) is also in the macOS
+      README.
+
+      **Minor, cosmetic, not yet chased down:** the built app also ends
+      up with an unused second copy of `VaultSignerAgent.app` at
+      `Contents/Resources/` — Xcode's own dependency resolution copies
+      it there automatically regardless of `SKIP_INSTALL`, independent
+      of and in addition to the real, intentional copy at
+      `Contents/Library/LoginItems/`. Harmless (nothing references it),
+      just wasted space; not worth the time to chase further right now.
 - [x] 2.7 `ASCredentialProviderExtension`. **Target built with a real
       passkey implementation, compiler-verified against the actual SDK;
       conclusively confirmed blocked on a paid Apple Developer Program

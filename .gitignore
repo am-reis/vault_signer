@@ -23,8 +23,9 @@ Thumbs.db
 .vscode/
 
 # --- macOS / iOS (Xcode) ---
-# Output of Scripts/build-staging.sh.
+# Output of Scripts/build-staging.sh and Scripts/package-release.sh.
 apps/macos/.staging-build/
+apps/macos/.release-artifacts/
 apps/macos/**/DerivedData/
 apps/macos/**/*.xcuserstate
 apps/macos/**/xcuserdata/

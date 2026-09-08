@@ -163,15 +163,18 @@ this:
   `kSecAttrAccessGroup`; until then, the first-launch prompt is expected,
   and a denied prompt fails silently rather than with a visible error —
   surfacing that failure in the UI is a good small follow-up.
-  **Known architectural gap:** `VaultSigner.app` (the management UI)
-  currently holds its own in-process `Vault` rather than routing every
-  mutation through the agent over IPC the way spec §8 describes ("the
-  management UI process never writes the container directly ... requests
-  mutations from the service"). `AgentServer`'s `internal.*` namespace
-  only covers what item 2.8's own verification needed
-  (`unlock_compartment`, `unlock_key`, `list_compartments`) — extending it
-  to the full management surface and switching the UI app to talk to the
-  agent instead of vaultcore directly is real follow-up work, not done.
+  **Resolved:** `VaultSigner.app` no longer holds a `Vault` of its own —
+  every mutation routes through the agent's `internal.*` namespace
+  (`Shared/ManagementClient.swift` / `VaultSignerAgent/Sources/ManagementHandlers.swift`),
+  matching spec §8 ("the management UI process never writes the
+  container directly ... requests mutations from the service"), with
+  real caller authentication (`PeerAuthentication.swift`, `SecCode`-based,
+  Release-only) closing the gap that made the original `internal.*`
+  namespace unsafe to rely on for anything beyond its original
+  test-only purpose. See PROGRESS.md item 2.6 for the full account and
+  what's deferred (`VaultSignerCredentialProvider` still holds its own
+  separate `Vault`, same issue, left alone since it can't be verified
+  live regardless of this fix — item 2.7).
 - **2.7 `ASCredentialProviderExtension`** — **real implementation,
   compiler-verified; conclusively confirmed blocked on a paid Apple
   Developer Program membership for anything beyond that.**

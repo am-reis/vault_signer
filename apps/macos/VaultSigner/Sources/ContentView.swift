@@ -9,7 +9,7 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if state.vault == nil {
+            if state.vaultPath == nil {
                 WelcomeView()
             } else if state.unlockedCompartmentId == nil {
                 UnlockView()

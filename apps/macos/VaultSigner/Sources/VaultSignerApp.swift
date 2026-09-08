@@ -83,12 +83,35 @@ func runI18nTestHookIfRequested() {
     exit(0)
 }
 
+/// `--test-create-vault <path> <label> <master_passphrase>`: exercises
+/// `ManagementClient.createVault` (and therefore `internal.create_vault`
+/// end-to-end, including `PeerAuthentication`, which specifically
+/// requires the *real*, signed `VaultSigner.app` binary as the caller —
+/// unlike the other test hooks here, this one cannot be replaced by a
+/// plain script). Not something a real user would ever pass.
+func runCreateVaultTestHookIfRequested() {
+    let arguments = CommandLine.arguments
+    guard let flagIndex = arguments.firstIndex(of: "--test-create-vault"), arguments.count > flagIndex + 3 else { return }
+    let path = arguments[flagIndex + 1]
+    let label = arguments[flagIndex + 2]
+    let masterPassphrase = arguments[flagIndex + 3]
+    ManagementClient.ensureAgentRunning()
+    do {
+        let compartments = try ManagementClient.createVault(path: path, compartmentLabel: label, masterPassphrase: masterPassphrase, profile: .desktop)
+        print("createVault() succeeded; compartments = \(compartments)")
+    } catch {
+        print("createVault() threw: \(error)")
+    }
+    exit(0)
+}
+
 @main
 struct VaultSignerApp: App {
     init() {
         runLoginItemTestHookIfRequested()
         runAutoUnlockTestHookIfRequested()
         runI18nTestHookIfRequested()
+        runCreateVaultTestHookIfRequested()
     }
 
     var body: some Scene {

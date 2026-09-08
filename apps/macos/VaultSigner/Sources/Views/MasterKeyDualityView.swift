@@ -75,19 +75,17 @@ struct MasterKeyDualityView: View {
     }
 
     private func runOption1(targetCompartmentId: String) {
-        guard let vault = state.vault else { return }
         busy = true
         Task {
             defer { busy = false }
-            do {
-                let outcome = try await Task.detached(priority: .userInitiated) {
-                    try vault.mergeReencryptDiscardIncoming(targetCompartmentId: targetCompartmentId, incomingManifestJson: info.manifestJson, incomingKeyBlobs: info.keyBlobs)
-                }.value
-                state.refreshKeys()
-                onCompleted(outcome.warnings)
-            } catch {
-                errorMessage = "\(error)"
+            guard let outcome = await state.mergeReencryptDiscardIncoming(targetCompartmentId: targetCompartmentId, incomingManifestJson: info.manifestJson, incomingKeyBlobs: info.keyBlobs)
+            else {
+                errorMessage = state.errorMessage ?? "unknown error"
+                state.clearError()
+                return
             }
+            state.refreshKeys()
+            onCompleted(outcome.warnings)
         }
     }
 
@@ -109,22 +107,19 @@ struct MasterKeyDualityView: View {
     }
 
     private func runOption2() {
-        guard let vault = state.vault else { return }
         busy = true
         Task {
             defer { busy = false }
-            do {
-                let outcome = try await Task.detached(priority: .userInitiated) {
-                    try vault.mergeSideBySide(
-                        incomingManifestJson: info.manifestJson, incomingKeyBlobs: info.keyBlobs,
-                        newCompartmentLabel: option2Label, newMasterPassphrase: option2Passphrase, profile: .desktop
-                    )
-                }.value
-                state.refreshCompartments()
-                onCompleted(outcome.warnings)
-            } catch {
-                errorMessage = "\(error)"
+            guard let outcome = await state.mergeSideBySide(
+                incomingManifestJson: info.manifestJson, incomingKeyBlobs: info.keyBlobs,
+                newCompartmentLabel: option2Label, newMasterPassphrase: option2Passphrase, profile: .desktop
+            ) else {
+                errorMessage = state.errorMessage ?? "unknown error"
+                state.clearError()
+                return
             }
+            await state.refreshCompartments()
+            onCompleted(outcome.warnings)
         }
     }
 
@@ -162,22 +157,20 @@ struct MasterKeyDualityView: View {
     }
 
     private func runOption3(targetCompartmentId: String) {
-        guard let vault = state.vault, let kdfParamsJson = info.embeddedMasterKdfParamsJson else { return }
+        guard let kdfParamsJson = info.embeddedMasterKdfParamsJson else { return }
         busy = true
         Task {
             defer { busy = false }
-            do {
-                let outcome = try await Task.detached(priority: .userInitiated) {
-                    try vault.mergeReplaceLocalWithIncoming(
-                        targetCompartmentId: targetCompartmentId, incomingManifestJson: info.manifestJson, incomingKeyBlobs: info.keyBlobs,
-                        incomingMasterPassphrase: option3Passphrase, incomingKdfParamsJson: kdfParamsJson, confirmationPhrase: option3Confirmation
-                    )
-                }.value
-                state.refreshKeys()
-                onCompleted(outcome.warnings)
-            } catch {
-                errorMessage = "\(error)"
+            guard let outcome = await state.mergeReplaceLocalWithIncoming(
+                targetCompartmentId: targetCompartmentId, incomingManifestJson: info.manifestJson, incomingKeyBlobs: info.keyBlobs,
+                incomingMasterPassphrase: option3Passphrase, incomingKdfParamsJson: kdfParamsJson, confirmationPhrase: option3Confirmation
+            ) else {
+                errorMessage = state.errorMessage ?? "unknown error"
+                state.clearError()
+                return
             }
+            state.refreshKeys()
+            onCompleted(outcome.warnings)
         }
     }
 }

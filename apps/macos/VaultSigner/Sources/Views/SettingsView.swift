@@ -89,7 +89,7 @@ struct SettingsView: View {
         .preventsScreenCapture()
         .onAppear {
             if let compartmentId = state.unlockedCompartmentId {
-                autoUnlockEnabled = AutoUnlockStore.load(forCompartment: compartmentId) != nil
+                Task { autoUnlockEnabled = await state.isAutoUnlockEnabled(compartmentId: compartmentId) }
             }
         }
         .sheet(isPresented: $showingAutoUnlockConfirmation) {
@@ -144,33 +144,25 @@ struct SettingsView: View {
         loginItemState = LoginItemManager.currentState
     }
 
-    /// Verifies `passphrase` against the vault before ever writing it to
-    /// the Keychain — otherwise a typo here would silently and
-    /// permanently break auto-unlock with no feedback to the user.
+    /// The agent verifies `passphrase` against its own vault before ever
+    /// writing it to the Keychain — otherwise a typo here would silently
+    /// and permanently break auto-unlock with no feedback to the user.
+    /// This app never touches the Keychain or `VaultConfig` for this —
+    /// see `ManagementClient.enableAutoUnlock`/`AgentServer`'s handler.
     private func enableAutoUnlock(passphrase: String) async {
-        guard let compartmentId = state.unlockedCompartmentId, let vault = state.vault else { return }
-        let verified: Bool? = try? await Task.detached(priority: .userInitiated) {
-            try vault.unlockCompartment(compartmentId: compartmentId, passphrase: passphrase)
-            return true
-        }.value
-        guard verified == true else {
-            errorMessage = "Incorrect master passphrase; auto-unlock was not enabled."
+        guard let compartmentId = state.unlockedCompartmentId else { return }
+        guard await state.enableAutoUnlock(compartmentId: compartmentId, passphrase: passphrase) else {
+            errorMessage = state.errorMessage ?? "Incorrect master passphrase; auto-unlock was not enabled."
+            state.clearError()
             autoUnlockEnabled = false
             return
         }
-        guard AutoUnlockStore.save(passphrase: passphrase, forCompartment: compartmentId) else {
-            errorMessage = "Couldn't save to Keychain."
-            autoUnlockEnabled = false
-            return
-        }
-        VaultConfig.saveAutoUnlockCompartmentId(compartmentId)
         errorMessage = nil
     }
 
     private func disableAutoUnlock() {
         guard let compartmentId = state.unlockedCompartmentId else { return }
-        AutoUnlockStore.delete(forCompartment: compartmentId)
-        VaultConfig.saveAutoUnlockCompartmentId(nil)
+        state.disableAutoUnlock(compartmentId: compartmentId)
     }
 }
 

@@ -45,7 +45,7 @@ struct BackupMasterKeyOnlyView: View {
     }
 
     private func chooseDestinationAndExport() {
-        guard let compartmentId = state.unlockedCompartmentId, let vault = state.vault else { return }
+        guard state.unlockedCompartmentId != nil else { return }
         let panel = NSSavePanel()
         panel.title = "Back Up Master Key"
         panel.nameFieldStringValue = "MasterKeyBackup.vltpack"
@@ -55,13 +55,12 @@ struct BackupMasterKeyOnlyView: View {
 
         let password = transferPassword
         Task {
+            guard let bytes = await state.exportPacket(keyIds: [], includeMasterKey: true, encryption: .oneTimeTransferPassword(password: password)) else {
+                errorMessage = "Backup failed: \(state.errorMessage ?? "unknown error")"
+                state.clearError()
+                return
+            }
             do {
-                let bytes = try await Task.detached(priority: .userInitiated) {
-                    try vault.exportPacket(
-                        compartmentId: compartmentId, keyIds: [], includeMasterKey: true,
-                        encryption: .oneTimeTransferPassword(password: password)
-                    )
-                }.value
                 try bytes.write(to: url, options: .atomic)
                 dismiss()
             } catch {

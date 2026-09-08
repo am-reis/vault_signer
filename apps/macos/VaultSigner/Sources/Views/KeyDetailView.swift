@@ -54,19 +54,25 @@ struct KeyDetailView: View {
     }
 
     private func exportSingleKey() {
-        guard let vault = state.vault, let compartmentId = state.unlockedCompartmentId else { return }
+        guard state.unlockedCompartmentId != nil else { return }
         let panel = NSSavePanel()
         panel.title = "Export Key"
         panel.nameFieldStringValue = "\(key.label).vltkey"
         panel.allowedContentTypes = []
         panel.allowsOtherFileTypes = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let bytes = try vault.exportSingleKey(compartmentId: compartmentId, keyId: key.keyId)
-            try bytes.write(to: url, options: .atomic)
-            exportErrorMessage = nil
-        } catch {
-            exportErrorMessage = "Export failed: \(error)"
+        Task {
+            guard let bytes = await state.exportSingleKey(keyId: key.keyId) else {
+                exportErrorMessage = "Export failed: \(state.errorMessage ?? "unknown error")"
+                state.clearError()
+                return
+            }
+            do {
+                try bytes.write(to: url, options: .atomic)
+                exportErrorMessage = nil
+            } catch {
+                exportErrorMessage = "Export failed: \(error)"
+            }
         }
     }
 }

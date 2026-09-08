@@ -405,23 +405,82 @@ here.
       prompt still fails silently (agent just starts locked) rather than
       surfacing an error — full detail in the macOS README.
 
-      **UI-vs-agent unlock sync, added this session (not the same as
-      auto-unlock).** The management UI holding its own separate
-      in-process `Vault` from the agent's meant unlocking a compartment
-      in `VaultSigner.app`'s window never made the agent aware of it —
-      confirmed directly: the Node.js RPC demo showed zero keys with the
-      vault visibly unlocked in the app. The fix is not "just turn on
-      auto-unlock" (a real user correctly rejected that suggestion: it's
-      a deliberate, persistent, Keychain-backed opt-in with its own
-      security tradeoffs, not a substitute for the app's own unlock
-      actually working). `Shared/AgentClient.swift` is a minimal client
-      for the agent's `internal.*` bootstrap namespace; `AppState`'s
-      unlock and create-vault flows now forward the same passphrase the
-      user already typed, once, over the socket — nothing persisted
-      anywhere, best-effort (fails silently if the agent isn't running).
-      Verified end-to-end with a disposable test vault: unlocked through
-      the real UI, then confirmed via a direct socket query that the
-      agent listed the real key with no manual `internal.*` calls.
+      **Single vault owner, full redesign (supersedes an earlier
+      stopgap that was correctly rejected as unsafe).** A first attempt
+      at fixing "the UI shows a key unlocked but the agent doesn't" just
+      forwarded the unlock passphrase to the agent's already-existing
+      `internal.unlock_compartment` bootstrap method (added originally
+      as a test-only backdoor for `agent_test_client.py`, with **no
+      caller authentication at all** — any same-user process could call
+      it). Flagged as unsafe and correctly rejected: "if it is not safe
+      there is no point for inventing excuses. It has to be redesigned
+      ... There should be a single copy owned by the background. The UI
+      is supposed to be just a UI." That is exactly spec §8's original
+      design, never fully implemented until now — see the amendment to
+      §8 formalizing the requirement this closes.
+
+      `VaultSigner.app` now holds **no `Vault` instance at all**.
+      `Shared/ManagementClient.swift` is its sole means of touching
+      vault state — every operation the UI used to perform directly
+      (create/open vault, unlock, list/create/discard keys, change
+      passphrase, reveal raw key, export/export-single-key/import, all
+      three merge options, enable/disable/query auto-unlock) is now one
+      `internal.*` call to `VaultSignerAgent`, handled in the new
+      `VaultSignerAgent/Sources/ManagementHandlers.swift`. Auto-unlock's
+      Keychain reads/writes moved server-side too (`AutoUnlockStore` is
+      no longer touched from `VaultSigner.app` at all) — the agent is
+      now the sole owner of vault state, key material, *and* the
+      Keychain-backed auto-unlock secret, with zero exceptions.
+
+      `internal.*` callers are now authenticated for real:
+      `PeerAuthentication.swift` uses `SecCode`/`Security.framework`
+      (`SecCodeCopyGuestWithAttributes`, `SecCodeCheckValidity`,
+      `SecCodeCopySigningInformation`) to verify the connecting process
+      is validly signed, identified as `com.vaultsigner.app`, and
+      shares this agent's own Team Identifier (read dynamically from
+      the agent's own code, never hardcoded) — not just "reached the
+      socket as the same OS user." Skipped in Debug builds only, so
+      `agent_test_client.py` (a bare Python script with no signature)
+      keeps working as a dev/test tool; enforced unconditionally in
+      Release, the only configuration this project ever installs and
+      runs (`Scripts/build-staging.sh`).
+
+      `VaultSignerAgent` itself changed from "owns exactly one `Vault`
+      fixed at launch" to "owns zero or one `Vault`, mutable at
+      runtime" — `main.swift` no longer exits when no vault is
+      configured yet (a fresh install has none until
+      `internal.create_vault` is called), and `AgentServer.vault` is
+      now `var Vault?` behind a lock instead of a fixed `let`.
+      `Shared/ManagementClient.ensureAgentRunning()` launches the
+      embedded agent directly (not via `SMAppService`) if it isn't
+      already reachable, so a fresh install with the login item not yet
+      approved can still create a vault.
+
+      **Verified end-to-end**, not just built: (1) confirmed a plain
+      unsigned Python script calling `internal.list_compartments`
+      against a Release build is now rejected with `unauthorized_caller`
+      (rejected the exact same way `internal.create_vault` was too,
+      requiring a new `--test-create-vault` headless hook in
+      `VaultSignerApp.swift` — mirroring the existing `--test-login-item`
+      pattern — specifically because a real, signed `VaultSigner.app`
+      process is the only thing `PeerAuthentication` will now accept,
+      by design); (2) using a disposable test vault, drove the real UI
+      through create → unlock → create-key → lock, confirming via a
+      direct socket query after *each* step that `VaultSignerAgent` —
+      a separate OS process — reflected the change immediately, with
+      zero manual `internal.*` calls made by hand at any point. Export/
+      import/merge paths were not re-exercised live beyond a clean
+      Release compile (their RPC wiring follows the identical pattern
+      already proven working for create/unlock/create-key/lock).
+
+      **Deferred, same underlying issue, not forgotten:**
+      `VaultSignerCredentialProvider` (the FIDO2 extension,
+      `CredentialProviderViewController.swift`) still opens its own
+      separate in-process `Vault`, same as the old design. Left alone
+      here since it can never run live regardless (blocked on the paid
+      Apple Developer entitlement — item 2.7), so fixing its
+      architecture can't be verified end-to-end the way the two
+      testable processes above can.
 
       **Minor, cosmetic, not yet chased down:** the built app also ends
       up with an unused second copy of `VaultSignerAgent.app` at

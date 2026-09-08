@@ -16,40 +16,43 @@ import Foundation
 /// `AutoUnlockStore` (Keychain) and unlocks it before the socket even
 /// starts accepting connections, so a `vaultsigner.list_public_keys`
 /// call works immediately after boot with no human present.
+///
+/// This process must stay running and keep serving `internal.*` even
+/// when no vault is configured yet (a fresh install, before the user has
+/// ever created one) — `VaultSigner.app` no longer opens a `Vault`
+/// itself (spec §8), so `internal.create_vault` is now the *only* way a
+/// vault ever comes into being, and that call has to reach a live agent.
 
 // `--vault` is for direct/manual testing (see uniffi-verify/). The real
 // launchd-launched agent has no CLI arguments to receive — its
 // LaunchAgents plist's `ProgramArguments` are static, baked in at embed
-// time — so it reads `VaultConfig` instead, which `VaultSigner.app`
-// writes whenever the user creates/opens a vault.
+// time — so it reads `VaultConfig` instead, which the agent itself now
+// writes whenever `internal.create_vault`/`internal.open_vault` succeeds.
 let arguments = CommandLine.arguments
-let vaultPath: String
+let vaultPath: String?
 if let vaultFlagIndex = arguments.firstIndex(of: "--vault"), arguments.count > vaultFlagIndex + 1 {
     vaultPath = arguments[vaultFlagIndex + 1]
-} else if let configured = VaultConfig.loadVaultPath() {
-    vaultPath = configured
 } else {
-    // No vault configured yet (e.g. first login before the user has ever
-    // created one). Exit quietly rather than error-looping under
-    // launchd's KeepAlive — it will retry on its own schedule, and
-    // succeed once VaultSigner.app has written a config.
-    exit(0)
+    vaultPath = VaultConfig.loadVaultPath()
 }
 
-let vault: Vault
-do {
-    vault = try Vault.open(path: vaultPath)
-} catch {
-    FileHandle.standardError.write(Data("VaultSignerAgent: failed to open vault at \(vaultPath): \(error)\n".utf8))
-    exit(1)
-}
-
-if let compartmentId = VaultConfig.loadAutoUnlockCompartmentId(), let passphrase = AutoUnlockStore.load(forCompartment: compartmentId) {
+var vault: Vault?
+if let vaultPath {
     do {
-        try vault.unlockCompartment(compartmentId: compartmentId, passphrase: passphrase)
-        print("VaultSignerAgent: auto-unlocked compartment \(compartmentId)")
+        let opened = try Vault.open(path: vaultPath)
+        vault = opened
+        if let compartmentId = VaultConfig.loadAutoUnlockCompartmentId(), let passphrase = AutoUnlockStore.load(forCompartment: compartmentId) {
+            do {
+                try opened.unlockCompartment(compartmentId: compartmentId, passphrase: passphrase)
+                print("VaultSignerAgent: auto-unlocked compartment \(compartmentId)")
+            } catch {
+                FileHandle.standardError.write(Data("VaultSignerAgent: auto-unlock failed for \(compartmentId): \(error)\n".utf8))
+            }
+        }
     } catch {
-        FileHandle.standardError.write(Data("VaultSignerAgent: auto-unlock failed for \(compartmentId): \(error)\n".utf8))
+        // Stay alive regardless — `internal.open_vault`/`internal.create_vault`
+        // can still recover from a missing/corrupt configured path.
+        FileHandle.standardError.write(Data("VaultSignerAgent: failed to open configured vault at \(vaultPath): \(error)\n".utf8))
     }
 }
 

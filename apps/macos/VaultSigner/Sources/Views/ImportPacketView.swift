@@ -86,26 +86,24 @@ struct ImportPacketView: View {
     }
 
     private func tryImport(_ packetBytes: Data, transferPassword: String?) {
-        guard let vault = state.vault else { return }
         Task {
-            do {
-                let info = try await Task.detached(priority: .userInitiated) {
-                    try vault.importPacket(packetBytes: packetBytes, transferPassword: transferPassword)
-                }.value
-                if info.embeddedMasterCompartmentId != nil {
-                    step = .duality(info: info)
-                } else {
-                    await mergeWithoutDuality(info: info)
-                }
-            } catch {
+            guard let info = await state.importPacket(packetBytes: packetBytes, transferPassword: transferPassword) else {
                 if transferPassword == nil {
                     // Most likely a transfer-encrypted packet — offer the password prompt
                     // rather than immediately surfacing a raw error.
+                    state.clearError()
                     step = .needsTransferPassword(packetBytes: packetBytes)
                 } else {
-                    errorMessage = "Import failed: \(error)"
+                    errorMessage = "Import failed: \(state.errorMessage ?? "unknown error")"
+                    state.clearError()
                     step = .pickingFile
                 }
+                return
+            }
+            if info.embeddedMasterCompartmentId != nil {
+                step = .duality(info: info)
+            } else {
+                await mergeWithoutDuality(info: info)
             }
         }
     }
@@ -114,17 +112,16 @@ struct ImportPacketView: View {
     /// keys into whichever compartment is currently unlocked (spec
     /// §5.3's duality screen only concerns an *included* master key).
     private func mergeWithoutDuality(info: ImportedPacketInfo) async {
-        guard let vault = state.vault, let compartmentId = state.unlockedCompartmentId else { return }
-        do {
-            let outcome = try await Task.detached(priority: .userInitiated) {
-                try vault.mergeReencryptDiscardIncoming(targetCompartmentId: compartmentId, incomingManifestJson: info.manifestJson, incomingKeyBlobs: info.keyBlobs)
-            }.value
-            state.refreshKeys()
-            step = .done(warnings: outcome.warnings)
-        } catch {
-            errorMessage = "Import failed: \(error)"
+        guard let compartmentId = state.unlockedCompartmentId else { return }
+        guard let outcome = await state.mergeReencryptDiscardIncoming(targetCompartmentId: compartmentId, incomingManifestJson: info.manifestJson, incomingKeyBlobs: info.keyBlobs)
+        else {
+            errorMessage = "Import failed: \(state.errorMessage ?? "unknown error")"
+            state.clearError()
             step = .pickingFile
+            return
         }
+        state.refreshKeys()
+        step = .done(warnings: outcome.warnings)
     }
 }
 

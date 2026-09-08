@@ -5,8 +5,9 @@ import AppKit
 /// entry screen (`WelcomeView`) and Settings, so managing known vaults
 /// never requires closing whatever vault is currently open. Operates
 /// purely on `AppState.knownVaults`/`KnownVaultsStore` — never touches
-/// `state.vault` — which is what makes it safe to open from either
-/// context.
+/// the currently-open vault (there isn't one held here anyway; that
+/// lives solely in `VaultSignerAgent` now) — which is what makes it
+/// safe to open from either context.
 struct ManageVaultsView: View {
     @EnvironmentObject private var state: AppState
     @Environment(\.dismiss) private var dismiss

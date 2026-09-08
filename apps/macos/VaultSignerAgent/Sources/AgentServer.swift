@@ -1,33 +1,46 @@
 import Darwin
 import Foundation
 
-/// The background service (spec §8): owns the unlocked `Vault`, the
-/// retention cache/throttle state that live inside it, and the custom
-/// local signing protocol's transport (spec §7) — a Unix domain socket
-/// at a well-known, owner-only-permission path, never accepting
-/// non-loopback connections (a Unix socket is loopback-only by
-/// construction). Framing is newline-delimited JSON: each request is one
-/// line, each response is one line, matching the message shapes
-/// `vaultcore::protocol` already defines.
+/// The background service (spec §8): owns the single `Vault` instance —
+/// there is no other copy anywhere else in the system, per spec §8 ("the
+/// service ... is the sole writer of the container file") — its
+/// retention cache/throttle state, and the custom local signing
+/// protocol's transport (spec §7): a Unix domain socket at a well-known,
+/// owner-only-permission path, never accepting non-loopback connections
+/// (a Unix socket is loopback-only by construction). Framing is
+/// newline-delimited JSON: each request is one line, each response is
+/// one line, matching the message shapes `vaultcore::protocol` already
+/// defines.
 ///
 /// Method namespace: `vaultsigner.*` requests are passed straight to
 /// `vault.handleProtocolRequest`, unchanged from spec §7. `internal.*`
 /// methods are this agent's own management namespace (spec §8: "using an
-/// internal-only method namespace") for the not-yet-built management UI
-/// to drive vault operations without ever touching the container file
-/// itself — today this covers only what's needed to unlock a compartment
-/// for testing; the full management surface (create/discard key, etc.)
-/// is `VaultSigner.app`'s job to add here once it talks to the agent
-/// instead of holding its own in-process `Vault` (see the macOS README
-/// for that known architectural gap).
+/// internal-only method namespace") — `VaultSigner.app` never opens a
+/// `Vault` of its own; every vault operation it performs, including
+/// creating/opening the vault file itself, is one of these calls (see
+/// `ManagementHandlers.swift`). Real callers are authenticated via
+/// `PeerAuthentication` (Release builds only — see that file).
+///
+/// `vault` is `var`/optional rather than a fixed `let`, because a fresh
+/// install has no vault yet: the agent still needs to be running (to
+/// serve `internal.create_vault`) before one exists. Reads/writes of the
+/// property itself are guarded by `vaultLock`; `Vault`'s own methods are
+/// already internally synchronized (a Rust `Mutex` guards its mutable
+/// state), so no additional locking is needed once a reference is read.
 final class AgentServer {
-    private let vault: Vault
+    private var _vault: Vault?
+    private let vaultLock = NSLock()
+    var vault: Vault? {
+        get { vaultLock.lock(); defer { vaultLock.unlock() }; return _vault }
+        set { vaultLock.lock(); defer { vaultLock.unlock() }; _vault = newValue }
+    }
+
     private let socketPath: String
     private var listenFD: Int32 = -1
     private let prompter = AlertPassphrasePrompter()
 
-    init(vault: Vault, socketPath: String) {
-        self.vault = vault
+    init(vault: Vault?, socketPath: String) {
+        self._vault = vault
         self.socketPath = socketPath
     }
 
@@ -113,16 +126,28 @@ final class AgentServer {
         let id = json["id"] ?? NSNull()
 
         if method.hasPrefix("internal.") {
+            guard PeerAuthentication.callerIsVaultSignerApp(socketFD: socketFD) else {
+                return errorResponse(id: id, code: "unauthorized_caller", message: "internal.* is restricted to VaultSigner.app")
+            }
             return handleInternal(method: method, params: json["params"] as? [String: Any] ?? [:], id: id)
         }
 
+        guard let vault else {
+            return errorResponse(id: id, code: "no_vault_open", message: "no vault is currently open")
+        }
         let callerIdentity = PeerIdentity.callerDisplayName(forSocket: socketFD)
         return vault.handleProtocolRequest(callerIdentity: callerIdentity, rawJson: line, prompter: prompter)
     }
 
+    /// The original bootstrap namespace (unlock/list only — see
+    /// `ManagementHandlers.swift` for the full surface added when
+    /// `VaultSigner.app` stopped holding its own `Vault`). Kept here,
+    /// not moved, since these three predate and are unrelated to that
+    /// split — no reason to churn their location too.
     private func handleInternal(method: String, params: [String: Any], id: Any) -> Data {
         switch method {
         case "internal.unlock_compartment":
+            guard let vault else { return errorResponse(id: id, code: "no_vault_open", message: "no vault is currently open") }
             guard let compartmentId = params["compartment_id"] as? String, let passphrase = params["passphrase"] as? String else {
                 return errorResponse(id: id, code: "invalid_params", message: "compartment_id and passphrase are required")
             }
@@ -133,9 +158,11 @@ final class AgentServer {
                 return errorResponse(id: id, code: "unlock_failed", message: "\(error)")
             }
         case "internal.list_compartments":
+            guard let vault else { return resultResponse(id: id, result: ["compartments": []]) }
             let compartments = vault.listCompartments().map { ["compartment_id": $0.compartmentId, "label": $0.label, "unlocked": $0.unlocked] }
             return resultResponse(id: id, result: ["compartments": compartments])
         case "internal.unlock_key":
+            guard let vault else { return errorResponse(id: id, code: "no_vault_open", message: "no vault is currently open") }
             guard let compartmentId = params["compartment_id"] as? String, let keyId = params["key_id"] as? String,
                   let passphrase = params["passphrase"] as? String
             else {
@@ -149,15 +176,15 @@ final class AgentServer {
                 return errorResponse(id: id, code: "unlock_failed", message: "\(error)")
             }
         default:
-            return errorResponse(id: id, code: "method_not_found", message: "unknown method: \(method)")
+            return handleManagementInternal(method: method, params: params, id: id)
         }
     }
 
-    private func resultResponse(id: Any, result: Any) -> Data {
+    func resultResponse(id: Any, result: Any) -> Data {
         (try? JSONSerialization.data(withJSONObject: ["id": id, "result": result])) ?? Data("{}".utf8)
     }
 
-    private func errorResponse(id: Any, code: String, message: String) -> Data {
+    func errorResponse(id: Any, code: String, message: String) -> Data {
         (try? JSONSerialization.data(withJSONObject: ["id": id, "error": ["code": code, "message": message]])) ?? Data("{}".utf8)
     }
 }

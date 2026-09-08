@@ -134,7 +134,7 @@ struct ExportPacketView: View {
     }
 
     private func chooseDestinationAndExport() {
-        guard let compartmentId = state.unlockedCompartmentId, let vault = state.vault else { return }
+        guard state.unlockedCompartmentId != nil else { return }
         let encryption: FacadeExportEncryption
         switch encryptionChoice {
         case .asIs: encryption = .asIs
@@ -152,12 +152,12 @@ struct ExportPacketView: View {
 
         let keyIds = Array(selectedKeyIds)
         Task {
+            guard let bytes = await state.exportPacket(keyIds: keyIds, includeMasterKey: includeMasterKey, encryption: encryption) else {
+                errorMessage = "Export failed: \(state.errorMessage ?? "unknown error")"
+                state.clearError()
+                return
+            }
             do {
-                // Argon2id-derivation-heavy (options 2/3) — off the main
-                // thread so the UI doesn't freeze for ~1s.
-                let bytes = try await Task.detached(priority: .userInitiated) {
-                    try vault.exportPacket(compartmentId: compartmentId, keyIds: keyIds, includeMasterKey: includeMasterKey, encryption: encryption)
-                }.value
                 try bytes.write(to: url, options: .atomic)
                 dismiss()
             } catch {

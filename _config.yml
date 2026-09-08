@@ -1,0 +1,4 @@
+theme: jekyll-theme-cayman
+title: VaultSigner
+description: A portable, compact, multi-platform cryptographic signer.
+markdown: kramdown

@@ -12,11 +12,11 @@ struct UnlockView: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "lock.fill").font(.system(size: 40)).foregroundStyle(.secondary)
-            Text("Unlock Vault").font(.title2.bold())
+            Text("unlock.title").font(.title2.bold())
             Text(state.vaultPath ?? "").font(.caption).foregroundStyle(.secondary)
 
             if state.compartments.count > 1 {
-                Picker("Compartment", selection: $selectedCompartmentId) {
+                Picker("unlock.compartment_picker", selection: $selectedCompartmentId) {
                     ForEach(state.compartments, id: \.compartmentId) { compartment in
                         Text(compartment.label).tag(Optional(compartment.compartmentId))
                     }
@@ -25,11 +25,11 @@ struct UnlockView: View {
                 .frame(width: 260)
             }
 
-            SecureField("Master passphrase", text: $passphrase)
+            SecureField("unlock.master_passphrase_field", text: $passphrase)
                 .frame(width: 260)
                 .onSubmit(unlock)
 
-            Button("Unlock") { unlock() }
+            Button("unlock.unlock_button") { unlock() }
                 .buttonStyle(.borderedProminent)
                 .disabled(passphrase.isEmpty || currentCompartmentId == nil)
         }

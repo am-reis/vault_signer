@@ -23,32 +23,32 @@ struct CreateKeyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Create Key").font(.title2.bold())
+            Text("createkey.title").font(.title2.bold())
 
-            TextField("Label", text: $label)
-            TextField("Description (optional)", text: $description)
-            TextField("Resource, e.g. https://example.com", text: $resource)
-            TextField("Tags, comma-separated", text: $tagsText)
+            TextField("createkey.label_field", text: $label)
+            TextField("createkey.description_field", text: $description)
+            TextField("createkey.resource_field", text: $resource)
+            TextField("createkey.tags_field", text: $tagsText)
 
-            Picker("Key type", selection: $keyType) {
-                Text("Ed25519 (default)").tag(FacadeKeyType.ed25519)
-                Text("ECDSA P-256").tag(FacadeKeyType.ecdsaP256)
+            Picker("createkey.key_type_label", selection: $keyType) {
+                Text("createkey.key_type_ed25519_option").tag(FacadeKeyType.ed25519)
+                Text("common.key_type_ecdsa_p256").tag(FacadeKeyType.ecdsaP256)
             }
 
-            SecureField("Key passphrase", text: $passphrase)
-            SecureField("Confirm key passphrase", text: $confirmPassphrase)
+            SecureField("createkey.passphrase_field", text: $passphrase)
+            SecureField("createkey.confirm_passphrase_field", text: $confirmPassphrase)
             if !confirmPassphrase.isEmpty && confirmPassphrase != passphrase {
-                Text("Passphrases don't match").font(.caption).foregroundStyle(.red)
+                Text("common.passphrases_dont_match").font(.caption).foregroundStyle(.red)
             }
 
-            Text("This passphrase is independent of your vault's master passphrase — you'll need it again to sign or reveal this key.")
+            Text("createkey.passphrase_explanation")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Create") {
+                Button("common.cancel_button") { dismiss() }
+                Button("createkey.create_button") {
                     let tags = tagsText.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
                     Task {
                         if await state.createKey(

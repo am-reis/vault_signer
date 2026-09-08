@@ -19,8 +19,8 @@ struct KeyListView: View {
                     // build the equivalent empty state by hand.
                     VStack(spacing: 12) {
                         Image(systemName: "key").font(.system(size: 40)).foregroundStyle(.secondary)
-                        Text("No Keys Yet").font(.headline)
-                        Text("Create your first key to start signing.").font(.caption).foregroundStyle(.secondary)
+                        Text("keylist.no_keys_title").font(.headline)
+                        Text("keylist.no_keys_subtitle").font(.caption).foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -28,7 +28,7 @@ struct KeyListView: View {
                         NavigationLink(value: key.keyId) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(key.label).font(.headline)
-                                Text("\(key.resource.isEmpty ? "(no resource)" : key.resource) · \(keyTypeLabel(key.keyType)) · \(purposeLabel(key.purpose))")
+                                Text("\(key.resource.isEmpty ? String(localized: "keylist.no_resource") : key.resource) · \(keyTypeLabel(key.keyType)) · \(purposeLabel(key.purpose))")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -44,27 +44,27 @@ struct KeyListView: View {
             .navigationTitle(currentCompartmentLabel)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showingCreateKey = true } label: { Label("New Key", systemImage: "plus") }
+                    Button { showingCreateKey = true } label: { Label("keylist.new_key_button", systemImage: "plus") }
                 }
                 ToolbarItem(placement: .automatic) {
                     Menu {
-                        Button("Export Packet…") { showingExport = true }
-                        Button("Import Packet…") { showingImport = true }
+                        Button("keylist.export_packet_button") { showingExport = true }
+                        Button("keylist.import_packet_button") { showingImport = true }
                     } label: {
-                        Label("Import/Export", systemImage: "tray.and.arrow.up")
+                        Label("keylist.import_export_menu", systemImage: "tray.and.arrow.up")
                     }
                     // Without this, VoiceOver/Accessibility-tree tools
                     // read this control as "Outbox" (inferred from the
                     // SF Symbol) instead of the actual label above —
                     // found while UI-testing 2.3/2.4 via the
                     // Accessibility API (see the macOS README).
-                    .accessibilityLabel("Import/Export")
+                    .accessibilityLabel(Text("keylist.import_export_menu"))
                 }
                 ToolbarItem(placement: .automatic) {
-                    Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
+                    Button { showingSettings = true } label: { Label("keylist.settings_button", systemImage: "gearshape") }
                 }
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Lock") { state.lockAll() }
+                    Button("keylist.lock_button") { state.lockAll() }
                 }
             }
         }
@@ -85,21 +85,21 @@ struct KeyListView: View {
     }
 
     private var currentCompartmentLabel: String {
-        state.compartments.first(where: { $0.compartmentId == state.unlockedCompartmentId })?.label ?? "Keys"
+        state.compartments.first(where: { $0.compartmentId == state.unlockedCompartmentId })?.label ?? String(localized: "keylist.default_title")
     }
 
     private func keyTypeLabel(_ type: FacadeKeyType) -> String {
         switch type {
-        case .ed25519: return "Ed25519"
-        case .ecdsaP256: return "ECDSA P-256"
+        case .ed25519: return String(localized: "common.key_type_ed25519")
+        case .ecdsaP256: return String(localized: "common.key_type_ecdsa_p256")
         }
     }
 
     private func purposeLabel(_ purpose: FacadePurpose) -> String {
         switch purpose {
-        case .fido2: return "FIDO2"
-        case .customSigning: return "Custom signing"
-        case .both: return "FIDO2 + custom signing"
+        case .fido2: return String(localized: "common.purpose_fido2")
+        case .customSigning: return String(localized: "common.purpose_custom_signing")
+        case .both: return String(localized: "common.purpose_both")
         }
     }
 }

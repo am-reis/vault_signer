@@ -17,26 +17,26 @@ struct KeyDetailView: View {
 
     var body: some View {
         Form {
-            Section("Details") {
-                LabeledContent("Label", value: key.label)
-                if !key.description.isEmpty { LabeledContent("Description", value: key.description) }
-                if !key.resource.isEmpty { LabeledContent("Resource", value: key.resource) }
-                LabeledContent("Public key", value: String(key.publicKeyHex.prefix(16)) + "…")
-                LabeledContent("Created", value: key.createdAt)
-                if !key.tags.isEmpty { LabeledContent("Tags", value: key.tags.joined(separator: ", ")) }
+            Section("keydetail.details_section") {
+                LabeledContent("keydetail.label_field", value: key.label)
+                if !key.description.isEmpty { LabeledContent("keydetail.description_field", value: key.description) }
+                if !key.resource.isEmpty { LabeledContent("keydetail.resource_field", value: key.resource) }
+                LabeledContent("keydetail.public_key_field", value: String(key.publicKeyHex.prefix(16)) + "…")
+                LabeledContent("keydetail.created_field", value: key.createdAt)
+                if !key.tags.isEmpty { LabeledContent("keydetail.tags_field", value: key.tags.joined(separator: ", ")) }
             }
 
-            Section("Actions") {
-                Button("Change Passphrase…") { showingChangePassphrase = true }
-                Button("Reveal Raw Key…", role: .destructive) { showingReveal = true }
-                Button("Export This Key…") { exportSingleKey() }
+            Section("keydetail.actions_section") {
+                Button("keydetail.change_passphrase_button") { showingChangePassphrase = true }
+                Button("keydetail.reveal_raw_key_button", role: .destructive) { showingReveal = true }
+                Button("keydetail.export_button") { exportSingleKey() }
                 if let exportErrorMessage {
                     Text(exportErrorMessage).font(.caption).foregroundStyle(.red)
                 }
             }
 
             Section {
-                Button("Discard Key…", role: .destructive) { showingDiscardConfirm = true }
+                Button("keydetail.discard_button", role: .destructive) { showingDiscardConfirm = true }
             }
         }
         .formStyle(.grouped)
@@ -56,14 +56,14 @@ struct KeyDetailView: View {
     private func exportSingleKey() {
         guard state.unlockedCompartmentId != nil else { return }
         let panel = NSSavePanel()
-        panel.title = "Export Key"
+        panel.title = String(localized: "keydetail.panel_title")
         panel.nameFieldStringValue = "\(key.label).vltkey"
         panel.allowedContentTypes = []
         panel.allowsOtherFileTypes = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task {
             guard let bytes = await state.exportSingleKey(keyId: key.keyId) else {
-                exportErrorMessage = "Export failed: \(state.errorMessage ?? "unknown error")"
+                exportErrorMessage = String(format: String(localized: "keydetail.export_failed_format"), state.errorMessage ?? "unknown error")
                 state.clearError()
                 return
             }
@@ -71,7 +71,7 @@ struct KeyDetailView: View {
                 try bytes.write(to: url, options: .atomic)
                 exportErrorMessage = nil
             } catch {
-                exportErrorMessage = "Export failed: \(error)"
+                exportErrorMessage = String(format: String(localized: "keydetail.export_failed_format"), "\(error)")
             }
         }
     }
@@ -88,15 +88,15 @@ private struct ChangePassphraseView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Change Key Passphrase").font(.title2.bold())
-            SecureField("Current passphrase", text: $oldPassphrase)
-            SecureField("New passphrase", text: $newPassphrase)
-            SecureField("Confirm new passphrase", text: $confirmPassphrase)
-            if failed { Text("Incorrect current passphrase").font(.caption).foregroundStyle(.red) }
+            Text("changepassphrase.title").font(.title2.bold())
+            SecureField("changepassphrase.current_field", text: $oldPassphrase)
+            SecureField("changepassphrase.new_field", text: $newPassphrase)
+            SecureField("changepassphrase.confirm_field", text: $confirmPassphrase)
+            if failed { Text("changepassphrase.incorrect_current").font(.caption).foregroundStyle(.red) }
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Change") {
+                Button("common.cancel_button") { dismiss() }
+                Button("changepassphrase.change_button") {
                     Task {
                         if await state.changeKeyPassphrase(keyId: keyId, oldPassphrase: oldPassphrase, newPassphrase: newPassphrase) {
                             dismiss()
@@ -123,12 +123,16 @@ private struct RevealRawKeyView: View {
     @State private var revealed: String?
     @State private var failed = false
 
+    private var dismissButtonKey: LocalizedStringKey {
+        revealed == nil ? "common.cancel_button" : "common.done_button"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Danger Zone", systemImage: "exclamationmark.triangle.fill")
+            Label("revealkey.danger_zone_label", systemImage: "exclamationmark.triangle.fill")
                 .foregroundStyle(.red)
                 .font(.headline)
-            Text("This reveals the raw private key. Anyone who sees it can act as this key. It will not be copied to the clipboard automatically.")
+            Text("revealkey.warning_text")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -139,15 +143,15 @@ private struct RevealRawKeyView: View {
                     .padding(8)
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
             } else {
-                SecureField("Key passphrase", text: $passphrase)
-                if failed { Text("Incorrect passphrase").font(.caption).foregroundStyle(.red) }
+                SecureField("revealkey.passphrase_field", text: $passphrase)
+                if failed { Text("revealkey.incorrect_passphrase").font(.caption).foregroundStyle(.red) }
             }
 
             HStack {
                 Spacer()
-                Button(revealed == nil ? "Cancel" : "Done") { dismiss() }
+                Button(dismissButtonKey) { dismiss() }
                 if revealed == nil {
-                    Button("Reveal") {
+                    Button("revealkey.reveal_button") {
                         Task {
                             if let hex = await state.revealRawKeyHex(keyId: keyId, passphrase: passphrase) {
                                 revealed = hex
@@ -180,15 +184,15 @@ private struct DiscardKeyView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Discard Key", systemImage: "trash.fill").foregroundStyle(.red).font(.headline)
-            Text("This permanently deletes \"\(key.label)\". Type \"\(expected)\" to confirm.")
+            Label("discardkey.title", systemImage: "trash.fill").foregroundStyle(.red).font(.headline)
+            Text(String(format: String(localized: "discardkey.confirm_format"), key.label, expected))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             TextField(expected, text: $confirmText)
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Discard", role: .destructive) {
+                Button("common.cancel_button") { dismiss() }
+                Button("discardkey.discard_button", role: .destructive) {
                     Task {
                         if await state.discardKey(keyId: key.keyId, confirmText: confirmText) {
                             dismiss()

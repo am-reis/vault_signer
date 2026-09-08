@@ -22,16 +22,16 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Start VaultSigner at login", isOn: $startAtLoginEnabled)
+                Toggle("settings.start_at_login_toggle", isOn: $startAtLoginEnabled)
                     .onChange(of: startAtLoginEnabled) { newValue in setLoginItem(newValue) }
                 statusRow
             } footer: {
-                Text("Runs the background service that answers signing requests and FIDO2 prompts even when the VaultSigner window isn't open.")
+                Text("settings.start_at_login_footer")
                     .font(.caption)
             }
 
             Section {
-                Toggle("Auto-unlock on startup", isOn: $autoUnlockEnabled)
+                Toggle("settings.auto_unlock_toggle", isOn: $autoUnlockEnabled)
                     .disabled(state.unlockedCompartmentId == nil)
                     .onChange(of: autoUnlockEnabled) { newValue in
                         if newValue {
@@ -45,19 +45,19 @@ struct SettingsView: View {
                         }
                     }
             } footer: {
-                Text("Off by default. When on, this compartment's master passphrase is stored in the Keychain so it unlocks automatically at login, without you typing anything. This is weaker than the vault's normal design — see the confirmation dialog for what that means before turning it on.")
+                Text("settings.auto_unlock_footer")
                     .font(.caption)
             }
 
             Section {
-                Button("Back Up Everything…") { showingBackupEverything = true }
+                Button("settings.backup_everything_button") { showingBackupEverything = true }
                     .disabled(state.unlockedCompartmentId == nil)
-                Button("Back Up Master Key Only…") { showingBackupMasterKeyOnly = true }
+                Button("settings.backup_master_only_button") { showingBackupMasterKeyOnly = true }
                     .disabled(state.unlockedCompartmentId == nil)
             } header: {
-                Text("Backup")
+                Text("settings.backup_header")
             } footer: {
-                Text("\"Back up everything\" protects all keys + the master key together (spec §5.4 recommends the one-time transfer password option for backups stored anywhere other than an already-encrypted local disk). \"Master key only\" is a shortcut for people who store key recovery material separately — on its own it does NOT protect anything, since the per-key blobs are also required.")
+                Text("settings.backup_footer")
                     .font(.caption)
             }
 
@@ -68,7 +68,7 @@ struct SettingsView: View {
                     state.closeVault()
                 }
             } header: {
-                Text("Vaults")
+                Text("settings.vaults_header")
             } footer: {
                 Text("manage_vaults.settings_footer")
                     .font(.caption)
@@ -83,7 +83,7 @@ struct SettingsView: View {
         .padding(.top, 8)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Done") { dismiss() }
+                Button("common.done_button") { dismiss() }
             }
         }
         .preventsScreenCapture()
@@ -121,11 +121,11 @@ struct SettingsView: View {
     private var statusRow: some View {
         switch loginItemState {
         case .requiresApproval:
-            Label("Approve VaultSigner in System Settings → General → Login Items & Extensions", systemImage: "exclamationmark.triangle.fill")
+            Label("settings.approve_login_item_message", systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
                 .foregroundStyle(.orange)
         case .notFound:
-            Label("Login item not found in this build (development build outside /Applications?)", systemImage: "exclamationmark.circle")
+            Label("settings.login_item_not_found_message", systemImage: "exclamationmark.circle")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         case .enabled, .disabled:
@@ -138,7 +138,7 @@ struct SettingsView: View {
             try LoginItemManager.setEnabled(enabled)
             errorMessage = nil
         } catch {
-            errorMessage = "Couldn't change login item: \(error.localizedDescription)"
+            errorMessage = String(format: String(localized: "settings.login_item_change_failed_format"), error.localizedDescription)
             startAtLoginEnabled = LoginItemManager.currentState == .enabled
         }
         loginItemState = LoginItemManager.currentState
@@ -152,7 +152,7 @@ struct SettingsView: View {
     private func enableAutoUnlock(passphrase: String) async {
         guard let compartmentId = state.unlockedCompartmentId else { return }
         guard await state.enableAutoUnlock(compartmentId: compartmentId, passphrase: passphrase) else {
-            errorMessage = state.errorMessage ?? "Incorrect master passphrase; auto-unlock was not enabled."
+            errorMessage = state.errorMessage ?? String(localized: "settings.auto_unlock_incorrect_passphrase")
             state.clearError()
             autoUnlockEnabled = false
             return
@@ -173,23 +173,19 @@ private struct AutoUnlockConfirmationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("Enable Auto-Unlock?", systemImage: "exclamationmark.triangle.fill")
+            Label("autounlockconfirm.title", systemImage: "exclamationmark.triangle.fill")
                 .font(.headline)
                 .foregroundStyle(.orange)
-            Text("""
-            Your master passphrase will be stored in the macOS Keychain so this compartment unlocks automatically every time you log in or restart — no one needs to type anything.
-
-            This means a decryption path to your key list and labels now persists across a reboot without your input. It does not expose your keys themselves — each key still needs its own separate passphrase to sign or reveal. But anyone who can run code as you on this Mac may be able to read this stored passphrase too, similar to other Keychain-backed secrets.
-            """)
+            Text("autounlockconfirm.body_text")
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)
 
-            SecureField("Confirm master passphrase", text: $passphrase)
+            SecureField("autounlockconfirm.confirm_passphrase_field", text: $passphrase)
 
             HStack {
                 Spacer()
-                Button("Cancel") { onCancel() }
-                Button("Enable Auto-Unlock") { onConfirm(passphrase) }
+                Button("common.cancel_button") { onCancel() }
+                Button("autounlockconfirm.enable_button") { onConfirm(passphrase) }
                     .buttonStyle(.borderedProminent)
                     .disabled(passphrase.isEmpty)
             }

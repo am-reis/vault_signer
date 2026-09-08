@@ -36,9 +36,13 @@ struct ExportPacketView: View {
         case oneTimeTransferPassword
     }
 
+    private var titleKey: LocalizedStringKey {
+        (forceIncludeMasterKey && lockSelectionToAllKeys) ? "exportpacket.title_backup" : "exportpacket.title_export"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(forceIncludeMasterKey && lockSelectionToAllKeys ? "Back Up" : "Export Keys").font(.title2.bold())
+            Text(titleKey).font(.title2.bold())
 
             if !lockSelectionToAllKeys {
                 List(state.keys, id: \.keyId, selection: $selectedKeyIds) { key in
@@ -48,13 +52,13 @@ struct ExportPacketView: View {
             }
 
             if !forceIncludeMasterKey {
-                Toggle("Include master key in export", isOn: $includeMasterKey)
-                Text("Lets the recipient treat this as carrying its own master key (spec §5.2.1) instead of just independently-passphrased keys.")
+                Toggle("exportpacket.include_master_toggle", isOn: $includeMasterKey)
+                Text("exportpacket.include_master_explanation")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
-            Text("Protect this export with:").font(.headline)
+            Text("exportpacket.protect_with_label").font(.headline)
             encryptionChoiceCards
 
             if let errorMessage {
@@ -63,8 +67,8 @@ struct ExportPacketView: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Export…") { chooseDestinationAndExport() }
+                Button("common.cancel_button") { dismiss() }
+                Button("exportpacket.export_button") { chooseDestinationAndExport() }
                     .buttonStyle(.borderedProminent)
                     .disabled(!canExport)
             }
@@ -93,23 +97,23 @@ struct ExportPacketView: View {
     @ViewBuilder
     private var encryptionChoiceCards: some View {
         VStack(alignment: .leading, spacing: 10) {
-            encryptionCard(.asIs, title: "Just package the keys as-is") {
-                Text("Keys stay encrypted with their own passphrases; no extra layer is added. **The label, description, and resource for each key travel in the clear inside this file.** Only use this if the recipient already knows each key's passphrase and the transport channel itself is trusted.")
+            encryptionCard(.asIs, title: "exportpacket.option_asis_title") {
+                Text("exportpacket.option_asis_detail")
             }
-            encryptionCard(.destinationMasterPassword, title: "Re-encrypt for the destination vault's master password") {
+            encryptionCard(.destinationMasterPassword, title: "exportpacket.option_destination_title") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Choose this only if you know the master password of the vault you're importing into.")
+                    Text("exportpacket.option_destination_detail")
                     if encryptionChoice == .destinationMasterPassword {
-                        SecureField("Destination vault's master passphrase", text: $destinationPassword)
+                        SecureField("exportpacket.option_destination_field", text: $destinationPassword)
                     }
                 }
             }
-            encryptionCard(.oneTimeTransferPassword, title: "Protect with a one-time transfer password") {
+            encryptionCard(.oneTimeTransferPassword, title: "exportpacket.option_transfer_title") {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Set a new passphrase for this export only. Deliver it to the recipient through a separate channel from the file itself.")
+                    Text("exportpacket.option_transfer_detail")
                     if encryptionChoice == .oneTimeTransferPassword {
-                        SecureField("Transfer passphrase", text: $transferPassword)
-                        SecureField("Confirm transfer passphrase", text: $confirmTransferPassword)
+                        SecureField("exportpacket.transfer_passphrase_field", text: $transferPassword)
+                        SecureField("exportpacket.confirm_transfer_field", text: $confirmTransferPassword)
                     }
                 }
             }
@@ -117,7 +121,7 @@ struct ExportPacketView: View {
     }
 
     @ViewBuilder
-    private func encryptionCard(_ choice: EncryptionChoice, title: String, @ViewBuilder detail: () -> some View) -> some View {
+    private func encryptionCard(_ choice: EncryptionChoice, title: LocalizedStringKey, @ViewBuilder detail: () -> some View) -> some View {
         Button { encryptionChoice = choice } label: {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -144,7 +148,7 @@ struct ExportPacketView: View {
         }
 
         let panel = NSSavePanel()
-        panel.title = "Export Packet"
+        panel.title = String(localized: "exportpacket.panel_title")
         panel.nameFieldStringValue = "Export.vltpack"
         panel.allowedContentTypes = []
         panel.allowsOtherFileTypes = true
@@ -153,7 +157,7 @@ struct ExportPacketView: View {
         let keyIds = Array(selectedKeyIds)
         Task {
             guard let bytes = await state.exportPacket(keyIds: keyIds, includeMasterKey: includeMasterKey, encryption: encryption) else {
-                errorMessage = "Export failed: \(state.errorMessage ?? "unknown error")"
+                errorMessage = String(format: String(localized: "exportpacket.export_failed_format"), state.errorMessage ?? "unknown error")
                 state.clearError()
                 return
             }
@@ -161,7 +165,7 @@ struct ExportPacketView: View {
                 try bytes.write(to: url, options: .atomic)
                 dismiss()
             } catch {
-                errorMessage = "Export failed: \(error)"
+                errorMessage = String(format: String(localized: "exportpacket.export_failed_format"), "\(error)")
             }
         }
     }

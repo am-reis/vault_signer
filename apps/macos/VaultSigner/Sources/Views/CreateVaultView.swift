@@ -19,39 +19,39 @@ struct CreateVaultView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Create New Vault").font(.title2.bold())
+            Text("createvault.title").font(.title2.bold())
 
-            LabeledContent("Compartment label") {
-                TextField("Personal", text: $label)
+            LabeledContent("createvault.compartment_label_field") {
+                TextField("createvault.compartment_label_placeholder", text: $label)
             }
 
             HStack {
-                Text(destinationURL?.lastPathComponent ?? "No location chosen")
+                Text(destinationURL?.lastPathComponent ?? String(localized: "createvault.no_location_chosen"))
                     .foregroundStyle(destinationURL == nil ? .secondary : .primary)
                 Spacer()
-                Button("Choose Location…") { chooseDestination() }
+                Button("createvault.choose_location_button") { chooseDestination() }
             }
 
-            SecureField("Master passphrase", text: $passphrase)
-            SecureField("Confirm passphrase", text: $confirmPassphrase)
+            SecureField("createvault.master_passphrase_field", text: $passphrase)
+            SecureField("createvault.confirm_passphrase_field", text: $confirmPassphrase)
             if !confirmPassphrase.isEmpty && confirmPassphrase != passphrase {
-                Text("Passphrases don't match").font(.caption).foregroundStyle(.red)
+                Text("common.passphrases_dont_match").font(.caption).foregroundStyle(.red)
             }
 
-            Picker("Device profile", selection: $profile) {
-                Text("Desktop").tag(FacadeDeviceProfile.desktop)
-                Text("Mobile").tag(FacadeDeviceProfile.mobile)
+            Picker("createvault.device_profile_label", selection: $profile) {
+                Text("createvault.profile_desktop").tag(FacadeDeviceProfile.desktop)
+                Text("createvault.profile_mobile").tag(FacadeDeviceProfile.mobile)
             }
             .pickerStyle(.segmented)
 
-            Text("The master passphrase protects your key list and labels, but not the keys themselves — each key gets its own independent passphrase when you create it.")
+            Text("createvault.master_passphrase_explanation")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
-                Button("Create Vault") {
+                Button("common.cancel_button") { dismiss() }
+                Button("createvault.create_button") {
                     guard let url = destinationURL else { return }
                     Task {
                         await state.createVault(path: url.path, label: label, masterPassphrase: passphrase, profile: profile)
@@ -69,7 +69,7 @@ struct CreateVaultView: View {
 
     private func chooseDestination() {
         let panel = NSSavePanel()
-        panel.title = "Create Vault"
+        panel.title = String(localized: "createvault.panel_title")
         panel.nameFieldStringValue = "MyVault.vlt"
         panel.allowedContentTypes = []
         panel.allowsOtherFileTypes = true

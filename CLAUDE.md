@@ -63,7 +63,7 @@ Built artifacts are published as GitHub Releases attached to the corresponding t
 - `VaultSigner-macOS-vX.Y.Z.zip` — the signed application, for end users.
 - `vaultcore-vX.Y.Z-macos.zip` — the compiled library, headers, and generated Swift bindings, for developers who want to use vaultcore without building it themselves.
 
-These are signed with a Development certificate, not a Developer ID — a download from a stranger's machine will trigger Gatekeeper's "unidentified developer" warning (right-click → Open bypasses it). Warning-free public distribution needs Developer ID signing and notarization, which requires a paid Apple Developer Program membership — not yet set up. See `PROGRESS.md` item 2.7 for the same underlying constraint.
+Opening a downloaded copy on another Mac triggers Gatekeeper's "unidentified developer" warning (right-click → Open bypasses it). Developers can avoid this by building from source with their own Apple ID instead. Wide, public-facing distribution — Developer ID signing and notarization — isn't part of this project's current stage.
 
 Publish via the GitHub web UI (Releases → Draft a new release → select the tag → upload the files → paste the corresponding `CHANGELOG.md` section as the release notes), or with the `gh` CLI once installed: `gh release create vX.Y.Z <files> --notes-file <changelog-section>`.
 

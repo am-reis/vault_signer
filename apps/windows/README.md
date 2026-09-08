@@ -6,6 +6,12 @@ work, since that work happens on a Windows machine this repository
 wasn't developed on. Everything in this file was actually run and
 verified where stated; anything not verified says so explicitly.
 
+No Windows machine on hand? [`docs/qemu-vm-setup.md`](docs/qemu-vm-setup.md)
+covers running one on Debian via QEMU/OVMF/swtpm (UEFI + Secure Boot +
+a software TPM, so Windows Hello and the WebAuthn platform
+authenticator actually work), driven from the CLI and reached over
+SSH + VNC.
+
 ## Architecture (mirrors macOS's Phase 2 shape — see `apps/macos/README.md`)
 
 Per spec §2, all cryptographic and protocol logic lives in `vaultcore`

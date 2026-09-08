@@ -734,6 +734,19 @@ here:
   real Windows machine.
 - Created the `platform/windows` branch (from `shared`, per
   `CLAUDE.md`'s branch model) as the starting point for that work.
+- **QEMU Windows VM host environment now actually provisioned** on the
+  real target Debian server (not just written up): `libtpms`/`swtpm`
+  built from source (bullseye never packaged either — a real gap the
+  original guide's "Debian 11's ... swtpm ... packages are old but
+  fully adequate" claim got wrong, now corrected), VM disk + per-VM
+  OVMF vars + TPM state dir created, and `start-tpm.sh`/`install.sh`/
+  `run.sh` scripts ready to go. See `apps/windows/docs/qemu-vm-setup.md`
+  for the full detail, including the exact path deviation (disk-space-
+  driven: the VM lives on this server's `/home/blackshark/backup`
+  spinning disk, not `/`). **Not done yet**: the Windows 11 ISO itself
+  and the actual (interactive, VNC-driven) OS install — left for a
+  human, since installer GUI interaction isn't something this session
+  can drive.
 
 ## Phase 4 — Android
 

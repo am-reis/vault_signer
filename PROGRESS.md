@@ -403,10 +403,25 @@ here.
       this may already be resolved, but it hasn't been specifically
       re-tested since the signing fix. If it still happens, denying the
       prompt still fails silently (agent just starts locked) rather than
-      surfacing an error — full detail in the macOS README. The known
-      UI-vs-agent architecture gap (management UI should route mutations
-      through the agent, not hold its own `Vault`) is also in the macOS
-      README.
+      surfacing an error — full detail in the macOS README.
+
+      **UI-vs-agent unlock sync, added this session (not the same as
+      auto-unlock).** The management UI holding its own separate
+      in-process `Vault` from the agent's meant unlocking a compartment
+      in `VaultSigner.app`'s window never made the agent aware of it —
+      confirmed directly: the Node.js RPC demo showed zero keys with the
+      vault visibly unlocked in the app. The fix is not "just turn on
+      auto-unlock" (a real user correctly rejected that suggestion: it's
+      a deliberate, persistent, Keychain-backed opt-in with its own
+      security tradeoffs, not a substitute for the app's own unlock
+      actually working). `Shared/AgentClient.swift` is a minimal client
+      for the agent's `internal.*` bootstrap namespace; `AppState`'s
+      unlock and create-vault flows now forward the same passphrase the
+      user already typed, once, over the socket — nothing persisted
+      anywhere, best-effort (fails silently if the agent isn't running).
+      Verified end-to-end with a disposable test vault: unlocked through
+      the real UI, then confirmed via a direct socket query that the
+      agent listed the real key with no manual `internal.*` calls.
 
       **Minor, cosmetic, not yet chased down:** the built app also ends
       up with an unused second copy of `VaultSignerAgent.app` at

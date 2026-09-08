@@ -8,9 +8,9 @@ Current implementation status: [`PROGRESS.md`](PROGRESS.md).
 
 Built, ready-to-use releases are published on the [Releases page](https://github.com/am-reis/vault_signer/releases), attached to their version tag. Each macOS release includes the signed application (for end users) and a standalone build of the `vaultcore` library with its Swift bindings (for developers who want to use it without building from source).
 
-These builds are signed with an Apple Development certificate, not a Developer ID. Opening a downloaded copy on another Mac will trigger Gatekeeper's "unidentified developer" warning — right-click the app and choose Open to bypass it. Publishing without that warning requires Developer ID signing and notarization, which needs a paid Apple Developer Program membership; this project does not currently have one.
+Opening a downloaded copy on another Mac will trigger Gatekeeper's "unidentified developer" warning — right-click the app and choose Open to bypass it.
 
-Developers who prefer to avoid the Gatekeeper warning entirely, or who want a build signed with their own certificate, can build from source instead — see `apps/macos/README.md`.
+Developers can avoid this entirely by building from source with their own Apple ID — see `apps/macos/README.md`. Wide, public-facing distribution isn't part of this project's current stage.
 
 ## Branching and releases
 

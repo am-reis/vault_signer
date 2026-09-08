@@ -742,6 +742,26 @@ session's macOS UI-testing made clear that a technically-correct app is
 not the same thing as a usable one for someone with no cryptography/FIDO
 background. Item 8.5 above is the corresponding execution-plan entry.
 
+- [x] 8.6 Third-party protocol integration documentation (no spec
+      amendment needed — this documents what §7 already specifies, for
+      the audience of developers building against it, rather than
+      introducing a new requirement). Split to match the shared/platform
+      branch structure: `docs/protocol-integration/README.md` (shared)
+      covers the platform-agnostic wire format, the two `vaultsigner.*`
+      methods, authorization behavior, the exact rate-limiting formula
+      (5 failures, 1s doubling to a 300s cap), and the full error
+      catalog; `apps/macos/docs/protocol-integration.md`
+      (`platform/macos`) covers the socket path/framing, discovery
+      caveats specific to a third-party app (it can't launch the agent
+      itself; an empty key list usually means no compartment is
+      unlocked), the agent-specific `no_vault_open` error, and runnable
+      Python/Node.js/Swift examples — the Python and Node.js ones point
+      at the already-verified `demos/rpc-demo-client`/`demos/rpc-demo-nodejs`
+      apps rather than duplicating untested code. Both docs explicitly
+      scope out `internal.*` (authenticated, VaultSigner-app-only) and
+      FIDO2/WebAuthn (a separate OS-level integration path) so a reader
+      doesn't build against either by mistake.
+
 ---
 
 ## Open questions carried from spec §13 (not resolved here — product decisions)

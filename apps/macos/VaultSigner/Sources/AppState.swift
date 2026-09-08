@@ -86,6 +86,7 @@ final class AppState: ObservableObject {
         if let first = compartments.first {
             unlockedCompartmentId = first.compartmentId
             refreshKeys()
+            AgentClient.syncUnlockCompartment(compartmentId: first.compartmentId, passphrase: masterPassphrase)
         }
     }
 
@@ -112,6 +113,7 @@ final class AppState: ObservableObject {
         unlockedCompartmentId = compartmentId
         refreshCompartments()
         refreshKeys()
+        AgentClient.syncUnlockCompartment(compartmentId: compartmentId, passphrase: passphrase)
     }
 
     func lockAll() {

@@ -1238,21 +1238,52 @@ reasoning about the code):
   correct) — created a real key (`claude-test-key`, Ed25519 /
   CustomSigning), confirmed it appeared in the key list, selected it
   and confirmed the detail panel populated correctly (label,
-  description, a real-looking 65-hex-char public key), then discarded
-  it via the same confirm-text flow the UI requires. Pipe stayed
-  healthy throughout the whole flow.
+  description, a real 64-hex-char public key), then discarded it via
+  the same confirm-text flow the UI requires. Pipe stayed healthy
+  throughout the whole flow.
 - vaultcore itself was not touched — this was entirely a
   `VaultSignerAgent`/.NET-side bug.
 
-**Not attempted this session**: resume step 3 (a real
-`vaultsigner.sign` round trip exercising `WinFormsPassphrasePrompter`'s
-real dialog) and step 4 (WebAuthn plugin-authenticator COM
-registration research) from the previous checkpoint — both still open,
-now unblocked.
+**Resume step 3 also completed this session**: a real end-to-end
+`vaultsigner.sign` round trip. Created a second key
+(`sign-test-key`, Ed25519 / CustomSigning) directly via
+`internal.create_key`, then called `vaultsigner.sign` from a raw
+PowerShell pipe client (deliberately *not* `VaultSignerUI` — proves
+`vaultsigner.*` really is reachable by an arbitrary third-party
+caller, per spec/the protocol doc, not just the first-party UI). The
+call blocks correctly until answered: `WinFormsPassphrasePrompter`'s
+real dialog appeared (found by window title via `EnumWindows`,
+confirmed visible on-screen by the user, not just detected
+programmatically), correctly named the *real* calling process —
+"`powershell.exe` wants to sign with a VaultSigner key" — not
+anything from the request itself, matching spec's requirement that
+the shown identity come from OS-level process identity. Answered it
+for real via UI Automation (`ValuePattern.SetValue` on the passphrase
+field, `InvokePattern.Invoke()` on Allow) rather than skipping/mocking
+it. Got back a real signature: `signature_b64` decodes to 64 bytes
+(a raw Ed25519 signature, matching the protocol doc's documented
+format), and `public_key_b64` decodes to the exact same 32 bytes
+`internal.create_key` had returned as `public_key_hex` for that key.
+Test key discarded afterward.
 
-**Not yet committed** — this checkpoint's code changes
-(`apps/windows/VaultSignerAgent/AgentServer.cs`) and this `PROGRESS.md`
-update are sitting uncommitted in the working tree as of this entry.
+One practical lesson from driving this: a `Start-Job` background job
+and any UI Automation interaction with what it triggers must happen
+within *one* PowerShell invocation/process — job state doesn't survive
+across separate process launches, so answering the dialog has to be
+scripted inline (poll for the window, then act on it, then
+`Wait-Job`/`Receive-Job`) rather than split across steps.
+
+**Not attempted this session**: step 4 (WebAuthn plugin-authenticator
+COM registration research) from the previous checkpoint — still open,
+research only, no system-wide registration without the user's explicit
+sign-off.
+
+The pipe fix itself (`apps/windows/VaultSignerAgent/AgentServer.cs`)
+plus this checkpoint's first half were committed on `platform/windows`
+as `7fe9efb`. The `vaultsigner.sign` verification recorded just above
+was written up after that commit and is (as of this line) sitting
+uncommitted in the working tree, code-change-free — no source changed
+for step 3, only this file.
 
 ## Phase 4 — Android
 

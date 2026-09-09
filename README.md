@@ -6,7 +6,7 @@ Current implementation status: [`PROGRESS.md`](PROGRESS.md).
 
 ## Downloads
 
-Built, ready-to-use releases are published on the [Releases page](https://github.com/am-reis/vault_signer/releases), attached to their version tag. Each macOS release includes the signed application (for end users) and a standalone build of the `vaultcore` library with its Swift bindings (for developers who want to use it without building from source).
+Built, ready-to-use releases are published on the [Releases page](https://github.com/am-reis/vault_signer/releases). Each platform ships and versions independently — a macOS release is tagged `macos-vX.Y.Z`, and includes the signed application (for end users) plus a standalone build of the `vaultcore` library with its Swift bindings, versioned separately as `vaultcore-vA.B.C` (for developers who want the library without building from source). Other platforms follow the same pattern under their own tag as they ship.
 
 Opening a downloaded copy on another Mac will trigger Gatekeeper's "unidentified developer" warning — right-click the app and choose Open to bypass it.
 

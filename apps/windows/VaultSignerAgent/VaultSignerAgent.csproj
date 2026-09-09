@@ -12,6 +12,10 @@
          LSUIElement accessory-policy app) — WinFormsPassphrasePrompter
          is the only UI this process ever shows, on demand. -->
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- uniffi-bindgen-cs's generated bindings use unsafe pointer code
+         for buffer marshalling (confirmed by trying it: without this,
+         build fails with CS0227 at several points in Generated/vaultcore.cs). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

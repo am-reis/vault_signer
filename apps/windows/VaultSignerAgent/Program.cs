@@ -1,4 +1,4 @@
-using VaultSigner.Core;
+using uniffi.vaultcore;
 
 namespace VaultSignerAgent;
 
@@ -49,13 +49,13 @@ internal static class Program
                         vault.UnlockCompartment(autoUnlockCompartmentId, passphrase);
                         Console.WriteLine($"VaultSignerAgent: auto-unlocked compartment {autoUnlockCompartmentId}");
                     }
-                    catch (VaultException e)
+                    catch (FacadeException e)
                     {
                         Console.Error.WriteLine($"VaultSignerAgent: auto-unlock failed for {autoUnlockCompartmentId}: {e.Message}");
                     }
                 }
             }
-            catch (VaultException e)
+            catch (FacadeException e)
             {
                 // Stay alive regardless — internal.open_vault/internal.create_vault
                 // can still recover from a missing/corrupt configured path.

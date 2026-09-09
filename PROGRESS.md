@@ -865,32 +865,102 @@ explicitly because of that.
   checkpoint, this session's commits are local-only on both `shared`
   and `platform/windows` — not yet pushed to `origin`.**
 
+### Session checkpoint (this entry): VaultSignerAgent compiles clean against real bindings
+
+Done on a dedicated QEMU test VM (Windows 11, installed fresh onto a
+physical SSD passed through to the VM directly — see
+`apps/windows/docs/qemu-vm-setup.md` — not the personal laptop from the
+previous entry). Picked up exactly at that entry's resume steps 3–4;
+steps 1–2 (disk space, git re-auth) didn't apply here since this VM's
+disk is dedicated and empty, and this session's own git identity was
+set up fresh (SSH deploy key, not the credential-manager path that
+blocked the personal laptop).
+
+**Verified, real, and now pushed:**
+- `cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs --tag v0.10.0+v0.29.4`
+  and `apps/windows/Scripts/generate-csharp-bindings.ps1` both run
+  clean, producing a real `Generated/vaultcore.cs` (163KB) from
+  vaultcore's actual compiled `uniffi`-feature build.
+- **`VaultSignerAgent` now builds with 0 errors, 0 warnings** against
+  those real bindings — the previous entry's guessed
+  method/type/property names needed several real, mechanical fixes
+  (below), now confirmed correct rather than assumed.
+- vaultcore's own build+test suite re-verified on this machine too
+  (113 passed, 0 failed, 1 intentionally ignored), independent of the
+  personal-laptop session's earlier confirmation — a second real data
+  point on a different machine.
+
+**Real bugs found and fixed, not guessed at:**
+- `generate-csharp-bindings.ps1` itself had a latent bug: `uniffi-
+  bindgen-cs --library` runs `cargo metadata` internally, resolved
+  from the **current working directory**, not from the dylib's path.
+  Running the script from outside the repo tree failed with "could not
+  find `Cargo.toml`" even though the dylib built fine. Fixed by
+  `Push-Location`ing into `vaultcore/` before that specific call.
+- **Namespace mismatch**: the hand-written C# assumed `VaultSigner.Core`;
+  the real generated namespace is `uniffi.vaultcore`. One-line fix,
+  four files (`AgentServer.cs`, `ManagementHandlers.cs`, `Program.cs`,
+  `WinFormsPassphrasePrompter.cs`).
+- **Exception type**: assumed `VaultException`; the real generated type
+  is `FacadeException` (matching the `Facade`-prefixed naming already
+  correctly guessed for `FacadeKeyType`/`FacadePurpose`/
+  `FacadeDeviceProfile`). Fixed in `ManagementHandlers.cs`, `Program.cs`.
+- **Callback interface name**: assumed `IPassphrasePrompter` (C#
+  convention); the real generated interface is `PassphrasePrompter`, no
+  `I` prefix (uniffi-bindgen-cs doesn't apply C# naming conventions to
+  Rust trait names). One-line fix in `WinFormsPassphrasePrompter.cs`;
+  the method signature itself (`string? Prompt(string, string)`) was
+  already exactly right.
+- **`CompartmentInfo`/`KeyInfo` field casing**: these are C# `record`s
+  with positional-parameter properties, which take the **exact
+  parameter name given** — uniffi-bindgen-cs emits camelCase parameter
+  names (`@compartmentId`, `@label`, ...), so the real properties are
+  `compartmentId`/`label`/`unlocked`/etc., not the PascalCase
+  `CompartmentId`/`Label`/`Unlocked` that would be conventional
+  hand-written C#. Fixed every access site in `ManagementHandlers.cs`.
+- **`ListCompartments()`/`ListKeys()` return plain arrays**
+  (`CompartmentInfo[]`/`KeyInfo[]`), not `List<T>` — so
+  `.ConvertAll(...)` (a `List<T>` instance method) doesn't resolve the
+  way it would on a list; fixed to the static `Array.ConvertAll(array,
+  converter)` form. Same reasoning fixed a `List<string>` passed where
+  `CreateKey`'s `tags` parameter needs `string[]` — changed
+  `GetStringArray`'s return type to `string[]` directly.
+- **Missing `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>`**: the
+  generated bindings use `unsafe` pointer code for buffer marshalling;
+  without this the build fails with `CS0227` at several points.
+  Genuinely missing from `VaultSignerAgent.csproj`, not something the
+  previous session could have caught without a real compile.
+- **A real `uniffi-bindgen-cs` v0.10.0+v0.29.4 codegen bug**, not a
+  vaultcore or hand-written-code issue: any Rust `Vec<Vec<u8>>` (used
+  for incoming key blobs in the not-yet-ported merge functions) emits
+  an invalid jagged-array allocation — `new byte[][(length)]`, which
+  isn't legal C# (the rank specifier lands in the wrong bracket pair).
+  Worked around with a targeted post-generation regex patch in
+  `generate-csharp-bindings.ps1` (`new byte[][(length)]` →
+  `new byte[length][]`) rather than hand-editing `Generated/`, since
+  that directory is regenerated from scratch every run. Worth reporting
+  upstream at some point; not blocking in the meantime.
+
+**Not yet done, still open:**
+- `PeerAuthentication.cs`'s path-based caller check (already documented
+  as weaker than macOS's code-signature check) — unchanged this
+  session, still a known real gap.
+- Everything below in "Exact resume steps" — `VaultSignerUI`, a real
+  named-pipe round trip test, and WebAuthn research — none of that was
+  attempted this session; this checkpoint is scoped to getting
+  `VaultSignerAgent` itself to actually compile against real bindings.
+
 **Exact resume steps, next session, in order:**
-1. Free real space on `C:` (Windows Update cleanup is the safe ~4GB
-   win; a full Disk Cleanup covers more) or continue on a machine with
-   more room.
-2. Re-authenticate git (`git push` will prompt the credential manager;
-   complete its browser login), then push both `shared` and
-   `platform/windows` — nothing about that needs redoing, it's already
-   committed locally.
-3. `cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs --tag v0.10.0+v0.29.4`
-   (needs the now-working MSVC linker), then
-   `apps/windows/Scripts/generate-csharp-bindings.ps1`.
-4. `dotnet build` on `VaultSignerAgent` against the real generated
-   `Generated/vaultcore.cs` — fix whatever naming mismatches surface
-   (method/type PascalCasing was inferred from the Rust source and
-   macOS's Swift bindings, not confirmed against real `uniffi-bindgen-
-   cs` output yet).
-5. `dotnet restore`/`dotnet build` on `VaultSignerUI`, then actually
+1. `dotnet restore`/`dotnet build` on `VaultSignerUI`, then actually
    build the screens (Welcome/create-open, key list, create key, key
    detail) against a `ManagementClient.cs` calling the now-verified
    `VaultSignerAgent` over its named pipe — none of that exists yet,
    only the unmodified template.
-6. Run `apps/windows/VaultSignerAgent` for real, connect a minimal test
+2. Run `apps/windows/VaultSignerAgent` for real, connect a minimal test
    client (mirroring `apps/macos/uniffi-verify/agent_test_client.py`)
    over the named pipe, and verify a real `vaultsigner.sign` round trip
    — spec item 3.6, not attempted yet.
-7. Item 3.4 (WebAuthn plugin-authenticator COM registration) — research
+3. Item 3.4 (WebAuthn plugin-authenticator COM registration) — research
    only so far (none done this session); do not actually register
    anything system-wide without the user's explicit sign-off, since
    that changes system-level security surface, same caution macOS's

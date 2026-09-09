@@ -1,5 +1,5 @@
 using System.Text.Json;
-using VaultSigner.Core;
+using uniffi.vaultcore;
 
 namespace VaultSignerAgent;
 
@@ -53,7 +53,7 @@ internal sealed class ManagementHandlers
                 _ => AgentServer.ErrorResponse(id, "method_not_found", $"unknown method: {method}"),
             };
         }
-        catch (VaultException e)
+        catch (FacadeException e)
         {
             // Every vaultcore facade error surfaces through here uniformly
             // (mirrors Swift's `catch { "\(error)" }` — the underlying
@@ -79,7 +79,7 @@ internal sealed class ManagementHandlers
         var compartments = created.ListCompartments();
         return AgentServer.ResultResponse(id, new Dictionary<string, object?>
         {
-            ["compartments"] = compartments.ConvertAll(EncodeCompartment),
+            ["compartments"] = Array.ConvertAll(compartments, EncodeCompartment),
         });
     }
 
@@ -100,7 +100,7 @@ internal sealed class ManagementHandlers
         var compartments = Vault?.ListCompartments() ?? [];
         return AgentServer.ResultResponse(id, new Dictionary<string, object?>
         {
-            ["compartments"] = compartments.ConvertAll(EncodeCompartment),
+            ["compartments"] = Array.ConvertAll(compartments, EncodeCompartment),
         });
     }
 
@@ -145,7 +145,7 @@ internal sealed class ManagementHandlers
         var keys = vault.ListKeys(compartmentId);
         return AgentServer.ResultResponse(id, new Dictionary<string, object?>
         {
-            ["keys"] = keys.ConvertAll(EncodeKeyInfo),
+            ["keys"] = Array.ConvertAll(keys, EncodeKeyInfo),
         });
     }
 
@@ -219,7 +219,7 @@ internal sealed class ManagementHandlers
         {
             vault.UnlockCompartment(compartmentId, passphrase);
         }
-        catch (VaultException)
+        catch (FacadeException)
         {
             return AgentServer.ErrorResponse(id, "passphrase_incorrect", "incorrect master passphrase; auto-unlock was not enabled");
         }
@@ -260,24 +260,24 @@ internal sealed class ManagementHandlers
 
     private static Dictionary<string, object?> EncodeCompartment(CompartmentInfo info) => new()
     {
-        ["compartment_id"] = info.CompartmentId,
-        ["label"] = info.Label,
-        ["unlocked"] = info.Unlocked,
+        ["compartment_id"] = info.compartmentId,
+        ["label"] = info.label,
+        ["unlocked"] = info.unlocked,
     };
 
     private static Dictionary<string, object?> EncodeKeyInfo(KeyInfo info) => new()
     {
-        ["key_id"] = info.KeyId,
-        ["compartment_id"] = info.CompartmentId,
-        ["label"] = info.Label,
-        ["description"] = info.Description,
-        ["resource"] = info.Resource,
-        ["key_type"] = EncodeKeyType(info.KeyType),
-        ["purpose"] = EncodePurpose(info.Purpose),
-        ["created_at"] = info.CreatedAt,
-        ["last_used_at"] = info.LastUsedAt,
-        ["tags"] = info.Tags,
-        ["public_key_hex"] = info.PublicKeyHex,
+        ["key_id"] = info.keyId,
+        ["compartment_id"] = info.compartmentId,
+        ["label"] = info.label,
+        ["description"] = info.description,
+        ["resource"] = info.resource,
+        ["key_type"] = EncodeKeyType(info.keyType),
+        ["purpose"] = EncodePurpose(info.purpose),
+        ["created_at"] = info.createdAt,
+        ["last_used_at"] = info.lastUsedAt,
+        ["tags"] = info.tags,
+        ["public_key_hex"] = info.publicKeyHex,
     };
 
     private static string EncodeKeyType(FacadeKeyType type) => type switch
@@ -327,15 +327,15 @@ internal sealed class ManagementHandlers
         return obj.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.String ? el.GetString() : null;
     }
 
-    private static List<string> GetStringArray(JsonElement obj, string key)
+    private static string[] GetStringArray(JsonElement obj, string key)
     {
         var result = new List<string>();
-        if (obj.ValueKind != JsonValueKind.Object) return result;
-        if (!obj.TryGetProperty(key, out var el) || el.ValueKind != JsonValueKind.Array) return result;
+        if (obj.ValueKind != JsonValueKind.Object) return result.ToArray();
+        if (!obj.TryGetProperty(key, out var el) || el.ValueKind != JsonValueKind.Array) return result.ToArray();
         foreach (var item in el.EnumerateArray())
         {
             if (item.ValueKind == JsonValueKind.String) result.Add(item.GetString()!);
         }
-        return result;
+        return result.ToArray();
     }
 }

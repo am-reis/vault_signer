@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using VaultSigner.Core;
+using uniffi.vaultcore;
 
 namespace VaultSignerAgent;
 
@@ -18,7 +18,7 @@ namespace VaultSignerAgent;
 /// closes. This is correct here for the same reason the macOS version's
 /// `DispatchQueue.main.sync` blocks: the calling app's `vaultsigner.sign`
 /// request is supposed to block until the user answers the prompt.
-internal sealed class WinFormsPassphrasePrompter : IPassphrasePrompter
+internal sealed class WinFormsPassphrasePrompter : PassphrasePrompter
 {
     // WDA_EXCLUDEFROMCAPTURE (0x11) — Windows 10 2004+. Falls back to
     // WDA_MONITOR (0x1, blacked-out-but-still-captured) on older builds

@@ -29,28 +29,13 @@
                     <TextBlock Text="Resource" FontWeight="SemiBold" Margin="0,8,0,0" />
                     <TextBox x:Name="ResourceBox" PlaceholderText="e.g. a hostname or service name" />
 
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="12" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Spacing="8">
-                            <TextBlock Text="Key type" FontWeight="SemiBold" />
-                            <ComboBox x:Name="KeyTypeCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
-                                <ComboBoxItem Content="Ed25519" />
-                                <ComboBoxItem Content="ECDSA P-256" />
-                            </ComboBox>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2" Spacing="8">
-                            <TextBlock Text="Purpose" FontWeight="SemiBold" />
-                            <ComboBox x:Name="PurposeCombo" HorizontalAlignment="Stretch" SelectedIndex="1">
-                                <ComboBoxItem Content="FIDO2" />
-                                <ComboBoxItem Content="Custom signing" />
-                                <ComboBoxItem Content="Both" />
-                            </ComboBox>
-                        </StackPanel>
-                    </Grid>
+                    <TextBlock Text="Key type" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <ComboBox x:Name="KeyTypeCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
+                        <ComboBoxItem Content="Ed25519" />
+                        <ComboBoxItem Content="ECDSA P-256" />
+                    </ComboBox>
+                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                               Text="Keys created here are for custom signing only. A FIDO2/passkey credential needs a real relying-party registration ceremony to supply its rp_id and user handle — it's created automatically the first time you register this vault as a passkey with a site, not through this form." />
 
                     <TextBlock Text="Key passphrase" FontWeight="SemiBold" Margin="0,8,0,0" />
                     <PasswordBox x:Name="PassphraseBox" PlaceholderText="Required each time this key is used to sign" />

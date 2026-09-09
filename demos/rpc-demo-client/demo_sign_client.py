@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Minimal GUI demo of VaultSigner's custom local signing protocol
-(spec §7), written deliberately in something other than Swift to show
-the protocol is a real, language-agnostic wire format — any process on
-the machine that can open a Unix domain socket can ask VaultSigner to
-sign something, exactly like this app does.
+(spec §7), written deliberately in something other than Swift/C# to
+show the protocol is a real, language-agnostic wire format — any
+process on the machine that can open the local transport can ask
+VaultSigner to sign something, exactly like this app does.
 
 This is a demo, not a test: `apps/macos/uniffi-verify/agent_test_client.py`
 is the non-interactive automated check (it deliberately avoids the
@@ -11,18 +11,30 @@ passphrase prompt via the internal.unlock_key bootstrap method — see
 its own docstring). This app does the opposite on purpose: every
 "Request Signature" click is a *real* `vaultsigner.sign` call for a key
 with no cached material, so it genuinely triggers VaultSignerAgent's
-live `NSAlert` passphrase prompt, screen-capture-blocked per spec §5.0,
-running as a totally separate OS process from this one.
+live passphrase prompt (an `NSAlert` on macOS, a WinForms dialog on
+Windows), screen-capture-blocked per spec §5.0, running as a totally
+separate OS process from this one.
 
-Stdlib only (socket, json, tkinter) — nothing to install. Optionally
-uses PyNaCl, if present, to independently verify an Ed25519 signature
-client-side, the same way `agent_test_client.py` does; skips that step
-otherwise rather than failing.
+Cross-platform on purpose, not just macOS: the JSON-RPC message shapes
+(spec §7) are identical everywhere, and only the local transport
+underneath them differs — a Unix domain socket on macOS/Linux, a named
+pipe on Windows (`AgentServer.cs`'s `VaultSignerAgent` pipe). This file
+proves that by branching on nothing but the transport open/read/write,
+in `_connect()` below; every line above and below it — request
+encoding, response parsing, error handling, the UI — is identical
+across platforms.
+
+Stdlib only (socket, json, tkinter on macOS/Linux; the same plus plain
+file I/O against the named pipe on Windows) — nothing to install.
+Optionally uses PyNaCl, if present, to independently verify an Ed25519
+signature client-side, the same way `agent_test_client.py` does; skips
+that step otherwise rather than failing.
 
 Prerequisites:
-  - VaultSignerAgent must already be running (launch VaultSigner.app,
-    or run VaultSignerAgent.app directly) with a vault open and at
-    least one compartment/key created.
+  - VaultSignerAgent must already be running with a vault open and at
+    least one compartment/key created — launch VaultSigner.app on
+    macOS, or VaultSignerAgent.exe (or VaultSignerUI.exe, which starts
+    it) on Windows.
   - That compartment does not need to be "unlocked" first — signing a
     cold key is exactly what makes the agent show its passphrase
     prompt, which is the point of this demo.
@@ -42,7 +54,45 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Any
 
-SOCKET_PATH = os.path.expanduser("~/Library/Application Support/VaultSigner/agent.sock")
+IS_WINDOWS = os.name == "nt"
+
+if IS_WINDOWS:
+    # Matches AgentServer.cs's `PipeName` — see apps/windows/VaultSignerAgent/AgentServer.cs.
+    TRANSPORT_PATH = r"\\.\pipe\VaultSignerAgent"
+else:
+    TRANSPORT_PATH = os.path.expanduser("~/Library/Application Support/VaultSigner/agent.sock")
+
+
+class _WindowsPipeConnection:
+    """Wraps a Windows named-pipe client handle behind the same
+    sendall/recv/close surface socket.socket exposes, so rpc_call()'s
+    logic below needs exactly one code path regardless of platform.
+    Plain `open()` on a `\\\\.\\pipe\\NAME` path is enough on Windows —
+    the C runtime's CreateFile call underneath handles it like any
+    other file handle once a server instance is listening; no pywin32
+    or other dependency required. `buffering=0` keeps reads unbuffered
+    (io.FileIO), so recv() behaves like socket.recv() — returns
+    whatever's available rather than blocking for a full buffer."""
+
+    def __init__(self, path: str = TRANSPORT_PATH) -> None:
+        self._f = open(path, "r+b", buffering=0)
+
+    def sendall(self, data: bytes) -> None:
+        self._f.write(data)
+
+    def recv(self, n: int) -> bytes:
+        return self._f.read(n)
+
+    def close(self) -> None:
+        self._f.close()
+
+
+def _connect() -> Any:
+    if IS_WINDOWS:
+        return _WindowsPipeConnection(TRANSPORT_PATH)
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(TRANSPORT_PATH)
+    return sock
 
 ERROR_EXPLANATIONS = {
     "user_declined": "The person at VaultSigner's alert clicked Deny.",
@@ -65,11 +115,10 @@ def rpc_call(method: str, params: dict, req_id: int) -> Any:
     """Opens a fresh connection, sends one newline-delimited JSON-RPC
     request, and blocks for the one-line response. A fresh connection
     per call keeps this demo simple; the wire format itself (matching
-    `vaultcore::protocol` and `AgentServer.swift`) supports pipelining
-    several requests over one connection too."""
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    `vaultcore::protocol`, `AgentServer.swift`, and `AgentServer.cs`)
+    supports pipelining several requests over one connection too."""
+    sock = _connect()
     try:
-        sock.connect(SOCKET_PATH)
         sock.sendall((json.dumps({"method": method, "params": params, "id": req_id}) + "\n").encode("utf-8"))
         buf = b""
         while b"\n" not in buf:
@@ -111,7 +160,7 @@ def try_verify_ed25519(public_key_b64: str, message: bytes, signature_b64: str) 
 class DemoApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("VaultSigner RPC Demo Client (Python, not Swift)")
+        self.title("VaultSigner RPC Demo Client (Python, not Swift/C#)")
         self.geometry("640x520")
         self.keys: list[dict] = []
         self._next_id = 1
@@ -136,8 +185,8 @@ class DemoApp(tk.Tk):
         header = ttk.Label(
             self,
             text="This app is plain Python + Tkinter, not VaultSigner code.\n"
-            "It talks to VaultSignerAgent purely over its documented local socket\n"
-            "protocol (spec §7) — the same way any third-party app would.",
+            "It talks to VaultSignerAgent purely over its documented local\n"
+            "transport protocol (spec §7) — the same way any third-party app would.",
             justify="left",
         )
         header.pack(anchor="w", **pad)
@@ -176,11 +225,12 @@ class DemoApp(tk.Tk):
     # -- key listing -------------------------------------------------
 
     def refresh_keys(self) -> None:
-        self.log_line(f"Connecting to {SOCKET_PATH} ...")
+        self.log_line(f"Connecting to {TRANSPORT_PATH} ...")
         try:
             result = rpc_call("vaultsigner.list_public_keys", {}, self._next_request_id())
         except FileNotFoundError:
-            self.log_line("VaultSignerAgent isn't running (no socket found). Launch VaultSigner.app, open a vault, then Refresh Keys.")
+            launch_hint = "VaultSignerAgent.exe (or VaultSignerUI.exe)" if IS_WINDOWS else "VaultSigner.app"
+            self.log_line(f"VaultSignerAgent isn't running (transport not found). Launch {launch_hint}, open a vault, then Refresh Keys.")
             return
         except (RpcError, ConnectionError, OSError) as e:
             self.log_line(f"Couldn't list keys: {e}")
@@ -215,9 +265,9 @@ class DemoApp(tk.Tk):
         self.log_line("")
         self.log_line(f"Sending vaultsigner.sign for key '{key['label']}' ({key['key_id']})...")
         self.log_line(
-            "VaultSigner identifies the caller itself, from the OS socket peer credentials\n"
+            "VaultSigner identifies the caller itself, from OS-level process identity\n"
             "(never from anything this app claims) — watch for its prompt to name this\n"
-            "process by its real executable name, e.g. \"python3\"."
+            "process by its real executable name, e.g. \"python.exe\" / \"python3\"."
         )
         self.log_line("Waiting for approval in VaultSigner — a password prompt should appear now (bring VaultSigner to the front if you don't see it)...")
 

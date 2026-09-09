@@ -1,11 +1,24 @@
 # VaultSigner RPC demo client
 
 A minimal, demo-only GUI app — plain Python + Tkinter, deliberately
-**not** Swift — that proves VaultSigner's custom local signing protocol
-(spec §7) is a real, language-agnostic wire format: any process on the
-machine that can open a Unix domain socket can ask VaultSigner to sign
-something and get a real signature back, gated by VaultSignerAgent's
-own live passphrase prompt.
+**not** Swift/C#, and deliberately cross-platform (see
+`demo_sign_client.py`'s `_connect()` for the one place transport
+differs by platform) — that proves VaultSigner's custom local signing
+protocol (spec §7) is a real, language-agnostic wire format: any
+process on the machine that can open the local transport (a Unix
+domain socket on macOS/Linux, a named pipe on Windows) can ask
+VaultSigner to sign something and get a real signature back, gated by
+VaultSignerAgent's own live passphrase prompt.
+
+On Windows specifically, this needs no extra dependency either —
+`_WindowsPipeConnection` talks to `\\.\pipe\VaultSignerAgent`
+(matching `AgentServer.cs`'s `PipeName`) via plain `open()`, no
+pywin32 required. If Python itself isn't installed and the official
+installer is misbehaving, the "Windows embeddable package (zip)" on
+python.org is a no-install fallback, but note it excludes Tcl/Tk by
+default, which this demo's GUI needs — the regular installer or an
+existing full Python install is the simpler path for this particular
+demo.
 
 This is different from `apps/macos/uniffi-verify/agent_test_client.py`,
 which is a non-interactive *automated test* that deliberately avoids

@@ -2,17 +2,27 @@
 'use strict';
 /**
  * Minimal, zero-dependency demo of VaultSigner's custom local signing
- * protocol (spec §7) — a plain Node.js app, deliberately not Swift,
+ * protocol (spec §7) — a plain Node.js app, deliberately not Swift/C#,
  * talking to the REAL, already-running VaultSignerAgent over its
- * documented Unix domain socket. Nothing here is faked or bypassed:
+ * documented local transport. Nothing here is faked or bypassed:
  * no throwaway vault, no `internal.*` bootstrap namespace, nothing
  * that a genuine third-party app couldn't do itself. If you see no
  * keys, that's correct and expected until you unlock a compartment
- * the normal way, in VaultSigner.app's own UI.
+ * the normal way, in VaultSigner's own UI.
+ *
+ * Cross-platform on purpose: the JSON-RPC message shapes (spec §7) are
+ * identical everywhere; only the local transport differs — a Unix
+ * domain socket on macOS/Linux, a named pipe on Windows (matching
+ * `AgentServer.cs`'s `PipeName`). `net.createConnection` already
+ * handles both transparently given the right path string, so
+ * `TRANSPORT_PATH` below is the only platform-specific line in this
+ * file — everything else (request encoding, response parsing, the
+ * whole page) is identical across platforms.
  *
  * Run: node server.js
  * Then open the URL it prints (it also tries to open your browser
- * automatically). Everything else happens in that one page.
+ * automatically on macOS/Windows). Everything else happens in that
+ * one page.
  */
 
 const http = require('http');
@@ -22,16 +32,19 @@ const path = require('path');
 const crypto = require('crypto');
 const { exec } = require('child_process');
 
-const SOCKET_PATH = path.join(os.homedir(), 'Library', 'Application Support', 'VaultSigner', 'agent.sock');
+const TRANSPORT_PATH = process.platform === 'win32'
+  ? '\\\\.\\pipe\\VaultSignerAgent'
+  : path.join(os.homedir(), 'Library', 'Application Support', 'VaultSigner', 'agent.sock');
 const PORT = 8934;
 let nextId = 1;
 
 /** One newline-delimited JSON-RPC request/response over a fresh
- * connection to the real agent socket — the exact wire format
- * `vaultcore::protocol` and `AgentServer.swift` define. */
+ * connection to the real agent transport — the exact wire format
+ * `vaultcore::protocol`, `AgentServer.swift`, and `AgentServer.cs`
+ * define. */
 function rpcCall(method, params) {
   return new Promise((resolve, reject) => {
-    const socket = net.createConnection(SOCKET_PATH);
+    const socket = net.createConnection(TRANSPORT_PATH);
     let buffer = '';
     socket.on('connect', () => {
       socket.write(JSON.stringify({ method, params, id: nextId++ }) + '\n');
@@ -94,9 +107,10 @@ const PAGE = `<!doctype html>
   This page is served by a plain Node.js script with zero dependencies.
   It never imports vaultcore or any VaultSigner code — it only speaks
   the documented local JSON-RPC protocol (spec §7) to your real,
-  already-running <code>VaultSignerAgent</code>, over its Unix socket.
+  already-running <code>VaultSignerAgent</code>, over its local
+  transport (a named pipe on Windows, a Unix socket on macOS/Linux).
   If the list below is empty, that's correct until you unlock a
-  compartment the normal way in VaultSigner.app.
+  compartment the normal way in VaultSigner's own UI.
 </p>
 
 <label>Key to sign with</label>
@@ -134,7 +148,7 @@ async function refreshKeys() {
   if (resp.error) {
     log('Could not list keys: ' + resp.error.code + ' — ' + resp.error.message);
     if (resp.error.code === 'connection_error') {
-      log('Is VaultSignerAgent running? Launch VaultSigner.app first.');
+      log('Is VaultSignerAgent running? Launch it (or the VaultSigner app that starts it) first.');
     }
     return;
   }
@@ -166,9 +180,9 @@ document.getElementById('signBtn').addEventListener('click', async () => {
   signBtn.disabled = true;
   log('');
   log("Sending vaultsigner.sign for key " + select.value + " ...");
-  log('VaultSigner names the caller itself, from OS socket peer credentials');
+  log('VaultSigner names the caller itself, from OS-level process identity');
   log('(never from anything this page claims) — watch its prompt name this');
-  log('process by its real executable name, e.g. "node".');
+  log('process by its real executable name, e.g. "node" or "node.exe".');
   log('Waiting for approval in VaultSigner — a password prompt should appear now...');
   try {
     const resp = await rpc('vaultsigner.sign', { key_id: select.value, message_b64: messageB64 });
@@ -231,6 +245,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   const url = `http://localhost:${PORT}`;
   console.log(`VaultSigner RPC demo (Node.js) running at ${url}`);
-  console.log(`Talking to the real VaultSignerAgent at ${SOCKET_PATH}`);
+  console.log(`Talking to the real VaultSignerAgent at ${TRANSPORT_PATH}`);
   if (process.platform === 'darwin') exec(`open ${url}`);
+  if (process.platform === 'win32') exec(`start ${url}`);
 });

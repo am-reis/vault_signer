@@ -1,10 +1,18 @@
 # VaultSigner — Windows
 
-Phase 3 target (spec §12, items 3.1–3.8). Not started — this is the
-initial groundwork prepared before any Windows-side implementation
-work, since that work happens on a Windows machine this repository
-wasn't developed on. Everything in this file was actually run and
-verified where stated; anything not verified says so explicitly.
+Phase 3 target (spec §12, items 3.1–3.11). Core functionality is real
+and verified: the management UI (`VaultSignerUI`, WinUI 3), the
+background agent (`VaultSignerAgent`) hosting the named-pipe custom
+protocol and retention cache, vault/compartment/key lifecycle,
+export/import/merge/backup, and screen-capture blocking are all built,
+built clean, and exercised live against a real vault on a real Windows
+machine — see `PROGRESS.md`'s Phase 3 session checkpoints for exactly
+what was verified and how. Still open: FIDO2 plugin-authenticator
+registration (3.4), a Settings screen (autostart/auto-unlock have
+agent-side support but no UI yet), and the Phase 10 test/fuzz suite
+(3.8). This file covers setup/architecture for someone building this
+app from source; everything in it was actually run and verified where
+stated, and anything not verified says so explicitly.
 
 No Windows machine on hand? [`docs/qemu-vm-setup.md`](docs/qemu-vm-setup.md)
 covers running one on Debian via QEMU/OVMF/swtpm (UEFI + Secure Boot +
@@ -97,15 +105,12 @@ correctly under .NET 8+.
 
 ## What's genuinely unverified
 
-Cross-compiling vaultcore itself for `x86_64-pc-windows-msvc` **is now
-verified** (see step 3 above) — that line from the previous version of
-this file was wrong as of this session's real test. Still genuinely
-unverified: whether `Generated/vaultcore.cs` actually compiles against
-`VaultSignerAgent`/`VaultSignerUI`'s C# (method/type PascalCasing was
-inferred, not confirmed against real `uniffi-bindgen-cs` output), and
-everything about WinUI 3 actually running, the Windows background-agent
-process actually serving real requests, DPAPI round-tripping for real,
-and WebAuthn plugin-authenticator registration — none of that has been
-run yet, only written. See PROGRESS.md for the exact next steps and why
-this session stopped short of them (disk space, then a git-credentials
-problem on the way to pushing).
+This section is stale as of several sessions ago — the things it used
+to list (bindings compiling, WinUI 3 actually running, the agent
+serving real requests) are now all verified live; see `PROGRESS.md`'s
+Phase 3 checkpoints for exactly what and how, rather than trusting a
+summary here that will only go stale again. Currently open, per
+`PROGRESS.md`: FIDO2 plugin-authenticator registration (3.4), the
+Settings screen (autostart/auto-unlock have agent-side support but no
+UI), single-key export UI, reveal-raw-key UI, and DPAPI auto-unlock has
+agent-side support but is untested end-to-end.

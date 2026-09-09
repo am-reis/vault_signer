@@ -704,11 +704,22 @@ here.
 
 ## Phase 3 — Windows
 
-Not started (none of items 3.1–3.8), but initial groundwork done and
-verified from macOS ahead of the actual Windows-side work, since the
-implementation itself needs a Windows machine this repo wasn't
-developed on. See `apps/windows/README.md` for the full detail; summary
-here:
+**This intro paragraph is the oldest text in this phase's section,
+written before any real Windows-side work happened — kept below for
+history, but it is no longer an accurate status summary.** For current
+status, read the session checkpoints further down in date order (each
+is a real, dated snapshot of what was actually verified when), or the
+condensed item-by-item status right before this phase's final
+checkpoint entry. Short version as of the most recent checkpoint: the
+core app is real and working (management UI, background agent, named
+pipe protocol, vault/key/compartment lifecycle, export/import/merge/
+backup, screen-capture blocking); still open are FIDO2 registration
+(3.4), a Settings screen, and the Phase 10 test/fuzz suite (3.8).
+
+Initial groundwork done and verified from macOS ahead of the actual
+Windows-side work, since the implementation itself needs a Windows
+machine this repo wasn't developed on. See `apps/windows/README.md` for
+the full detail; summary here:
 
 - **Confirmed uniffi (vaultcore's own dependency) does not generate C#
   bindings** — `uniffi-bindgen generate --help` lists only
@@ -1610,6 +1621,98 @@ this app's own established page-per-action pattern and (loosely)
   `CreateCompartmentPage` is the closest live evidence for it. Worth
   the user specifically checking Create Vault's new fields when they do
   their hands-on pass.
+
+### Session checkpoint (this entry): a real bug fix, and the docs trio (spec §14) for the first time on this phase
+
+Same VM, same session, continuing directly from the checkpoint above.
+Two things, at the user's direct request:
+
+**1. Fixed a real bug the user found by hand**: selecting ECDSA +
+"Both" (or FIDO2) as a key's purpose in `CreateKeyPage` threw
+`vault_error: fido2 purpose requires fido2_rp_id`. Checked
+`CreateKeyView.swift` before writing a fix: macOS doesn't offer
+FIDO2/Both in its manual create-key form *at all*, by design — a
+bindable passkey needs a real relying-party ceremony
+(`Vault.handleFido2MakeCredential` supplies `rp_id`/`user_handle` from
+the live CTAP2 request), which a manual form has no way to provide.
+Removed the purpose picker entirely rather than adding rp_id/user-
+handle fields that don't belong in this flow — this manual path now
+always creates `CustomSigning` keys, matching macOS exactly. Verified
+live via UI Automation: key creation (Ed25519 and the ECDSA case that
+triggered the bug) now succeeds with no error. (`f9c4ed3`)
+
+**2. Spec §14's documentation trio, done for Windows for the first
+time** — the user asked for this explicitly, then separately asked to
+formalize it as a standing requirement for every future platform phase
+too (done first — see the `shared`-branch checkpoint this links to
+below — so this phase's own instance of the work could be checked
+against real, spec-mandated items rather than freelanced):
+
+- **Spec amendment** (on `shared`, `a60bff6`, merged into this branch
+  at `18b1819`): extended §14's already-existing "update per phase, not
+  as a single end-of-project task" mandate — previously scoped only to
+  `docs/user-guide.md` and only enforced by one Phase-8 end-of-project
+  checklist item (8.5) — to two more deliverables that had *no* spec
+  mention at all before (the per-platform protocol-integration.md
+  addendum, and rebuilding the published docs site), and added three
+  new checklist items to the end of each of Phases 2 through 6 as the
+  actual enforcement (see spec §12). Reframed 8.5 as a final cross-
+  platform consistency sweep, not the first pass.
+- **3.10 — `apps/windows/docs/protocol-integration.md` written**
+  (`005f9fa`): mirrors `apps/macos/docs/protocol-integration.md`'s
+  shape — transport (the named pipe + its owner-only ACL), discovery/
+  prerequisites, the `internal.*` boundary, FIDO2 status — with three
+  working examples (PowerShell, Python, Node.js). Verified live: the
+  PowerShell example's exact code, extracted straight from the doc file
+  and run against the real agent, returned real key data. The Node
+  example *is* `demos/rpc-demo-nodejs/server.js`'s already-verified
+  code. **The Python example was not independently re-run this
+  session** — this VM still has no working Python install (see the
+  install saga two checkpoints up); it uses the identical
+  `open()`-as-pipe-client technique already verified in
+  `demos/rpc-demo-client/`'s `_WindowsPipeConnection`, but that's
+  supporting evidence, not a live re-run. Linked from
+  `docs/protocol-integration/README.md`'s platform-guides list (shared
+  commit above).
+- **3.9 — `docs/user-guide.md` reconciled against Windows** (shared
+  commit above): the guide was already written platform-generically
+  and, after this session's work, is now mostly *accurate* for Windows
+  too, not just generic — added small `*Windows note: ...*` addenda
+  only where the app genuinely doesn't match the generic description
+  yet (no Settings screen, so no autostart/auto-unlock toggle or a
+  Settings-based "Close This Vault"; no Reveal Raw Key UI; no
+  single-key export UI) and one describing Windows's own standalone
+  "New Compartment" entry point, which — checked directly — macOS
+  doesn't have either.
+- **3.11 — docs site: prepared, not published.** `Scripts/build-docs-
+  site.sh` (shared commit above) now lists `apps/windows/README.md` and
+  `apps/windows/docs/protocol-integration.md` alongside the macOS
+  entries. **Deliberately did not run it or push `gh-pages` this
+  session** — the script itself requires running from staging, release,
+  or main (a branch with every completed platform's docs actually
+  merged in, which `platform/windows` alone is not), and pushing a
+  branch that's live-published as a public GitHub Pages site is exactly
+  the kind of action that should get the user's explicit go-ahead first
+  rather than happening as a side effect of finishing a checklist item.
+  **Also fixed first**: `apps/windows/README.md` was badly stale
+  (written before any real Windows work happened, still said "Not
+  started" and listed things as unverified that this session's own
+  checkpoints prove otherwise) — refreshed it (`005f9fa`) so it isn't
+  actively misleading whenever the site does get published.
+
+**Condensed status, spec items 3.1-3.11, as of this checkpoint** (see
+the dated checkpoints above for the verification evidence behind each):
+done — 3.1 (management UI), 3.2 (screen-capture blocking, this
+session's earlier checkpoint), 3.6 (custom protocol, verified via a
+real `vaultsigner.sign` round trip and now three more documented/
+verified examples), 3.9, 3.10. Prepared but not executed — 3.11 (script
+ready, publish step intentionally left for the user). Not started —
+3.4 (FIDO2 COM registration, research only so far), 3.5 (depends on
+3.4), 3.7 (i18n — Windows has no locale work yet at all), 3.8 (Phase 10
+test/fuzz suite). 3.3 is real (a per-user background process hosting
+the named-pipe listener and retention cache, DPAPI methods exist
+agent-side) but incomplete against its own text — no autostart/auto-
+unlock UI toggle exists yet, so treat 3.3 as partial, not done.
 
 ## Phase 4 — Android
 

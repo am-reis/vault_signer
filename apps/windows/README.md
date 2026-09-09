@@ -91,16 +91,21 @@ correctly under .NET 8+.
 
 1. `git clone` the repo, `git checkout platform/windows`.
 2. Install the prerequisites above.
-3. `cargo build --release --manifest-path vaultcore/Cargo.toml --target x86_64-pc-windows-msvc` — confirm vaultcore itself builds for Windows before touching any C#/UI code. This hasn't been tried from this repository yet (developed on macOS); if it doesn't build cleanly, that's the actual first task, not the UI.
-4. Run `Scripts/generate-csharp-bindings.ps1`, confirm `Generated/vaultcore.cs` compiles in a throwaway class library project before building anything on top of it.
-5. Start on spec §12 items 3.1–3.8 in order — `PROGRESS.md` tracks status the same way it does for macOS's Phase 2.
+3. `cargo build --release --manifest-path vaultcore/Cargo.toml --target x86_64-pc-windows-msvc` — confirm vaultcore itself builds for Windows before touching any C#/UI code. **Done, for real, on a real Windows machine — see PROGRESS.md's Phase 3 session-checkpoint entry.** Builds clean; `cargo test --workspace` is 117/117 green, including the new Windows `VirtualLock` memory-locking fix (`vaultcore/src/mem_lock.rs`, on the `shared` branch).
+4. Run `Scripts/generate-csharp-bindings.ps1`, confirm `Generated/vaultcore.cs` compiles in a throwaway class library project before building anything on top of it. **Not yet done from this repo** — the session that did step 3 ran out of safe disk headroom before installing `uniffi-bindgen-cs`; see PROGRESS.md's exact resume steps.
+5. Start on spec §12 items 3.1–3.8 in order — `PROGRESS.md` tracks status the same way it does for macOS's Phase 2. **`VaultSignerAgent/` (3.3-ish scope) and the start of `VaultSignerUI/` (3.1) exist**, written against the Rust source and macOS's proven Swift shape, but **not yet compiled** (blocked on step 4) — treat as a checkpoint, not verified progress, until they've actually built once real bindings exist.
 
 ## What's genuinely unverified
 
-Everything above the "Getting started" checklist was checked from a
-Mac: the bindings generation and a plain `dotnet build` compile check
-of the generated `.cs` file in isolation. Cross-compiling vaultcore
-itself for `x86_64-pc-windows-msvc`, and everything about WinUI 3, the
-Windows Service, DPAPI, and WebAuthn plugin-authenticator registration,
-has not been attempted at all — those need an actual Windows machine,
-which is why this file stops here rather than guessing further.
+Cross-compiling vaultcore itself for `x86_64-pc-windows-msvc` **is now
+verified** (see step 3 above) — that line from the previous version of
+this file was wrong as of this session's real test. Still genuinely
+unverified: whether `Generated/vaultcore.cs` actually compiles against
+`VaultSignerAgent`/`VaultSignerUI`'s C# (method/type PascalCasing was
+inferred, not confirmed against real `uniffi-bindgen-cs` output), and
+everything about WinUI 3 actually running, the Windows background-agent
+process actually serving real requests, DPAPI round-tripping for real,
+and WebAuthn plugin-authenticator registration — none of that has been
+run yet, only written. See PROGRESS.md for the exact next steps and why
+this session stopped short of them (disk space, then a git-credentials
+problem on the way to pushing).

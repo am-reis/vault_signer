@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "VaultSignerUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "VaultSignerUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

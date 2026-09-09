@@ -748,6 +748,154 @@ here:
   human, since installer GUI interaction isn't something this session
   can drive.
 
+### Session checkpoint (this entry): first real work from an actual Windows machine
+
+Done on a real Windows 11 laptop (not the QEMU VM above — a different,
+already-available physical machine), explicitly **not** the project's
+main Windows dev machine and not intended to keep the checkout — the
+point of this session was to do the steps that need a real Windows
+environment, verify them for real, and push. Stopped mid-session (disk
+space, below) with a clear resume point rather than pushing on and
+risking unverified work.
+
+**Verified, real, and pushed (on `shared`, not this branch — see that
+branch's own PROGRESS.md entry for item 1.6):** vaultcore builds clean
+for `x86_64-pc-windows-msvc` and all 117 tests pass, including the new
+`VirtualLock`-based memory-locking fix for the retention cache. This
+closes the very first unchecked box in this file's "Getting started"
+step 3 above — genuinely done now, not just documented as a plan.
+
+**Written this session, on this branch, but NOT YET COMPILED/VERIFIED**
+(uniffi-bindgen-cs was never run — see the disk-space blocker below —
+so `Generated/vaultcore.cs` doesn't exist yet and nothing here has
+actually built against it): `apps/windows/VaultSignerAgent/` (C#, .NET
+8) and the start of `apps/windows/VaultSignerUI/` (WinUI 3). Treat
+everything below as "written against the Rust source and the macOS
+Swift equivalent's proven shape, not yet build-verified" — the exact
+opposite of how the rest of this file reports progress, flagged
+explicitly because of that.
+
+- **`VaultSignerAgent`** (spec item 3.3, and item 3.3's DPAPI
+  disclosure): named-pipe transport (`AgentServer.cs`) with the same
+  newline-delimited-JSON framing and `internal.*`/`vaultsigner.*`
+  method-namespace split as macOS's `AgentServer.swift`;
+  `ManagementHandlers.cs` covers vault/compartment/key lifecycle and
+  auto-unlock (mirrors macOS's Phase 2 item 2.1 core) — **export/
+  import/merge (macOS's 2.3-2.5) intentionally not ported yet**, to
+  keep this session's surface small enough to actually verify rather
+  than guess at in bulk; `DpapiAutoUnlockStore.cs` (DPAPI
+  `CurrentUser`-scope, with the exact spec §8 disclosure written into
+  its doc comment, not just implied); `WinFormsPassphrasePrompter.cs`
+  (real modal dialog + `SetWindowDisplayAffinity` screen-capture
+  blocking, spec item 3.2); `AutostartManager.cs` (HKCU `Run` key, off
+  by default).
+  **Real architecture finding, not in the spec's own wording**: spec
+  item 3.3 says "Windows Service," but a real SCM-managed Windows
+  Service runs in Session 0 with no desktop access and cannot show the
+  interactive passphrase prompt spec §7/§8 require — Session 0
+  isolation, not a workaround-able limitation. macOS's own "background
+  service" is actually a **per-user `launchd` agent**, not a system
+  daemon, specifically so it can show a real `NSAlert`. This is
+  implemented as the direct Windows equivalent of that: a per-user
+  background process started at logon in the interactive session (see
+  `AgentServer.cs`'s doc comment), not an SCM service — DPAPI
+  `CurrentUser` scope only makes sense paired with this model too.
+  **`PeerAuthentication.cs` is honestly weaker than macOS's**: macOS
+  validates the caller's real code signature; this checks the caller's
+  resolved executable path against `VaultSignerUI.exe`'s expected
+  install location, which stops accidental callers but not a
+  deliberately malicious co-resident process — a real gap, not silently
+  accepted (see the file's own doc comment for what closing it would
+  need: a real code-signing certificate, not yet researched for
+  Windows the way macOS's Apple Developer Program requirement was).
+- **`VaultSignerUI`**: scaffolded via the official
+  `Microsoft.WindowsAppSDK.WinUI.CSharp.Templates` `winui` template
+  (not hand-rolled — `dotnet new search winui` found the real package
+  after `Microsoft.WindowsAppSDK.ProjectTemplates`, the first guess,
+  turned out not to exist). **NuGet restore did not finish** (disk
+  space, below) — the template's own generated files exist on disk but
+  nothing has been customized yet: no screens, no `ManagementClient`
+  wired up. This is a scaffold checkpoint, not a started UI.
+- **Real, non-obvious environment problems found and fixed on this
+  machine** (worth keeping in mind for whoever next sets up a Windows
+  box for this project): (1) this machine's `NuGet.Config` at
+  `%APPDATA%\NuGet\NuGet.Config` was a bare `<configuration />` with no
+  `<packageSources>` at all — not "using defaults," genuinely zero
+  sources, which fails every `dotnet new`/`restore` with "No NuGet
+  sources are defined" until `nuget.org` is added back explicitly
+  (`dotnet nuget add source https://api.nuget.org/v3/index.json --name
+  nuget.org`) — fixed. (2) `Microsoft.WindowsAppSDK.ProjectTemplates` is
+  not a real package name despite being a natural guess; the real one
+  is `Microsoft.WindowsAppSDK.WinUI.CSharp.Templates`, found via
+  `dotnet new search winui` rather than assumed.
+- **Disk space: the actual reason this session stopped.** This
+  machine's `C:` drive was already down to 5.1GB free before any of
+  this session's installs. Installing the MSVC C++ Build Tools (needed
+  for both Rust's `x86_64-pc-windows-msvc` linker and, it turned out,
+  not actually needed by the WinUI 3 restore itself) was redirected to
+  `D:` explicitly (`--installPath D:\VSBuildTools`, `$env:TEMP` also
+  redirected to `D:\VSTemp` for that install) specifically to avoid
+  this — but Visual Studio's installer still leaves some shared-
+  component footprint on `C:` regardless of `--installPath`, and the
+  subsequent `dotnet new winui` NuGet restore (defaults to
+  `%userprofile%\.nuget\packages` on `C:`, ~1.5GB+ for the Windows App
+  SDK alone) pushed `C:` to **0 bytes free** mid-restore, failing with
+  `There is not enough space on the disk` on
+  `Microsoft.WindowsAppSDK.Runtime.2.4.0`. Fixed the immediate crisis
+  by clearing this session's own installer/package caches (~1.6GB:
+  VS's `Package Cache`, NuGet's `v3-cache`/`plugins-cache`, stale
+  `%TEMP%` installer leftovers) and setting `NUGET_PACKAGES=D:\nuget-
+  packages` (user env var, persists) so future restores land on `D:`
+  instead — but that only recovered ~0.83GB free, not enough headroom
+  to safely finish the WinUI 3 restore or install `uniffi-bindgen-cs`
+  (another `cargo install`, more disk). The user (personal laptop, not
+  a disposable test machine) chose to stop for the day rather than
+  either clear the two big pre-existing consumers found
+  (`C:\Windows\Installer` at 15.64GB — MSI cache, not safely rm-able
+  directly — and `C:\Windows\SoftwareDistribution` at 4.32GB — Windows
+  Update's download cache, safe to clear) or push further on 0.83GB of
+  headroom.
+- **Also unresolved, found while trying to push this branch and
+  `shared`**: this machine's git credential manager (`manager-core`)
+  rejected with "Invalid username or token. Password authentication is
+  not supported for Git operations" — stored GitHub credentials on this
+  machine are stale/invalid. Needs the user to re-authenticate
+  interactively (this session did not attempt to work around it, since
+  that needs the user's own browser-based login). **As of this
+  checkpoint, this session's commits are local-only on both `shared`
+  and `platform/windows` — not yet pushed to `origin`.**
+
+**Exact resume steps, next session, in order:**
+1. Free real space on `C:` (Windows Update cleanup is the safe ~4GB
+   win; a full Disk Cleanup covers more) or continue on a machine with
+   more room.
+2. Re-authenticate git (`git push` will prompt the credential manager;
+   complete its browser login), then push both `shared` and
+   `platform/windows` — nothing about that needs redoing, it's already
+   committed locally.
+3. `cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs --tag v0.10.0+v0.29.4`
+   (needs the now-working MSVC linker), then
+   `apps/windows/Scripts/generate-csharp-bindings.ps1`.
+4. `dotnet build` on `VaultSignerAgent` against the real generated
+   `Generated/vaultcore.cs` — fix whatever naming mismatches surface
+   (method/type PascalCasing was inferred from the Rust source and
+   macOS's Swift bindings, not confirmed against real `uniffi-bindgen-
+   cs` output yet).
+5. `dotnet restore`/`dotnet build` on `VaultSignerUI`, then actually
+   build the screens (Welcome/create-open, key list, create key, key
+   detail) against a `ManagementClient.cs` calling the now-verified
+   `VaultSignerAgent` over its named pipe — none of that exists yet,
+   only the unmodified template.
+6. Run `apps/windows/VaultSignerAgent` for real, connect a minimal test
+   client (mirroring `apps/macos/uniffi-verify/agent_test_client.py`)
+   over the named pipe, and verify a real `vaultsigner.sign` round trip
+   — spec item 3.6, not attempted yet.
+7. Item 3.4 (WebAuthn plugin-authenticator COM registration) — research
+   only so far (none done this session); do not actually register
+   anything system-wide without the user's explicit sign-off, since
+   that changes system-level security surface, same caution macOS's
+   Developer Program step got.
+
 ## Phase 4 — Android
 
 Not started.

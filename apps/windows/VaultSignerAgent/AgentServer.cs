@@ -171,12 +171,21 @@ internal sealed class AgentServer
         public JsonElement Id { get; set; } = NullId;
     }
 
+    // Every real client (ManagementClient.cs, the macOS Swift client, the
+    // documented wire protocol in docs/protocol-integration/README.md)
+    // sends lowercase JSON keys ("method"/"params"/"id"). Deserializing
+    // into these PascalCase properties without case-insensitive matching
+    // silently left Method null on every single request -- a real,
+    // previously-undiscovered bug, found only once a real client reached
+    // this code through a working pipe connection for the first time.
+    private static readonly JsonSerializerOptions RequestJsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     private byte[] HandleLine(byte[] lineBytes, NamedPipeServerStream pipe)
     {
         RawRequest request;
         try
         {
-            request = JsonSerializer.Deserialize<RawRequest>(lineBytes)
+            request = JsonSerializer.Deserialize<RawRequest>(lineBytes, RequestJsonOptions)
                 ?? throw new JsonException("empty request");
             if (string.IsNullOrEmpty(request.Method))
             {

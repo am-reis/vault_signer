@@ -958,21 +958,212 @@ blocked the personal laptop).
   attempted this session; this checkpoint is scoped to getting
   `VaultSignerAgent` itself to actually compile against real bindings.
 
+### Session checkpoint (this entry): VaultSignerUI is real and functional; one serious open bug blocks reliable testing
+
+Done on the same QEMU test VM as the previous entry (`C:\dev\vault_signer`,
+`platform/windows`, machine name `DESKTOP-MK95E27`, Windows user
+`diana`). This entry exists because the session doing this work ended
+with the environment in a live, uncommitted-at-the-time state and no
+continuity into the next session — everything below is written so a
+completely fresh session, on this same Windows machine, with **no
+access to any prior conversation**, can pick up correctly. Read this
+whole entry before doing anything.
+
+**Verified, real, and pushed this session:**
+- **`ManagementClient.cs`** (new, `apps/windows/VaultSignerUI/VaultSignerUI/`):
+  full named-pipe JSON-RPC client mirroring
+  `apps/macos/Shared/ManagementClient.swift`, covering the same core
+  surface `ManagementHandlers.cs` implements (vault/compartment/key
+  lifecycle, auto-unlock). Compiled clean on the first real attempt.
+- **`MainPage.xaml`/`MainPage.xaml.cs`**: a real, working UI — one
+  scrollable page covering all of macOS's four screens' functionality
+  (create/open vault, compartment unlock, key list, create key, key
+  detail, discard key) rather than separate navigated pages. This was
+  a deliberate scoping call for a first pass, not a design decision —
+  splitting into real pages later is a refactor, not new functionality.
+- **A real vault was created through the real UI and confirmed to
+  exist on disk** — `C:\Users\diana\test-vault.vsvault`, compartment
+  label `Personal`, master passphrase `test`. This is a genuine,
+  working file — reuse it (via "Open Vault") rather than recreating,
+  unless it's confirmed corrupted.
+- **`VaultSignerUI.csproj`**: added the same `Generated/vaultcore.cs`
+  compile item + native-DLL-copy target pattern `VaultSignerAgent.csproj`
+  already had (the UI links vaultcore's generated bindings only for
+  plain data types — `KeyInfo`, `FacadeKeyType`, etc. — never to touch
+  a `Vault` directly), plus `AllowUnsafeBlocks`. Also added
+  `<WindowsPackageType>None</WindowsPackageType>` +
+  `<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>` —
+  **this was a real, hard-won fix**: running the UI unpackaged against
+  the system-installed Windows App Runtime failed every time with
+  `COMException 0x80040154 Class not registered` (at
+  `DeploymentManagerCS.AutoInitialize`) or, after installing the exact
+  matching runtime version, a native crash in `Microsoft.UI.Xaml.dll`
+  (`0xC000027B`, WinRT's generic "stowed exception" code — not
+  specific enough to diagnose from the code alone). Self-contained
+  deployment (bundles the Windows App SDK runtime into the app's own
+  output folder, uses registration-free WinRT) fixed it — **but this
+  was only ever confirmed working when launched from the real
+  interactive session** (see the environment note below); every test
+  of it from a non-interactive context showed the same crash, which
+  turned out to be a red herring caused by that context lacking any
+  display/GPU access at all, not the self-contained fix being wrong.
+- **`AgentServer.cs`**: fixed a real, previously-undiscovered bug —
+  `JsonSerializer.Deserialize<RawRequest>` used default case-*sensitive*
+  matching, but `RawRequest`'s properties are PascalCase
+  (`Method`/`Params`/`Id`) while every real client, including this
+  session's own `ManagementClient.cs` and the documented wire protocol
+  (`docs/protocol-integration/README.md`), sends lowercase JSON keys.
+  This meant **every single request had always failed** with
+  `parse_error: missing method` — the whole `internal.*`/`vaultsigner.*`
+  surface had never actually been reachable by any real client before
+  this session found it. Fixed with
+  `PropertyNameCaseInsensitive = true`.
+- **`PeerAuthentication.cs`**: added a `#if DEBUG` bypass around the
+  path-based caller check, mirroring
+  `PeerAuthentication.swift`'s own already-established pattern. The
+  path check assumes a packaged install (`VaultSignerUI.exe` sitting
+  next to `VaultSignerAgent.exe`), which a dev build never has — each
+  project builds to its own separate `bin/` folder. Without this, every
+  `internal.*` call from a Debug UI build was rejected with
+  `unauthorized_caller`, confirmed by hitting it for real.
+- `generate-csharp-bindings.ps1`: fixed a real `Push-Location`-into-
+  `vaultcore/`-before-calling-`uniffi-bindgen-cs` bug (it runs
+  `cargo metadata` internally, resolved from CWD, not from the dylib
+  path) and added a documented regex patch for a real
+  `uniffi-bindgen-cs` v0.10.0+v0.29.4 codegen bug (`Vec<Vec<u8>>`
+  produces invalid `new byte[][(length)]` instead of
+  `new byte[length][]`).
+- vaultcore re-verified independently on this VM: builds clean,
+  113/113 tests pass.
+
+**The one serious, NOT YET RESOLVED bug: `VaultSignerAgent.exe` dies
+unpredictably, with zero trace.** This is the actual blocker, and
+whoever picks this up should treat it as the top priority — nothing
+else can be reliably tested until it's understood.
+
+Symptoms: the UI (or a raw named-pipe test) intermittently reports
+`VaultSignerAgent isn't running` even though `Get-Process
+-Name VaultSignerAgent` shows it alive. Checking
+`[System.IO.Directory]::GetFiles('\\.\pipe\')` for `VaultSignerAgent`
+at that moment shows **no listening pipe at all**, despite the process
+existing. There is no crash: `Get-WinEvent` (both the generic
+Application log, id 1000, and the full `.NET Runtime` provider) shows
+nothing for these incidents, and Windows Defender's own history
+(`Get-MpThreatDetection`, the Defender Operational log) shows no
+detections either. The process is not crashing — something is either
+killing it cleanly with no trace, or (less likely, given
+`AgentServer`'s 4 concurrent `AcceptLoopAsync` loops) all 4 named-pipe
+listener instances are somehow getting stuck simultaneously.
+
+**One real, already-fixed contributing cause, ruled out but worth
+knowing about:** earlier in this session, *multiple* `VaultSignerAgent`
+processes ended up running simultaneously (each `Start-Process` call
+left the previous instance running instead of replacing it), all
+listening on the same pipe name with independent, inconsistent
+in-memory vault state — a request would land on whichever instance
+happened to accept next. **Always run
+`Get-Process -Name VaultSignerAgent` and kill any existing instance
+before starting a new one** — this is necessary but was not
+sufficient; the disappearing-pipe symptom recurred even with
+confirmed-single instances.
+
+**A real, controlled test that isolated part of the mechanism** (done
+from an SSH connection, not the interactive session — see the
+environment note below for why that distinction matters less here
+than it does for GUI rendering): launching `VaultSignerAgent.exe` via
+`Start-Process` from a short-lived PowerShell process (one that exits
+right after issuing the command, e.g. a single non-interactive
+`ssh host "powershell -Command '...'"` invocation) reliably let the
+agent die within moments of that launching PowerShell process exiting
+— no crash log, process just gone. Keeping the *launching* PowerShell
+process alive indefinitely (via a `while ($true) { Start-Sleep 5; ... }`
+loop in the same script, checked repeatedly over 20+ seconds) let the
+*same* agent process and its pipe survive the whole time without
+issue. This strongly suggests a **Job Object tying the child process's
+lifetime to whatever process launched it** — a real, known Windows/
+PowerShell behavior, not unique to this project's code.
+
+**What's NOT yet confirmed**: whether this same mechanism explains the
+failures seen from the user's own single, continuously-open
+interactive PowerShell window (as opposed to a short-lived scripted
+launch) — that window never closed, yet the agent still seemed to die
+between UI interactions. It's possible the zombie-process confusion
+above was the *entire* explanation for those specific incidents and
+this is a separate, second issue; it's also possible interactive
+PowerShell/Windows Terminal sessions have their own, different
+job-object association per command that also triggers this. **Do not
+assume either way — verify first**, with the isolated test below.
+
 **Exact resume steps, next session, in order:**
-1. `dotnet restore`/`dotnet build` on `VaultSignerUI`, then actually
-   build the screens (Welcome/create-open, key list, create key, key
-   detail) against a `ManagementClient.cs` calling the now-verified
-   `VaultSignerAgent` over its named pipe — none of that exists yet,
-   only the unmodified template.
-2. Run `apps/windows/VaultSignerAgent` for real, connect a minimal test
-   client (mirroring `apps/macos/uniffi-verify/agent_test_client.py`)
-   over the named pipe, and verify a real `vaultsigner.sign` round trip
-   — spec item 3.6, not attempted yet.
-3. Item 3.4 (WebAuthn plugin-authenticator COM registration) — research
-   only so far (none done this session); do not actually register
-   anything system-wide without the user's explicit sign-off, since
-   that changes system-level security surface, same caution macOS's
-   Developer Program step got.
+
+1. **First, isolate the real mechanism before touching any code.**
+   From a single, freshly-opened PowerShell window (not reused, not
+   via SSH), run exactly:
+   ```
+   Get-Process -Name VaultSignerAgent -ErrorAction SilentlyContinue | Stop-Process -Force
+   Start-Process "C:\dev\vault_signer\apps\windows\VaultSignerAgent\bin\Debug\net8.0-windows\VaultSignerAgent.exe"
+   [System.IO.Directory]::GetFiles('\\.\pipe\') | Select-String VaultSigner
+   ```
+   Run that last line again every 15-30 seconds for a few minutes,
+   *without* running any other command in between, and watch whether
+   the pipe stays present or disappears. This settles the open
+   question above. If it disappears even with nothing else happening
+   in that window, the Job Object theory extends to interactive use
+   too, and the real fix needs research into one of:
+   (a) a Task Scheduler task with an interactive-session trigger (this
+   session tried `/SC ONCE /IT /RU diana` — it ran, but landed in a
+   *different* session ID than the interactive desktop, so its window
+   wasn't visible; needs more investigation, possibly `/SC ONLOGON`
+   matching the real eventual `AutostartManager.cs` deployment path,
+   tested at an actual fresh logon rather than on-demand);
+   (b) explicitly breaking the child out of its parent's Job Object at
+   creation time (there is a real Win32 mechanism for this —
+   `CREATE_BREAKAWAY_FROM_JOB` — research whether it's reachable from
+   `Process.Start`/`ProcessStartInfo` in .NET, or whether it needs a
+   native `CreateProcess` call);
+   (c) accepting this as a known dev-environment-only quirk (real
+   deployment uses an HKCU Run-key at logon, a fundamentally different
+   launch path than any of this session's manual testing) and treating
+   the *actual* deployment mechanism, not manual `Start-Process`
+   testing, as the thing that needs to work — in which case, test via
+   `AutostartManager`'s own registration instead of manual launches.
+2. Once the agent reliably stays up, retry the real flow: launch
+   `VaultSignerAgent.exe`, then `VaultSignerUI.exe`
+   (`apps\windows\VaultSignerUI\VaultSignerUI\bin\Debug\net8.0-windows10.0.26100.0\win-x64\VaultSignerUI.exe`),
+   click **Open Vault** with path `C:\Users\diana\test-vault.vsvault`
+   (already exists, passphrase `test`), unlock the `Personal`
+   compartment, create a key, confirm it lists and shows detail
+   correctly.
+3. Run a real `vaultsigner.sign` round trip (spec item 3.6) — this
+   will trigger `WinFormsPassphrasePrompter`'s real dialog; confirm it
+   renders correctly (it uses plain WinForms, not WinUI3/
+   DirectComposition, so it may not be affected by the same rendering
+   path the UI's earlier crash was, but this has not been separately
+   confirmed) and that answering it returns a real signature.
+4. Item 3.4 (WebAuthn plugin-authenticator COM registration) —
+   research only so far; do not register anything system-wide without
+   the user's explicit sign-off.
+
+**Environment notes for whoever resumes:**
+- GUI rendering (any window, any dialog) only works when the process
+  is launched from within the actual interactive logon session — a
+  process launched via SSH, or via a Task Scheduler task without the
+  right session targeting, runs in a different, non-interactive
+  session (confirmed via `[System.Diagnostics.Process]::GetCurrentProcess().SessionId`
+  — SSH-launched processes on this box landed in session 0; the real
+  interactive desktop was session 3 at last check, but this number can
+  change across logons). This is why several of this session's
+  earlier diagnostic crashes (the WinUI3 `Class not registered`/
+  `0xC000027B` errors) turned out to be partly artifacts of testing
+  from the wrong session, not purely code bugs — though the
+  self-contained-deployment fix was real and still needed.
+- A `.gitignore`'d `apps/windows/Generated/vaultcore.cs` must exist
+  before either project builds — regenerate it with
+  `apps/windows/Scripts/generate-csharp-bindings.ps1` if missing.
+- `git` on this machine authenticates to GitHub via a dedicated SSH
+  deploy key already configured (`~/.ssh/config` has a `Host github.com`
+  entry pointing at `~/.ssh/github_deploy_key`) — this should already
+  work with no further setup.
 
 ## Phase 4 — Android
 

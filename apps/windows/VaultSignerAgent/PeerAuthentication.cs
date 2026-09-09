@@ -33,6 +33,14 @@ namespace VaultSignerAgent;
 ///    that can write to the same directory or that copies itself to that
 ///    exact path — a real gap a signature check would close. Documented
 ///    here rather than silently accepted.
+///
+/// `#if DEBUG` bypass below mirrors PeerAuthentication.swift's own exact
+/// pattern, for the same reason: the path check assumes a real packaged
+/// install (agent and UI shipped side by side), which isn't how a dev
+/// build works at all — each project builds to its own separate `bin/`
+/// folder, never colocated. Hit for real: a Debug UI build was rejected
+/// with `unauthorized_caller` until this bypass existed. Enforced fully
+/// in Release, same as macOS.
 internal static class PeerAuthentication
 {
     /// Full path to the installed `VaultSignerUI.exe`, next to this
@@ -44,11 +52,15 @@ internal static class PeerAuthentication
 
     public static bool CallerIsVaultSignerUi(PipeStream pipe)
     {
+#if DEBUG
+        return true;
+#else
         var callerPath = PeerIdentity.CallerExecutablePath(pipe);
         if (callerPath is null) return false;
         return string.Equals(
             Path.GetFullPath(callerPath),
             Path.GetFullPath(ExpectedUiPath),
             StringComparison.OrdinalIgnoreCase);
+#endif
     }
 }

@@ -28,9 +28,11 @@ Creating one asks for:
 
 That's it — your vault is created empty, ready for you to add keys to it.
 
-**You won't be asked where it is again.** VaultSigner remembers every vault you create or open, and shows them under **Recent Vaults** on that same opening screen — click one to unlock it directly, no browsing to the file again. If you use more than one vault (say, a personal one and a work one), switch between them with **Close This Vault** in Settings, which takes you back to that same list without quitting the app.
+**You won't be asked where it is again.** VaultSigner remembers every vault you create or open, and shows them under **Recent Vaults** on that same opening screen — click one to unlock it directly, no browsing to the file again. If you use more than one vault (say, a personal one and a work one), switch between them with **Close This Vault**/**Open a different vault** (in Settings on some platforms, directly on the main screen on others), which takes you back to that same list without quitting the app.
 
-If a listed vault shows a warning triangle, its file couldn't be found where VaultSigner last saw it — it may have moved or been deleted. Use **Manage Known Vaults…** (from either the opening screen or Settings) to add a vault you keep somewhere without opening it right away, or to **Forget** an entry you no longer want listed. Forgetting only removes it from this list — it never touches or deletes the actual file.
+If a listed vault shows a warning triangle, its file couldn't be found where VaultSigner last saw it — it may have moved or been deleted. Use **Manage Known Vaults…** (reachable from the opening screen everywhere, and also from Settings on platforms that have it) to add a vault you keep somewhere without opening it right away, or to **Forget** an entry you no longer want listed. Forgetting only removes it from this list — it never touches or deletes the actual file.
+
+*Windows note: keys are also organized into "compartments" — independent sets of keys, each with its own master passphrase, inside the same vault file. Most people only ever need one ("Personal"), created automatically with your vault; add another from **New Compartment…** next to the compartment picker if you want a separate set (say, "Work") with its own password.*
 
 ---
 
@@ -60,13 +62,15 @@ Once a key exists, you don't usually go looking for it — it comes to you:
 
 Every key has a "Reveal Raw Key" option in its details. **Treat this as a genuine danger zone, not a curiosity.** Anyone who sees what this reveals can act as that key, anywhere, without needing your device or your passphrase again. VaultSigner won't copy it to your clipboard automatically, on purpose — so a pasted copy sitting in some other app's history can't quietly leak it later. Only use this if you specifically need to move a key's raw material somewhere yourself, and know what you're going to do with it.
 
+*Windows note: not yet available as of this writing — there's no way to reveal a key's raw contents on Windows specifically yet.*
+
 ---
 
 ## Sending a key to another device, or backing up
 
 VaultSigner calls this "export" and "import." A few things worth knowing before you use it:
 
-**Sending a single key** ("Export This Key") makes a small file containing just that one key, still protected by its own passphrase. Send the file however you like; the recipient will still need that key's passphrase to use it.
+**Sending a single key** ("Export This Key") makes a small file containing just that one key, still protected by its own passphrase. Send the file however you like; the recipient will still need that key's passphrase to use it. *(Windows note: not yet available as of this writing — use "Export Keys…" with just that one key selected instead, below, which achieves the same result with one extra step: choosing how to protect the file.)*
 
 **Sending several keys at once, or backing up your whole vault**, gives you a choice of three ways to protect the file you're creating:
 
@@ -96,6 +100,8 @@ Two separate switches, each with a real tradeoff:
 
 - **Start VaultSigner automatically** — so it's ready to answer sign-in requests even when you haven't opened the app yourself. This is on by default, and is what most people want.
 - **Auto-unlock on startup** — off by default, and worth thinking about before turning on. Normally, your vault stays locked (showing nothing but a password prompt) until you type your master password. Turning this on stores that password on your device so the vault unlocks itself automatically. That's convenient, but it does mean your device itself now holds a way to unlock your vault without you — so it's only as safe as your device's own login security. It does **not** expose your individual keys; those still need their own passphrases regardless of this setting.
+
+*Windows note: this Settings screen doesn't exist yet — as of this writing there's no in-app way to turn either of these on for Windows specifically. Check back in a future update.*
 
 ---
 

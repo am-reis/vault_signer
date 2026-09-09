@@ -33,6 +33,7 @@ pub mod keyblob;
 pub mod keys;
 pub mod manifest;
 pub mod master_blob;
+pub mod mem_lock;
 pub mod merge;
 pub mod packet;
 pub mod protocol;

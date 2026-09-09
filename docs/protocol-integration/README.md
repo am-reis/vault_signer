@@ -97,5 +97,6 @@ A real implementation may surface additional, implementation-specific error code
 ## Platform guides
 
 - macOS: [`apps/macos/docs/protocol-integration.md`](../../apps/macos/docs/protocol-integration.md)
+- Windows: [`apps/windows/docs/protocol-integration.md`](../../apps/windows/docs/protocol-integration.md)
 
-Other platforms will be linked here as they ship (spec §7 covers the general transport shape per platform; §7.1 specifically calls out iOS as materially narrower than the socket/pipe model described above, since iOS has no persistent background listener).
+Other platforms will be linked here as they ship (spec §7 covers the general transport shape per platform; §7.1 specifically calls out iOS as materially narrower than the socket/pipe model described above, since iOS has no persistent background listener). Writing this addendum is a required part of finishing that platform's phase, not an optional follow-up — see spec §14.

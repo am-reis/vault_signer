@@ -15,13 +15,16 @@
 //!     `wipe_all` is out of scope for this in-memory structure and must
 //!     be wired up per-platform where the OS provides a hook.
 //!
-//! **Known gap, tracked in PROGRESS.md:** the spec also asks for
-//! `mlock`/`VirtualLock`/`mlockall`-equivalent calls to reduce the chance
-//! of this memory being paged out. That requires per-platform unsafe FFI
-//! against a fixed-address, non-relocating allocation (a `Vec<u8>` can
-//! reallocate/move), which is real platform-integration work, not a
-//! generic addition here — it is deliberately not implemented yet rather
-//! than faked with a no-op.
+//! **Windows: the `mlock`/`VirtualLock`-equivalent gap this module used
+//! to carry is closed.** [`crate::mem_lock::LockedBuffer`] backs every
+//! cached entry's bytes with a page-aligned `VirtualAlloc` region pinned
+//! via `VirtualLock` (not a `Vec<u8>`, which can reallocate/move,
+//! silently leaving a stale unlocked copy behind), zeroized via a
+//! volatile write loop and released on drop. **macOS/Linux: the gap is
+//! unchanged** — `LockedBuffer` falls back to a plain
+//! `zeroize`-wrapped `Vec<u8>` there (zeroized on drop, but not pinned
+//! against paging) until a real `mlock`/`mlockall` path is built and
+//! verified on an actual Unix machine. See `mem_lock`'s own doc comment.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
@@ -29,9 +32,10 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use uuid::Uuid;
-use zeroize::Zeroizing;
+use zeroize::Zeroize;
 
 use crate::error::{Result, VaultError};
+use crate::mem_lock::LockedBuffer;
 
 pub const MIN_RETENTION_SECS: u32 = 0;
 pub const MAX_RETENTION_SECS: u32 = 300;
@@ -49,7 +53,7 @@ pub fn validate_retention_secs(secs: u32) -> Result<()> {
 }
 
 struct CachedKey {
-    bytes: Zeroizing<Vec<u8>>,
+    bytes: LockedBuffer,
     expires_at: Instant,
     /// Zero-retention entries are removed the moment `use_key` finishes
     /// using them, regardless of the (already-elapsed) timer.
@@ -108,12 +112,18 @@ impl RetentionCache {
         Ok(())
     }
 
-    pub(crate) fn insert_raw(&self, key_id: Uuid, bytes: Vec<u8>, ttl: Duration, single_use: bool) {
+    pub(crate) fn insert_raw(&self, key_id: Uuid, mut bytes: Vec<u8>, ttl: Duration, single_use: bool) {
+        let locked = LockedBuffer::new(&bytes);
+        // The caller's Vec is a separate, ordinary heap allocation from
+        // the LockedBuffer copy above — zeroize it explicitly rather
+        // than letting it drop as plain (unwiped, unpinned) heap memory.
+        bytes.zeroize();
+
         let mut entries = self.shared.entries.lock().unwrap();
         entries.insert(
             key_id,
             CachedKey {
-                bytes: Zeroizing::new(bytes),
+                bytes: locked,
                 expires_at: Instant::now() + ttl,
                 single_use,
             },
@@ -138,7 +148,7 @@ impl RetentionCache {
             entries.remove(key_id);
             return None;
         }
-        let result = f(&entry.bytes);
+        let result = f(entry.bytes.as_slice());
         if entry.single_use {
             entries.remove(key_id);
         }

@@ -47,6 +47,9 @@ apps/ios/**/xcuserdata/
 # --- Windows (.NET / MSBuild) ---
 apps/windows/**/bin/
 apps/windows/**/obj/
+# Generated C# UniFFI bindings (see apps/windows/Scripts/generate-csharp-bindings.ps1
+# and the top-level UniFFI-bindings note above) — never hand-edited.
+apps/windows/Generated/
 
 # --- Android / Gradle ---
 apps/android/**/.gradle/

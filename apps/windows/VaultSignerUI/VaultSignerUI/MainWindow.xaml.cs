@@ -21,7 +21,9 @@ public sealed partial class MainWindow : Window
 
         AppWindow.SetIcon("Assets/AppIcon.ico");
 
-        // Navigate the root frame to the main page on startup.
-        RootFrame.Navigate(typeof(MainPage));
+        // Navigate the root frame to the welcome page on startup; it
+        // redirects straight to VaultHomePage itself if the agent
+        // already has a vault open.
+        RootFrame.Navigate(typeof(WelcomePage));
     }
 }

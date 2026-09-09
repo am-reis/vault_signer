@@ -1281,9 +1281,105 @@ sign-off.
 The pipe fix itself (`apps/windows/VaultSignerAgent/AgentServer.cs`)
 plus this checkpoint's first half were committed on `platform/windows`
 as `7fe9efb`. The `vaultsigner.sign` verification recorded just above
-was written up after that commit and is (as of this line) sitting
-uncommitted in the working tree, code-change-free — no source changed
-for step 3, only this file.
+was written up after that commit and committed separately as
+`db876b5`, code-change-free — no source changed for step 3, only this
+file.
+
+### Session checkpoint (this entry): real Windows demos, and VaultSignerUI split into actual navigated pages
+
+Same VM, continuing directly from the pipe-fix session above (`7fe9efb`,
+`db876b5`, both pushed to `origin/platform/windows` this session too).
+Two more things done at the user's request:
+
+**1. Both `demos/` apps now work on Windows**, not just macOS —
+`demos/rpc-demo-client/demo_sign_client.py` (Python+Tkinter) and
+`demos/rpc-demo-nodejs/server.js` (Node, browser-based). Neither needed
+real logic changes: each already isolated its local-transport
+connection into one place (`_connect()`/`TRANSPORT_PATH` now), and that
+was the only platform-specific line — request encoding, response
+parsing, error handling, and the whole UI stayed identical, which is
+itself the point these demos exist to prove (spec §7: the wire format
+is language- *and* transport-agnostic). Windows needs no extra
+dependency for either: the Python client opens
+`\\.\pipe\VaultSignerAgent` via plain `open()` (no pywin32), and
+Node's `net.createConnection` already treats a `\\.\pipe\` path as a
+named pipe natively. Verified live: the Node demo's plumbing (page
+loads, a real `vaultsigner.list_public_keys` round trip over the pipe)
+was confirmed from this session directly; the actual
+sign-and-approve-the-real-dialog step was deliberately left for the
+user to click through themselves rather than scripted — see the
+note below.
+
+**Installing Python and Node on this VM was its own small saga**,
+worth recording since it may recur: the official python.org MSI
+installer failed repeatedly and non-deterministically (`0x80070003`,
+`ERROR_PATH_NOT_FOUND`, plus a separate `tcltk` payload verify failure
+on a different attempt) trying to read its own just-cached `core.msi`
+out of `%LOCALAPPDATA%\Package Cache` — looks like flaky disk I/O on
+this VM (matches this session's own earlier `dotnet-dump` runs taking
+18+ minutes of real CPU time over a 36MB working set for no good
+reason), not a real Python/MSI bug. Switching to the official
+no-install zip distributions (Node's "Windows Binary (.zip)"; Python
+has a "Windows embeddable package (zip)" too, though note its README
+caveat about that one excluding Tcl/Tk) sidesteps the flaky installer
+path entirely and is the more robust choice on this specific machine
+going forward.
+
+**2. `VaultSignerUI` split into real navigated pages** — the deferred
+refactor `MainPage.xaml.cs`'s own doc comment flagged from the start
+("splitting into real pages later is a refactor, not new
+functionality"). `MainPage.xaml`/`.xaml.cs` are gone; in their place,
+using `MainWindow.xaml`'s existing (previously unused for this)
+`RootFrame`:
+- `WelcomePage` — create/open vault; auto-skips itself straight to
+  `VaultHomePage` (clearing the back stack) if the agent already has a
+  vault open, so it never flashes on a normal launch.
+- `VaultHomePage` — compartment picker + inline unlock, key list. Hub
+  page: everything routes back here. Re-fetches state in
+  `OnNavigatedTo` (not just first load) so it's never stale after
+  `Frame.GoBack()` from a subpage.
+- `CreateKeyPage` — standalone create-key form, takes the compartment
+  id as its nav parameter.
+- `KeyDetailPage` — standalone detail view with the discard-key danger
+  zone, takes a new `KeyDetailNavArgs(CompartmentId, KeyInfo)` record
+  as its nav parameter (a bare `KeyInfo` isn't enough to call
+  `internal.discard_key`, which also needs the owning compartment id).
+
+Same underlying functionality as before (nothing new added or
+removed), but real per-screen navigation instead of one panel-toggling
+scroll, plus a first real visual pass: `InfoBar` for errors instead of
+a plain red `TextBlock`, a `ProgressRing` + disabled buttons during any
+in-flight call (relevant now that KDF-backed calls can genuinely take
+real time — see the pipe-fix checkpoint above), an empty-state message
+on the key list, `AccentButtonStyle` on primary actions, and simple
+`FontIcon` glyphs (Segoe Fluent Icons) on Lock All / New Key. Deliberately
+did *not* reach for a `NavigationView` shell — this flow is a linear
+drill-down (Welcome → Home → Create/Detail, with back navigation), not
+a persistent multi-section app, so the existing `Frame` back stack plus
+a plain in-page "← Back" link per subpage fits better than a sidebar
+would.
+
+Built clean (0 warnings, 0 errors) and verified live this session —
+but only the *structure*: launched the real app, confirmed
+`WelcomePage` correctly auto-redirects to `VaultHomePage` when a vault
+is already open, confirmed the real key list renders, and drove
+navigation into `KeyDetailPage` and `CreateKeyPage` and back via UI
+Automation to confirm nothing crashes and each page's controls are
+genuinely present (not just that VaultOpenPanel-style visibility
+toggling still works). **Deliberately did not evaluate whether this
+actually looks/feels better** — the user was explicit this session
+that UX judgment should come from them actually using it, not from
+automation. See the resume note directly below.
+
+**Resume note, next session or later today:** the user should
+literally open the app and click through it — Welcome → create/open →
+Home → New Key → back → click a key → Detail → back — and say what
+does and doesn't work for them. Nothing about this pass should be
+assumed "done" from a UX standpoint until that happens. If they want
+further changes (more polish, a different flow, an actual
+`NavigationView`/breadcrumb shell after all, page transition
+animations, whatever), treat this checkpoint as a first structural
+pass, not a finished redesign.
 
 ## Phase 4 — Android
 

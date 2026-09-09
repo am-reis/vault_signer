@@ -33,7 +33,14 @@
                 <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
 
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Compartment" FontWeight="SemiBold" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Compartment" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <HyperlinkButton Grid.Column="1" Content="New Compartment…" Padding="0" Click="NewCompartmentLink_Click" />
+                    </Grid>
                     <ComboBox x:Name="CompartmentCombo" HorizontalAlignment="Stretch"
                               DisplayMemberPath="label" SelectionChanged="CompartmentCombo_SelectionChanged" />
 

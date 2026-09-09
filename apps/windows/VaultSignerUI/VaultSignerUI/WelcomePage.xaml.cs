@@ -109,8 +109,12 @@ public sealed partial class WelcomePage : Page, ISensitiveScreen
             {
                 throw new FacadeException.Failed("A file name, compartment name and master passphrase are all required.");
             }
+            if (passphrase != ConfirmPassphraseBox.Password)
+            {
+                throw new FacadeException.Failed("Passphrases don't match.");
+            }
             var path = System.IO.Path.Combine(_createFolderPath, fileName);
-            ManagementClient.CreateVault(path, label, passphrase, FacadeDeviceProfile.Desktop);
+            ManagementClient.CreateVault(path, label, passphrase, ProfilePicker.SelectedProfile);
             KnownVaultsStore.RecordOpened(path);
             Frame.Navigate(typeof(VaultHomePage));
             Frame.BackStack.Clear();

@@ -70,6 +70,8 @@
                     <TextBox x:Name="NewVaultFileNameBox" PlaceholderText="File name, e.g. MyVault.vlt" Text="MyVault.vlt" />
                     <TextBox x:Name="CompartmentLabelBox" PlaceholderText="First compartment name, e.g. Personal" Text="Personal" />
                     <PasswordBox x:Name="MasterPassphraseBox" PlaceholderText="Master passphrase" />
+                    <PasswordBox x:Name="ConfirmPassphraseBox" PlaceholderText="Confirm master passphrase" />
+                    <local:DeviceProfilePicker x:Name="ProfilePicker" />
                     <Button x:Name="CreateVaultButton" Content="Create Vault" Style="{StaticResource AccentButtonStyle}"
                             HorizontalAlignment="Right" Click="CreateVaultButton_Click" />
                 </StackPanel>

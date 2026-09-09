@@ -130,6 +130,8 @@ public sealed partial class VaultHomePage : Page, ISensitiveScreen
         Frame.Navigate(typeof(KeyDetailPage), new KeyDetailNavArgs(compartment.compartmentId, row.Info));
     }
 
+    private void NewCompartmentLink_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(CreateCompartmentPage));
+
     private void SwitchVaultLink_Click(object sender, RoutedEventArgs e)
     {
         Frame.Navigate(typeof(WelcomePage));

@@ -1559,6 +1559,58 @@ aren't silently forgotten):
 - Item 3.4 (WebAuthn plugin-authenticator COM registration) — still
   open from earlier checkpoints, research only.
 
+### Session checkpoint (this entry): standalone "add a compartment" UI
+
+Same VM, same session, immediately after the entry above. The user
+pointed out one more real gap on review: a vault can hold multiple
+independently-passphrased compartments (spec §4.1's header structure;
+"the user may have as many vaults [compartments] as they want," in
+their words — "vault" and "compartment" get used interchangeably
+day-to-day even though the spec keeps them distinct), but the only way
+to *create* one was buried inside the import master-key-duality flow's
+option 2. Checked first: **macOS doesn't have this either** —
+`internal.add_compartment`/`ManagementClient.AddCompartment` already
+existed on both platforms from earlier sessions, but grepping
+`apps/macos` turned up no call site for it outside
+`ManagementHandlers.swift`/`Shared/ManagementClient.swift` themselves.
+So this isn't a "port from macOS" — it's new product surface on top of
+an already-existing, already-tested vaultcore/agent primitive, on both
+this app's own established page-per-action pattern and (loosely)
+`CreateVaultView.swift`'s field shape.
+
+- `DeviceProfilePicker` (new, shared `UserControl`): the Desktop/Mobile
+  choice (spec §4.2 — controls Argon2id benchmark targets) that
+  `WelcomePage`'s Create Vault form was **missing** relative to
+  `CreateVaultView.swift` (which has it) — added there too while fixing
+  this, along with the confirm-passphrase field `CreateVaultView.swift`
+  also has and `WelcomePage` didn't. One control, not two copies of the
+  same picker + explanatory copy.
+- `CreateCompartmentPage` (new): label, passphrase, confirm passphrase,
+  device profile → `AddCompartment`. Reachable via a "New Compartment…"
+  link next to `VaultHomePage`'s compartment picker.
+- Verified live via raw pipe calls against the real agent:
+  `internal.add_compartment` (label "Work", real passphrase) succeeded
+  and the compartment showed up correctly in a follow-up
+  `list_compartments` (already unlocked, since its passphrase was just
+  supplied to create it) — first real exercise of this handler on
+  Windows since it was written. **Note for whoever picks up
+  `test-vault.vsvault` next**: it now has two compartments, "Personal"
+  and "Work," permanently — there's no remove-compartment operation to
+  clean this up with (compartments aren't deletable by design, only
+  individual keys are), and it's realistic state for this feature
+  anyway, so this was left as-is rather than treated as something to
+  undo.
+- Verified structurally (UI Automation): `CreateCompartmentPage`
+  navigates from `VaultHomePage` and renders all fields correctly,
+  including the shared `DeviceProfilePicker`. `WelcomePage`'s updated
+  Create Vault form was not separately re-verified live this entry
+  (the agent already has a vault open on this VM, so `WelcomePage`
+  auto-redirects before it can be reached) — the same
+  `DeviceProfilePicker` control rendering correctly on
+  `CreateCompartmentPage` is the closest live evidence for it. Worth
+  the user specifically checking Create Vault's new fields when they do
+  their hands-on pass.
+
 ## Phase 4 — Android
 
 Not started.

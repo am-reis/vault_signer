@@ -59,10 +59,19 @@ Phase 1.
 - [x] 1.6 In-memory retention cache with `zeroize` and configurable
       timer (§4.5). `vaultcore/src/retention.rs`. Background sweep
       thread proactively wipes expired entries rather than relying on
-      next-access; zero-retention entries are single-use. **Known gap:**
-      `mlock`/`VirtualLock`/`mlockall`-equivalent calls are not
-      implemented — this needs real per-platform unsafe FFI against a
-      non-relocating allocation and is deliberately left as a TODO
+      next-access; zero-retention entries are single-use. **Windows half
+      of the known gap closed this session** (done from a real Windows
+      machine — see Phase 3): `vaultcore/src/mem_lock.rs`'s
+      `LockedBuffer` backs cached key bytes with a page-aligned
+      `VirtualAlloc` region pinned via `VirtualLock`, zeroized via a
+      volatile write loop and released on drop, wired into
+      `CachedKey.bytes`. Verified for real: `cargo build --release
+      --target x86_64-pc-windows-msvc` and `cargo test --workspace`
+      (117 tests, up from 108) both clean on Windows. **macOS/Linux
+      still the original gap** — `LockedBuffer` falls back to a plain
+      `zeroize`-wrapped `Vec<u8>` there (zeroized on drop, not pinned
+      against paging) until a real `mlock`/`mlockall` path is built and
+      verified on an actual Unix machine; do not assume parity.
       rather than faked; see the module doc comment. (`eaa66fd`)
 - [x] 1.7 CTAP2 message handling (`authenticatorMakeCredential`,
       `authenticatorGetAssertion`) as a platform-agnostic library

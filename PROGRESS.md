@@ -71,8 +71,7 @@ Phase 1.
       still the original gap** — `LockedBuffer` falls back to a plain
       `zeroize`-wrapped `Vec<u8>` there (zeroized on drop, not pinned
       against paging) until a real `mlock`/`mlockall` path is built and
-      verified on an actual Unix machine; do not assume parity.
-      rather than faked; see the module doc comment. (`eaa66fd`)
+      verified on an actual Unix machine; do not assume parity. (`eaa66fd`)
 - [x] 1.7 CTAP2 message handling (`authenticatorMakeCredential`,
       `authenticatorGetAssertion`) as a platform-agnostic library
       function. `vaultcore/src/ctap2.rs`, built directly on the

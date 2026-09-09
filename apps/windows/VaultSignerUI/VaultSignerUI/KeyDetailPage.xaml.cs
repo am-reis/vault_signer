@@ -50,6 +50,78 @@ public sealed partial class KeyDetailPage : Page, ISensitiveScreen
         DiscardConfirmBox.Text = "";
     }
 
+    private async void ExportKeyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_args is not { } args) return;
+        var destination = await FilePickers.PickSaveDestinationAsync(App.MainWindow, $"{args.Key.label}.vltkey");
+        if (destination is null) return;
+        RunGuarded(() =>
+        {
+            var bytes = ManagementClient.ExportSingleKey(args.CompartmentId, args.Key.keyId);
+            File.WriteAllBytes(destination, bytes);
+        });
+    }
+
+    /// Spec §5.1: "off by default, gated behind a 'danger zone' warning
+    /// dialog and the per-key passphrase, shown once with no clipboard
+    /// auto-copy." The hex is selectable (so the user can manually copy
+    /// it if they choose) but nothing copies it for them. Deliberately
+    /// not using ContentDialog's PrimaryButton for the Reveal action —
+    /// clicking Primary always closes the dialog, and this needs to stay
+    /// open afterward to show the result — so Reveal is a plain button
+    /// inside Content and Close is the dialog's only native button,
+    /// relabeled "Done" once something has been revealed.
+    private async void RevealRawKeyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_args is not { } args) return;
+
+        var warningText = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            Text = "Anyone who sees this can act as this key, anywhere, without needing this device or your passphrase again. " +
+                   "Only continue if you specifically need to move this key's raw material somewhere yourself.",
+        };
+        var passphraseBox = new PasswordBox { PlaceholderText = "This key's passphrase" };
+        var errorText = new TextBlock { Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"], Visibility = Visibility.Collapsed };
+        var revealedBox = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"), Visibility = Visibility.Collapsed };
+        var revealButton = new Button { Content = "Reveal" };
+        var entryPanel = new StackPanel { Spacing = 10, Children = { passphraseBox, errorText, revealButton } };
+
+        var dialog = new ContentDialog
+        {
+            Title = "Reveal Raw Key — Danger Zone",
+            Content = new StackPanel { Spacing = 14, Children = { warningText, entryPanel, revealedBox } },
+            CloseButtonText = "Cancel",
+            XamlRoot = XamlRoot,
+        };
+
+        revealButton.Click += (_, _) =>
+        {
+            errorText.Visibility = Visibility.Collapsed;
+            if (passphraseBox.Password.Length == 0) return;
+            revealButton.IsEnabled = false;
+            try
+            {
+                var hex = ManagementClient.RevealRawKeyHex(args.CompartmentId, args.Key.keyId, passphraseBox.Password);
+                revealedBox.Text = hex;
+                revealedBox.Visibility = Visibility.Visible;
+                entryPanel.Visibility = Visibility.Collapsed;
+                dialog.CloseButtonText = "Done";
+            }
+            catch (FacadeException ex)
+            {
+                errorText.Text = ex.Message;
+                errorText.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                revealButton.IsEnabled = true;
+            }
+        };
+
+        await dialog.ShowAsync();
+    }
+
     private void DiscardKeyButton_Click(object sender, RoutedEventArgs e)
     {
         RunGuarded(() =>

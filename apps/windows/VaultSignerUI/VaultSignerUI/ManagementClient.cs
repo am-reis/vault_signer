@@ -209,6 +209,31 @@ internal static class ManagementClient
         }
     }
 
+    // MARK: - Autostart (spec §8's other independent toggle)
+
+    public static void EnableAutostart()
+    {
+        Call("internal.enable_autostart", new Dictionary<string, object?>());
+    }
+
+    public static void DisableAutostart()
+    {
+        try { Call("internal.disable_autostart", new Dictionary<string, object?>()); } catch { }
+    }
+
+    public static bool IsAutostartEnabled()
+    {
+        try
+        {
+            var result = Call("internal.is_autostart_enabled", new Dictionary<string, object?>());
+            return result.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     // MARK: - Transport
 
     private static JsonElement Call(string method, Dictionary<string, object?> @params)

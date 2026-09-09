@@ -46,6 +46,11 @@
                     </StackPanel>
                 </StackPanel>
 
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="ExportKeyButton" Content="Export This Key…" Click="ExportKeyButton_Click" />
+                    <Button x:Name="RevealRawKeyButton" Content="Reveal Raw Key…" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Click="RevealRawKeyButton_Click" />
+                </StackPanel>
+
                 <StackPanel Spacing="8" Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}" Padding="16" CornerRadius="6">
                     <TextBlock Text="Danger zone" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
                     <TextBlock TextWrapping="Wrap" Opacity="0.85"

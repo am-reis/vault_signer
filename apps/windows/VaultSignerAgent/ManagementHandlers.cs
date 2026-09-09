@@ -55,6 +55,9 @@ internal sealed class ManagementHandlers
                 "internal.enable_auto_unlock" => EnableAutoUnlock(@params, id),
                 "internal.disable_auto_unlock" => DisableAutoUnlock(@params, id),
                 "internal.is_auto_unlock_enabled" => IsAutoUnlockEnabled(@params, id),
+                "internal.enable_autostart" => EnableAutostart(id),
+                "internal.disable_autostart" => DisableAutostart(id),
+                "internal.is_autostart_enabled" => IsAutostartEnabled(id),
                 _ => AgentServer.ErrorResponse(id, "method_not_found", $"unknown method: {method}"),
             };
         }
@@ -399,6 +402,32 @@ internal sealed class ManagementHandlers
             ["enabled"] = DpapiAutoUnlockStore.Load(compartmentId) is not null,
         });
     }
+
+    // MARK: Autostart (spec §8's other independent toggle) — AutostartManager
+    // ownership lives here, not in the UI, same reasoning as auto-unlock above.
+
+    private static byte[] EnableAutostart(JsonElement id)
+    {
+        var exePath = Environment.ProcessPath ?? Environment.GetCommandLineArgs()[0];
+        try
+        {
+            AutostartManager.Enable(exePath);
+        }
+        catch (Exception e) when (e is UnauthorizedAccessException or System.Security.SecurityException or InvalidOperationException)
+        {
+            return AgentServer.ErrorResponse(id, "autostart_write_failed", $"couldn't write the Run registry value: {e.Message}");
+        }
+        return AgentServer.ResultResponse(id, new Dictionary<string, object?>());
+    }
+
+    private static byte[] DisableAutostart(JsonElement id)
+    {
+        AutostartManager.Disable();
+        return AgentServer.ResultResponse(id, new Dictionary<string, object?>());
+    }
+
+    private static byte[] IsAutostartEnabled(JsonElement id) =>
+        AgentServer.ResultResponse(id, new Dictionary<string, object?> { ["enabled"] = AutostartManager.IsEnabled() });
 
     private byte[] NoVaultOpen(JsonElement id) => AgentServer.ErrorResponse(id, "no_vault_open", "no vault is currently open");
 

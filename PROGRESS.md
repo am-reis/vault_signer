@@ -1714,6 +1714,155 @@ the named-pipe listener and retention cache, DPAPI methods exist
 agent-side) but incomplete against its own text — no autostart/auto-
 unlock UI toggle exists yet, so treat 3.3 as partial, not done.
 
+### Session checkpoint (this entry): FIDO2 blocked on OS version; Settings screen closes out 3.3, plus the remaining minor UI gaps
+
+Same VM, same session. Two threads:
+
+**1. FIDO2 (spec item 3.4) — real research done, blocked on this VM's
+OS version, not abandoned.** At the user's request (motivated by
+wanting to avoid macOS's paid-Apple-ID gate — see Phase 2's item 2.7
+note), researched Windows's actual current third-party passkey
+registration mechanism rather than guessing from possibly-stale
+knowledge (spec §6.2 explicitly requires this: "verify the exact
+current registration APIs ... against current Microsoft documentation
+at implementation time"). Real findings:
+- It's called the **Windows passkey Plugin API** (`IPluginAuthenticator`,
+  `WebAuthNPluginAddAuthenticator` and friends) — GA since the November
+  2025 security update, not the older/vaguer `WebAuthNGetPlatformCredentialList`
+  spec's own §6.2 text names (that text may itself be dated; worth a
+  spec correction once someone actually implements this).
+- **Genuinely encouraging on the user's actual concern**: Microsoft's
+  own official sample (`microsoft/windows-classic-samples`,
+  `Samples/PasskeyManager` — real, downloadable, MIT-licensed reference
+  code) requires nothing beyond a self-generated GUID and local
+  registration to build and run. No paid developer account, no Apple-ID
+  equivalent gate found in its documented build/run steps.
+- **Real blocker found instead**: the sample's own stated OS
+  requirement is Windows 11 24H2 (build 26100.6725+) or 25H2 (build
+  26200.6725+). This VM is on build 22631 (Windows 11 23H2 — despite
+  `ProductName` in the registry confusingly still saying "Windows 10
+  Pro for Workstations"), confirmed via `[System.Environment]::OSVersion.Version`
+  and the registry directly. That's roughly a year of feature updates
+  short.
+- Also real: the sample is a **C++/WinRT, MSIX-packaged** app
+  (`Package.appxmanifest`, `App.xaml.cpp`) — a different stack from this
+  project's current pure-C#, deliberately-unpackaged `VaultSignerUI`
+  (see that project's own `WindowsAppSDKSelfContained` comment for why
+  it's unpackaged). Implementing the real thing will mean either a new
+  small packaged C++/WinRT component alongside the existing app, or
+  reworking packaging — a real design decision for whoever picks this
+  up, not a trivial add.
+- Attempted the OS upgrade this session via the official Windows 11
+  Installation Assistant (`download.microsoft.com`, verified official
+  link). **Did not complete** — a routine reboot happened (Windows'
+  own update service finishing unrelated cumulative updates,
+  independent of a separate manual download attempt that failed with
+  `0x80070044`, likely more of this VM's characteristic flakiness
+  rather than a real Windows Update problem), but the build number
+  never advanced and no `$WINDOWS.~BT` staging folder was ever created
+  — the actual feature-update attempt appears to have stalled or been
+  closed before real progress happened. **User explicitly deprioritized
+  chasing this further this session** ("leave it alone... a lot of
+  effort just to make this extension") — parked, not abandoned. Next
+  attempt should probably try the offline ISO/Media Creation Tool route
+  instead of the Installation Assistant, since the online path already
+  failed once without a clear cause.
+
+**2. The three remaining "minor UI gaps" the user asked to close out**
+(their words: "a Settings screen... and a couple of minor UI entry
+points for features that already work underneath"):
+
+- **`SettingsPage` (new)** — closes out spec item 3.3's missing half.
+  Two independent toggles per spec §8: "Start VaultSigner automatically"
+  (new agent-side `internal.enable_autostart`/`disable_autostart`/
+  `is_autostart_enabled` handlers, since nothing had ever called the
+  already-existing `AutostartManager.cs` from anywhere — confirmed via
+  grep before writing these, same diligence as the compartment-creation
+  gap two checkpoints up) and "Auto-unlock this compartment on startup"
+  (already had agent/client methods from an earlier session; this is
+  their first UI). Auto-unlock is gated behind a `ContentDialog`
+  requiring the compartment's passphrase — never enabled from a bare
+  toggle flip (spec §8: "requires explicit opt-in with an in-app risk
+  explanation") — carrying the *exact* DPAPI limitation disclosure
+  `DpapiAutoUnlockStore.cs`'s own doc comment says is required: that any
+  process running as the same Windows user, not just VaultSignerAgent,
+  can in principle decrypt the stored passphrase, materially weaker
+  than macOS Keychain. Also the second required entry point to
+  `ManageVaultsPage` (spec §5.6: "reachable both from the entry screen
+  and from the app's settings"). No i18n scaffolding exists on Windows
+  yet (item 3.7), so this is plain literal copy, not resource keys —
+  same choice already made for every other page this phase.
+- **`KeyDetailPage`: "Export This Key…" and "Reveal Raw Key…" added.**
+  Both already had agent/client methods (`export_single_key`,
+  `reveal_raw_key_hex`) from an earlier session with no UI ever calling
+  them — first real exercise of both this session. Reveal follows spec
+  §5.1's danger-zone requirement: warning text, per-key passphrase
+  entry, shown once, hex is selectable (so the user *can* copy it
+  manually) but nothing copies it for them automatically. Built as a
+  `ContentDialog` with a plain `Button` for the Reveal action rather
+  than `ContentDialog`'s own `PrimaryButton` — clicking Primary always
+  closes the dialog, and this needs to stay open afterward to actually
+  show the result.
+
+**Verified for real, not just built** — agent-side, via raw pipe calls
+(the security-critical part): `enable_autostart`/`disable_autostart`
+round-tripped against the real `HKCU\...\Run` registry key (confirmed
+present after enable, confirmed gone after disable — not just that the
+call returned success). `enable_auto_unlock`/`disable_auto_unlock`
+round-tripped against a real DPAPI file on disk the same way. A wrong
+passphrase to `reveal_raw_key_hex` correctly fails; the correct one
+returns real 32-byte hex for a real Ed25519 key; `export_single_key`
+returns a real packet. All test keys/state cleaned up afterward.
+**UI verified structurally** (renders, navigates, exact copy present)
+via UI Automation for all three: `SettingsPage` (both toggles, the
+DPAPI disclosure text verbatim), the auto-unlock `ContentDialog`
+(correct content, correct buttons), and `KeyDetailPage`'s two new
+buttons plus the reveal dialog's danger-zone content.
+
+**One real limitation hit while verifying, worth recording**:
+`System.Windows.Automation`'s `ValuePattern.SetValue` — and even
+simulated keystrokes via `SendKeys` — could not reliably get text into
+a `PasswordBox` created dynamically inside a `ContentDialog` (WinUI3
+appears to intentionally not expose a settable value for password
+fields to automation, a reasonable security choice, not a bug). Two
+attempts at driving the auto-unlock confirmation dialog end-to-end via
+UI Automation both silently no-opped (empty password read back,
+toggle correctly reverted, no error — the code behaved correctly given
+what it received, the *automation* was the thing that failed). Traced
+this by testing the exact same agent call via raw pipe instead, which
+worked immediately — isolated the failure to the test tooling, not the
+product, but cost real time before landing on that. Also incidentally
+useful: this is exactly the kind of interactive passphrase-entry moment
+[[human-driven-ux-testing]] says to leave for a human anyway, so the
+UI Automation limitation and the "let the user drive it" principle
+point the same direction here.
+
+**A real, currently-unexplained anomaly, found during this
+verification, not caused by anything identified**: the "Personal"
+compartment's master passphrase, `test` — used successfully **dozens
+of times** earlier this same session (see every earlier checkpoint
+above) — started failing with a genuine `incorrect master passphrase`
+error (not a throttle response) partway through this entry's testing.
+Ruled out: throttling (the error was the real
+"incorrect"/`vault_error` response, not `key_locked_retry_later`,
+until several of *this checkpoint's own* verification attempts
+themselves triggered a real lockout — confirming spec §5.5's throttle
+works correctly, but also meaning **Personal is now genuinely
+rate-limited and will need the backoff to elapse**, up to 5 minutes,
+before it's usable again). Ruled out: vault-wide corruption or a
+general agent bug — the `Work` compartment's real passphrase
+(`workpass123`) kept working throughout, including for everything this
+entry actually verified against. Ruled out (as far as checked): common
+whitespace/case variants of "test". No merge/replace operation was run
+against Personal at any point this session that would explain a
+changed master passphrase. **Root cause not found — flagging rather
+than guessing.** Not a blocker (`Work` and `ethereum` compartments are
+fine, and this is disposable test-vault data, not real user data), but
+whoever next reaches for `test-vault.vsvault`'s "Personal" compartment
+with passphrase "test" should expect it might not work, and should not
+assume data loss or a security incident without first checking whether
+this is reproducible from a clean state.
+
 ## Phase 4 — Android
 
 Not started.

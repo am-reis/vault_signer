@@ -16,12 +16,17 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="4">
                         <TextBlock Text="VaultSigner" FontSize="32" FontWeight="SemiBold" />
                         <HyperlinkButton x:Name="SwitchVaultLink" Content="Open a different vault" Padding="0" Click="SwitchVaultLink_Click" />
                     </StackPanel>
-                    <Button Grid.Column="1" x:Name="LockAllButton" Click="LockAllButton_Click" VerticalAlignment="Top"
+                    <Button Grid.Column="1" x:Name="SettingsButton" Click="SettingsButton_Click" VerticalAlignment="Top" Margin="0,0,8,0"
+                            ToolTipService.ToolTip="Settings">
+                        <FontIcon Glyph="&#xE713;" FontSize="14" />
+                    </Button>
+                    <Button Grid.Column="2" x:Name="LockAllButton" Click="LockAllButton_Click" VerticalAlignment="Top"
                             ToolTipService.ToolTip="Lock every compartment and wipe cached key material">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE72E;" FontSize="14" />

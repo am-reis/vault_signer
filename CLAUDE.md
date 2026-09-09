@@ -52,6 +52,8 @@ SemVer: `vMAJOR.MINOR.PATCH`, e.g. `v0.1.0`. Pre-1.0 (per SemVer §4): MINOR for
 
 **`vaultcore` is versioned independently of every platform, but is never released on its own**: it has no independent release process (it's never published to crates.io — `publish = false` in `vaultcore/Cargo.toml` — and ships only bundled inside a platform's own release artifacts, below). Its `Cargo.toml` version is instead reasoned about purely by *its own* changes — a container-format or protocol-breaking change is MAJOR, a new capability is MINOR, a fixes-only batch is PATCH — completely decoupled from whatever number any platform's app happens to carry. When it moves, tag that exact commit on `shared` as `vaultcore-vA.B.C`: a plain, lightweight tag with **no GitHub Release and no artifacts attached to the tag itself** — it exists purely as a precise, referenceable marker in history (e.g. for someone tracking exactly what protocol/format version a given platform release actually shipped), not as a distribution event.
 
+For the protocol half of that reasoning specifically, [`docs/protocol-integration/PROTOCOL-SPEC.md`](docs/protocol-integration/PROTOCOL-SPEC.md) is the authoritative source: a change to what that document describes is what determines whether a given `vaultcore` bump is MAJOR or MINOR on protocol grounds, per its own §9. Container-format changes (unrelated to this protocol) still reason about MAJOR/MINOR independently, as above.
+
 ## Commit signing
 
 Commits will be required to carry a verified PGP signature once the corresponding key is added to this repository's configuration. Not yet in effect.

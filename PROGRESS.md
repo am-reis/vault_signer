@@ -55,6 +55,25 @@ Phase 1.
       equivalent) yet at all — needed before a Windows release can
       actually be cut. Left for whoever's already working directly on
       `platform/windows` rather than built as part of this change.
+- [x] 0.5 Write a formal, standalone specification of the custom local
+      signing protocol (§7), distinct from the spec (deliberately
+      informal/process-oriented by original design) and from
+      `docs/protocol-integration/README.md` (a friendlier integration
+      guide with examples, kept as-is for that purpose). **Decision:**
+      third-party integration against this protocol (including the
+      author's own browser-extension integration) had outgrown an
+      informal description — `docs/protocol-integration/PROTOCOL-SPEC.md`
+      is now the normative wire-format reference, versioned on its own
+      (currently 1.0) independently of any platform's version. Per
+      `CLAUDE.md`'s Versioning section, changes to that document are what
+      drive `vaultcore`'s MAJOR/MINOR reasoning on protocol grounds going
+      forward. One substantive addition made while formalizing it:
+      `no_vault_open` was previously described identically but
+      separately in both the macOS and Windows integration guides as an
+      "agent-specific" error beyond the core catalog — promoted to the
+      core error table itself, since both existing implementations
+      already agreed on it and leaving it informal invited future
+      platforms to invent their own name for the same condition.
 
 ## Phase 1 — vaultcore (shared, built once, platform-agnostic)
 

@@ -1165,6 +1165,95 @@ assume either way — verify first**, with the isolated test below.
   entry pointing at `~/.ssh/github_deploy_key`) — this should already
   work with no further setup.
 
+### Session checkpoint (this entry): the "VaultSignerAgent isn't running" bug is root-caused and fixed
+
+Same QEMU VM as the two previous entries. **The top-priority blocker from
+the previous checkpoint is resolved** — root cause found via a real
+reproduction (not just log reading), fixed, and verified end-to-end
+through the actual UI. The earlier checkpoint's Job-Object/session
+theories were a red herring — real, useful debugging that ruled things
+out, but not the actual mechanism. Thank the user for the correction
+that redirected this session: the process was never dying: only the
+UI's own error message said so.
+
+**Root cause**: `AgentServer.AcceptLoopAsync` (`apps/windows/VaultSignerAgent/AgentServer.cs`)
+called `NamedPipeServerStreamAcl.Create(..., pipeSecurity: BuildPipeSecurity())`
+on *every* loop iteration — i.e. for every instance of the named pipe,
+not just the first. Windows only honors an ACL on the first-ever
+instance of a given pipe name; every instance created after that must
+omit the security descriptor, or `NamedPipeServerStreamAcl.Create`
+throws `System.UnauthorizedAccessException` ("Access to the path is
+denied"). That's a sibling of `IOException`, not a subclass, so the
+existing `catch (IOException)` around that call never caught it. Since
+each `AcceptLoopAsync` is launched fire-and-forget
+(`_ = Task.Run(AcceptLoopAsync)`, 4 of them, never awaited or observed),
+the escaping exception silently ended whichever loop hit it — no crash,
+no log, process stays alive, confirmed via a live `dotnet-dump` stack
+capture showing zero threads doing anything related once all 4 loops
+had died.
+
+This is exactly why it looked "idle-stable" in isolated liveness
+testing but died under real use: at most one of the 4 loops' very first
+`Create` call could ever win the race to be genuinely first; the other
+3 died on their first iteration, before any client had even connected.
+The winner survived until a client consumed its instance, then died too
+the moment it looped back to create a replacement. The pipe only went
+fully dark once all 4 original instances had each been connected-to
+exactly once — reproduced deterministically this session: a **single**
+`internal.list_compartments` call (no KDF, no vault mutation) against a
+freshly-started agent was enough to start the collapse, and it was
+fully, permanently dead (verified via
+`[System.IO.Directory]::GetFiles('\\.\pipe\')` showing no
+`VaultSignerAgent` entry at all, process still alive/responding, 0ms
+CPU) after 4 total real requests.
+
+**Fix**: `_firstPipeInstanceCreated` (an `int` guarded by
+`Interlocked.CompareExchange`) tracks which single call — across all 4
+loops, whichever wins the race — is allowed to supply the ACL via
+`NamedPipeServerStreamAcl.Create`; every other instance, from then on,
+is created via the plain `NamedPipeServerStream` constructor with no
+security descriptor. Also added (belt-and-suspenders, kept
+permanently): both `AcceptLoopAsync` and `HandleConnectionAsync` now
+catch and log any unexpected exception type instead of only the ones
+each was originally written to expect, so a *different* future edge
+case can't silently kill a fire-and-forget accept loop again with zero
+trace the way this one did.
+
+**Verified this session**, all against the real built agent (not just
+reasoning about the code):
+- 20 sequential real pipe calls: all fast (0-1ms round trip after the
+  first), zero errors.
+- An 8-way concurrent burst (PowerShell background jobs hitting the
+  pipe simultaneously): all succeeded, pipe stayed listed and
+  reachable throughout.
+- `internal.unlock_compartment` with the real `test-vault.vsvault`
+  passphrase: succeeded, `unlocked: true` confirmed by a follow-up
+  `list_compartments`.
+- **The real UI, for real** (resume step 2 from the previous
+  checkpoint): launched `VaultSignerUI.exe` against the fixed agent,
+  drove it via UI Automation (`System.Windows.Automation` — screenshots
+  of this window came back stale/blank all session, a `CopyFromScreen`-
+  vs-DirectComposition capture quirk on this VM, *not* an app rendering
+  failure; the live accessibility tree was always fully populated and
+  correct) — created a real key (`claude-test-key`, Ed25519 /
+  CustomSigning), confirmed it appeared in the key list, selected it
+  and confirmed the detail panel populated correctly (label,
+  description, a real-looking 65-hex-char public key), then discarded
+  it via the same confirm-text flow the UI requires. Pipe stayed
+  healthy throughout the whole flow.
+- vaultcore itself was not touched — this was entirely a
+  `VaultSignerAgent`/.NET-side bug.
+
+**Not attempted this session**: resume step 3 (a real
+`vaultsigner.sign` round trip exercising `WinFormsPassphrasePrompter`'s
+real dialog) and step 4 (WebAuthn plugin-authenticator COM
+registration research) from the previous checkpoint — both still open,
+now unblocked.
+
+**Not yet committed** — this checkpoint's code changes
+(`apps/windows/VaultSignerAgent/AgentServer.cs`) and this `PROGRESS.md`
+update are sitting uncommitted in the working tree as of this entry.
+
 ## Phase 4 — Android
 
 Not started.

@@ -3,6 +3,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using uniffi.vaultcore;
 
 namespace VaultSignerAgent;
@@ -56,6 +57,25 @@ internal sealed class AgentServer
     private readonly ManagementHandlers _management;
     private volatile bool _running;
 
+    // Windows only lets the *first-ever* instance of a named pipe carry an
+    // ACL (`CreateNamedPipe`'s security descriptor is fixed by that call
+    // for the pipe name as a whole); every instance created after it must
+    // omit the security descriptor entirely, or `NamedPipeServerStreamAcl
+    // .Create` throws `UnauthorizedAccessException` ("Access to the path
+    // is denied") — not `IOException`, so the original code's `catch
+    // (IOException)` never caught it. Since `AcceptLoopAsync` is launched
+    // fire-and-forget via a discarded `Task.Run`, that exception silently
+    // ended whichever of the 4 loops hit it, with zero trace — this is the
+    // real mechanism behind PROGRESS.md's "VaultSignerAgent dies
+    // unpredictably" bug: every one of the 4 loops' *first* iteration
+    // raced to create the pipe and (at most) one could ever win; the
+    // other 3 died on their very first `Create` call, and the winner died
+    // too the moment it looped back to replace the instance a client had
+    // just connected to. The pipe would only ever go fully dark once all
+    // 4 original instances had each been consumed exactly once — which is
+    // why it looked idle-stable but died under real, repeated use.
+    private int _firstPipeInstanceCreated;
+
     public AgentServer(Vault? vault)
     {
         _vault = vault;
@@ -84,40 +104,76 @@ internal sealed class AgentServer
         return security;
     }
 
+    private NamedPipeServerStream CreatePipeInstance()
+    {
+        // Whichever call (from any of the 4 loops, or any later
+        // replacement instance) actually wins this race is "the first
+        // instance" from Windows' perspective and must be the one that
+        // supplies the ACL — see the comment on `_firstPipeInstanceCreated`.
+        if (Interlocked.CompareExchange(ref _firstPipeInstanceCreated, 1, 0) == 0)
+        {
+            return NamedPipeServerStreamAcl.Create(
+                PipeName,
+                PipeDirection.InOut,
+                NamedPipeServerStream.MaxAllowedServerInstances,
+                PipeTransmissionMode.Byte,
+                PipeOptions.Asynchronous,
+                inBufferSize: 4096,
+                outBufferSize: 4096,
+                pipeSecurity: BuildPipeSecurity());
+        }
+
+        return new NamedPipeServerStream(
+            PipeName,
+            PipeDirection.InOut,
+            NamedPipeServerStream.MaxAllowedServerInstances,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous,
+            inBufferSize: 4096,
+            outBufferSize: 4096);
+    }
+
     private async Task AcceptLoopAsync()
     {
         while (_running)
         {
-            NamedPipeServerStream pipe;
             try
             {
-                pipe = NamedPipeServerStreamAcl.Create(
-                    PipeName,
-                    PipeDirection.InOut,
-                    NamedPipeServerStream.MaxAllowedServerInstances,
-                    PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous,
-                    inBufferSize: 4096,
-                    outBufferSize: 4096,
-                    pipeSecurity: BuildPipeSecurity());
+                NamedPipeServerStream pipe;
+                try
+                {
+                    pipe = CreatePipeInstance();
+                }
+                catch (IOException)
+                {
+                    await Task.Delay(50);
+                    continue;
+                }
+
+                try
+                {
+                    await pipe.WaitForConnectionAsync();
+                }
+                catch
+                {
+                    pipe.Dispose();
+                    continue;
+                }
+
+                _ = Task.Run(() => HandleConnectionAsync(pipe));
             }
-            catch (IOException)
+            catch (Exception e)
             {
+                // Belt-and-suspenders: `AcceptLoopAsync` is launched
+                // fire-and-forget via a discarded `Task.Run`, so anything
+                // that escapes this loop dies silently with zero trace —
+                // exactly how the `UnauthorizedAccessException` above went
+                // unnoticed for so long. Log whatever it is and keep the
+                // loop alive rather than let a future, still-unknown edge
+                // case take a listener down permanently again.
+                Console.Error.WriteLine($"VaultSignerAgent: AcceptLoopAsync caught unexpected {e.GetType().FullName}: {e}");
                 await Task.Delay(50);
-                continue;
             }
-
-            try
-            {
-                await pipe.WaitForConnectionAsync();
-            }
-            catch
-            {
-                pipe.Dispose();
-                continue;
-            }
-
-            _ = Task.Run(() => HandleConnectionAsync(pipe));
         }
     }
 
@@ -154,6 +210,14 @@ internal sealed class AgentServer
             catch (IOException)
             {
                 // Peer disconnected mid-message — nothing to respond to.
+            }
+            catch (Exception e)
+            {
+                // DIAGNOSTIC (temporary, this session): see the matching
+                // note in AcceptLoopAsync — this task is also launched via
+                // a discarded `Task.Run`, so anything else escaping here
+                // would otherwise vanish with zero trace.
+                Console.Error.WriteLine($"VaultSignerAgent: HandleConnectionAsync caught unexpected {e.GetType().FullName}: {e}");
             }
         }
     }

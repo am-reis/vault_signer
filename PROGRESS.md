@@ -1863,6 +1863,77 @@ with passphrase "test" should expect it might not work, and should not
 assume data loss or a security incident without first checking whether
 this is reproducible from a clean state.
 
+### Session checkpoint (this entry): final Windows gap sweep, per the user's explicit "check if anything else is missing"
+
+Same VM, same session, immediately after the entry above. Rather than
+guess whether the three gaps just closed were the *only* ones, cross-
+checked systematically: grepped every `ManagementClient.cs` public
+method against actual call sites in every `.xaml.cs` file, and diffed
+`CreateKeyPage`/the key list row against `CreateKeyView.swift`/
+`KeyListView.swift` field-for-field rather than trusting memory. Found
+and closed three more real gaps, all the same shape as the last
+checkpoint's (a working agent/client method with zero UI ever calling
+it, or a field macOS's real UI collects/shows that Windows's didn't):
+
+- **`ChangeKeyPassphrase` had zero UI call sites** — spec §5.1: "standalone
+  action reachable from the key detail screen, independent of import/
+  export. Required for every imported key to be re-secured with a
+  locally-known passphrase." Added to `KeyDetailPage` as a
+  `ContentDialog` (current/new/confirm passphrase fields), this time
+  correctly using `ContentDialog.PrimaryButtonClick` with
+  `args.Cancel = true` on validation failure — a cleaner fit here than
+  the Reveal/auto-unlock dialogs' plain-inner-button pattern, since
+  Change Passphrase only needs to *stay open on failure*, not *show a
+  result after success*.
+- **The key list row was missing `resource`** — spec §5.1: "View list:
+  label, resource, key type, purpose." `KeyRow.TypeAndPurpose` (badly
+  named now, left as-is rather than a churn-only rename) showed only
+  `"{type} / {purpose}"`; `KeyListView.swift`'s real row format is
+  `"{resource} · {type} · {purpose}"`, including its own
+  `"(no resource)"` fallback text — matched exactly.
+- **`CreateKeyPage` was missing two fields `CreateKeyView.swift` has**:
+  a comma-separated Tags field (parsed with
+  `StringSplitOptions.TrimEntries | RemoveEmptyEntries`; `KeyInfo.tags`
+  already flowed correctly end-to-end otherwise — it was just always
+  sent empty) and a confirm-passphrase field (mismatch check before
+  create, same pattern already used for vault/compartment creation).
+  `KeyDetailPage` was also missing a Tags display row (only showing
+  when non-empty, matching the existing Last-Used row's pattern).
+
+**Also explicitly checked and confirmed *not* gaps** (worth recording
+so a future session doesn't re-derive this): every `internal.*` method
+the agent handles has exactly one corresponding `ManagementClient.cs`
+method (grepped both lists, diffed — no orphaned agent-side handlers).
+"Close vault"/"switch vault" needing an agent-side call — checked
+`AppState.swift`'s real `closeVault()`: it's pure client-side state
+reset, no RPC at all, matching `VaultHomePage`'s existing
+`SwitchVaultLink` exactly. `KeyListView.swift`'s "last used" field —
+despite spec §5.1's list literally naming it, macOS's own real
+implementation doesn't show it in the row either (only in detail),
+so Windows already matched real (not spec-aspirational) parity there.
+
+**Verified for real**: agent-side, via raw pipe calls — created a key
+with tags `["infra","deploy"]`, confirmed they round-tripped intact
+through `list_keys`; `change_key_passphrase` correctly rejected a wrong
+old passphrase, correctly succeeded with the right one, and the *old*
+passphrase correctly stopped working for `reveal_raw_key_hex`
+immediately afterward while the *new* one worked. UI verified
+structurally: the key list row now shows `"r.example.com · Ed25519 ·
+CustomSigning"`; `KeyDetailPage` shows `"a, b"` for tags and a working
+"Change Passphrase…" button alongside Export/Reveal. All test keys
+discarded afterward.
+
+**Status as of this checkpoint**: every `internal.*` method the agent
+implements now has a real UI entry point somewhere in `VaultSignerUI`
+— the "features that work underneath but have no UI" category the
+user asked about twice this session is now empty. What's left for
+Windows to reach macOS parity is architectural/research-scoped work,
+not missing UI wiring: FIDO2 (blocked on this VM's OS version, per the
+checkpoint above), i18n (item 3.7, no locale work started at all), and
+the Phase 10 test/fuzz suite (item 3.8). The Personal/"test" passphrase
+anomaly two checkpoints up remains unexplained and should be mentioned
+to the user directly, not just left in this file.
+
 ## Phase 4 — Android
 
 Not started.

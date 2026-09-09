@@ -33,6 +33,10 @@ public sealed partial class CreateKeyPage : Page, ISensitiveScreen
             {
                 throw new FacadeException.Failed("Label and key passphrase are required.");
             }
+            if (passphrase != ConfirmPassphraseBox.Password)
+            {
+                throw new FacadeException.Failed("Passphrases don't match.");
+            }
             var keyType = KeyTypeCombo.SelectedIndex == 1 ? FacadeKeyType.EcdsaP256 : FacadeKeyType.Ed25519;
             // FIDO2/Both are deliberately not offered here — a bindable
             // passkey needs a real relying-party ceremony (rp_id/user
@@ -40,9 +44,10 @@ public sealed partial class CreateKeyPage : Page, ISensitiveScreen
             // from the live CTAP2 request. This manual flow only ever
             // creates CustomSigning keys, matching CreateKeyView.swift.
             var purpose = FacadePurpose.CustomSigning;
+            var tags = TagsBox.Text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
             ManagementClient.CreateKey(
                 _compartmentId, keyType, purpose, label,
-                DescriptionBox.Text.Trim(), ResourceBox.Text.Trim(), [], passphrase);
+                DescriptionBox.Text.Trim(), ResourceBox.Text.Trim(), tags, passphrase);
             Frame.GoBack();
         });
     }

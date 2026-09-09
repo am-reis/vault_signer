@@ -29,6 +29,9 @@
                     <TextBlock Text="Resource" FontWeight="SemiBold" Margin="0,8,0,0" />
                     <TextBox x:Name="ResourceBox" PlaceholderText="e.g. a hostname or service name" />
 
+                    <TextBlock Text="Tags" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <TextBox x:Name="TagsBox" PlaceholderText="Comma-separated, optional" />
+
                     <TextBlock Text="Key type" FontWeight="SemiBold" Margin="0,8,0,0" />
                     <ComboBox x:Name="KeyTypeCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
                         <ComboBoxItem Content="Ed25519" />
@@ -39,6 +42,7 @@
 
                     <TextBlock Text="Key passphrase" FontWeight="SemiBold" Margin="0,8,0,0" />
                     <PasswordBox x:Name="PassphraseBox" PlaceholderText="Required each time this key is used to sign" />
+                    <PasswordBox x:Name="ConfirmPassphraseBox" PlaceholderText="Confirm key passphrase" />
                 </StackPanel>
 
                 <Button x:Name="CreateButton" Content="Create Key" Style="{StaticResource AccentButtonStyle}"

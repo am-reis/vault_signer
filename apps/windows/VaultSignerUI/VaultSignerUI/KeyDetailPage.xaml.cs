@@ -45,9 +45,71 @@ public sealed partial class KeyDetailPage : Page, ISensitiveScreen
         {
             LastUsedRow.Visibility = Visibility.Collapsed;
         }
+        if (info.tags.Length > 0)
+        {
+            TagsRow.Visibility = Visibility.Visible;
+            TagsText.Text = string.Join(", ", info.tags);
+        }
+        else
+        {
+            TagsRow.Visibility = Visibility.Collapsed;
+        }
         PublicKeyText.Text = info.publicKeyHex;
         ConfirmPrompt.Text = $"Type \"{info.label}\" to confirm:";
         DiscardConfirmBox.Text = "";
+    }
+
+    /// Spec §5.1: "standalone action reachable from the key detail
+    /// screen, independent of import/export. Required for every
+    /// imported key to be re-secured with a locally-known passphrase."
+    private async void ChangePassphraseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_args is not { } args) return;
+
+        var oldBox = new PasswordBox { PlaceholderText = "Current passphrase" };
+        var newBox = new PasswordBox { PlaceholderText = "New passphrase" };
+        var confirmBox = new PasswordBox { PlaceholderText = "Confirm new passphrase" };
+        var errorText = new TextBlock { Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"], Visibility = Visibility.Collapsed };
+
+        var dialog = new ContentDialog
+        {
+            Title = "Change Key Passphrase",
+            Content = new StackPanel { Spacing = 10, Children = { oldBox, newBox, confirmBox, errorText } },
+            PrimaryButtonText = "Change",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+        dialog.PrimaryButtonClick += (_, dialogArgs) =>
+        {
+            errorText.Visibility = Visibility.Collapsed;
+            if (oldBox.Password.Length == 0 || newBox.Password.Length == 0)
+            {
+                errorText.Text = "Enter the current and new passphrase.";
+                errorText.Visibility = Visibility.Visible;
+                dialogArgs.Cancel = true;
+                return;
+            }
+            if (newBox.Password != confirmBox.Password)
+            {
+                errorText.Text = "New passphrases don't match.";
+                errorText.Visibility = Visibility.Visible;
+                dialogArgs.Cancel = true;
+                return;
+            }
+            try
+            {
+                ManagementClient.ChangeKeyPassphrase(args.CompartmentId, args.Key.keyId, oldBox.Password, newBox.Password);
+            }
+            catch (FacadeException ex)
+            {
+                errorText.Text = ex.Message;
+                errorText.Visibility = Visibility.Visible;
+                dialogArgs.Cancel = true;
+            }
+        };
+
+        await dialog.ShowAsync();
     }
 
     private async void ExportKeyButton_Click(object sender, RoutedEventArgs e)

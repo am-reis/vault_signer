@@ -13,7 +13,13 @@ internal sealed class KeyRow(KeyInfo info)
 {
     public KeyInfo Info { get; } = info;
     public string Label => Info.label;
-    public string TypeAndPurpose => $"{Info.keyType} / {Info.purpose}";
+
+    /// Spec §5.1's "View list: label, resource, key type, purpose" —
+    /// mirrors KeyListView.swift's "resource · type · purpose" row
+    /// subtitle exactly, including its "no resource" fallback text
+    /// (this was previously missing resource entirely).
+    public string TypeAndPurpose =>
+        $"{(Info.resource.Length > 0 ? Info.resource : "(no resource)")} · {Info.keyType} · {Info.purpose}";
 }
 
 /// Compartment picker + key list — the hub screen a user lands on and

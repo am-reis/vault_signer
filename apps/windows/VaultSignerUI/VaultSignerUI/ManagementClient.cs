@@ -124,6 +124,66 @@ internal static class ManagementClient
         throw new FacadeException.Failed("malformed response");
     }
 
+    // MARK: - Export / import / merge (spec §5.2-5.4)
+
+    public static byte[] ExportPacket(string compartmentId, string[] keyIds, bool includeMasterKey, FacadeExportEncryption encryption)
+    {
+        var result = Call("internal.export_packet", new Dictionary<string, object?>
+        {
+            ["compartment_id"] = compartmentId, ["key_ids"] = keyIds, ["include_master_key"] = includeMasterKey,
+            ["encryption"] = EncodeExportEncryption(encryption),
+        });
+        return DecodeBase64Field(result, "packet_b64");
+    }
+
+    public static byte[] ExportSingleKey(string compartmentId, string keyId)
+    {
+        var result = Call("internal.export_single_key", new Dictionary<string, object?> { ["compartment_id"] = compartmentId, ["key_id"] = keyId });
+        return DecodeBase64Field(result, "packet_b64");
+    }
+
+    public static ImportedPacketInfo ImportPacket(byte[] packetBytes, string? transferPassword)
+    {
+        var @params = new Dictionary<string, object?> { ["packet_b64"] = Convert.ToBase64String(packetBytes) };
+        if (transferPassword is not null) @params["transfer_password"] = transferPassword;
+        var result = Call("internal.import_packet", @params);
+        return DecodeImportedPacketInfo(result);
+    }
+
+    public static MergeOutcomeInfo MergeReencryptDiscardIncoming(string targetCompartmentId, string incomingManifestJson, IncomingKeyBlob[] incomingKeyBlobs)
+    {
+        var result = Call("internal.merge_reencrypt_discard_incoming", new Dictionary<string, object?>
+        {
+            ["target_compartment_id"] = targetCompartmentId, ["incoming_manifest_json"] = incomingManifestJson,
+            ["incoming_key_blobs"] = EncodeIncomingKeyBlobs(incomingKeyBlobs),
+        });
+        return DecodeMergeOutcome(result);
+    }
+
+    public static MergeOutcomeInfo MergeSideBySide(
+        string incomingManifestJson, IncomingKeyBlob[] incomingKeyBlobs, string newCompartmentLabel, string newMasterPassphrase, FacadeDeviceProfile profile)
+    {
+        var result = Call("internal.merge_side_by_side", new Dictionary<string, object?>
+        {
+            ["incoming_manifest_json"] = incomingManifestJson, ["incoming_key_blobs"] = EncodeIncomingKeyBlobs(incomingKeyBlobs),
+            ["new_compartment_label"] = newCompartmentLabel, ["new_master_passphrase"] = newMasterPassphrase, ["profile"] = EncodeProfile(profile),
+        });
+        return DecodeMergeOutcome(result);
+    }
+
+    public static MergeOutcomeInfo MergeReplaceLocalWithIncoming(
+        string targetCompartmentId, string incomingManifestJson, IncomingKeyBlob[] incomingKeyBlobs,
+        string incomingMasterPassphrase, string incomingKdfParamsJson, string confirmationPhrase)
+    {
+        var result = Call("internal.merge_replace_local_with_incoming", new Dictionary<string, object?>
+        {
+            ["target_compartment_id"] = targetCompartmentId, ["incoming_manifest_json"] = incomingManifestJson,
+            ["incoming_key_blobs"] = EncodeIncomingKeyBlobs(incomingKeyBlobs), ["incoming_master_passphrase"] = incomingMasterPassphrase,
+            ["incoming_kdf_params_json"] = incomingKdfParamsJson, ["confirmation_phrase"] = confirmationPhrase,
+        });
+        return DecodeMergeOutcome(result);
+    }
+
     // MARK: - Auto-unlock (spec §8) — the agent owns DPAPI + VaultConfig writes for this
 
     public static void EnableAutoUnlock(string compartmentId, string passphrase)
@@ -276,5 +336,86 @@ internal static class ManagementClient
             throw new FacadeException.Failed("malformed list in response");
         }
         return array.EnumerateArray().Select(decode).ToArray();
+    }
+
+    // MARK: - Export/import/merge encoding (mirrored by VaultSignerAgent's
+    // ManagementHandlers.cs — same field names, same "type" discriminator
+    // shape for FacadeExportEncryption)
+
+    private static Dictionary<string, object?> EncodeExportEncryption(FacadeExportEncryption encryption) => encryption switch
+    {
+        FacadeExportEncryption.AsIs => new Dictionary<string, object?> { ["type"] = "as_is" },
+        FacadeExportEncryption.DestinationMasterPassword p => new Dictionary<string, object?> { ["type"] = "destination_master_password", ["password"] = p.password },
+        FacadeExportEncryption.OneTimeTransferPassword p => new Dictionary<string, object?> { ["type"] = "one_time_transfer_password", ["password"] = p.password },
+        _ => throw new ArgumentOutOfRangeException(nameof(encryption)),
+    };
+
+    private static object[] EncodeIncomingKeyBlobs(IncomingKeyBlob[] blobs) =>
+        blobs.Select(b => new Dictionary<string, object?> { ["key_id"] = b.keyId, ["blob_bytes_b64"] = Convert.ToBase64String(b.blobBytes) }).ToArray<object>();
+
+    private static byte[] DecodeBase64Field(JsonElement result, string key)
+    {
+        if (result.TryGetProperty(key, out var el) && el.ValueKind == JsonValueKind.String)
+        {
+            return Convert.FromBase64String(el.GetString()!);
+        }
+        throw new FacadeException.Failed("malformed response");
+    }
+
+    private static ImportedPacketInfo DecodeImportedPacketInfo(JsonElement obj)
+    {
+        if (!obj.TryGetProperty("manifest_json", out var manifestJson) || manifestJson.ValueKind != JsonValueKind.String ||
+            !obj.TryGetProperty("key_blobs", out var blobsEl) || blobsEl.ValueKind != JsonValueKind.Array)
+        {
+            throw new FacadeException.Failed("malformed import result");
+        }
+        var keyBlobs = blobsEl.EnumerateArray().Select(DecodeIncomingKeyBlob).ToArray();
+        var embeddedMasterCompartmentId = obj.TryGetProperty("embedded_master_compartment_id", out var c) && c.ValueKind == JsonValueKind.String ? c.GetString() : null;
+        var embeddedMasterKdfParamsJson = obj.TryGetProperty("embedded_master_kdf_params_json", out var k) && k.ValueKind == JsonValueKind.String ? k.GetString() : null;
+        return new ImportedPacketInfo(manifestJson.GetString()!, keyBlobs, embeddedMasterCompartmentId, embeddedMasterKdfParamsJson);
+    }
+
+    private static IncomingKeyBlob DecodeIncomingKeyBlob(JsonElement obj)
+    {
+        if (!obj.TryGetProperty("key_id", out var keyId) || keyId.ValueKind != JsonValueKind.String ||
+            !obj.TryGetProperty("blob_bytes_b64", out var blobB64) || blobB64.ValueKind != JsonValueKind.String)
+        {
+            throw new FacadeException.Failed("malformed key blob in import result");
+        }
+        return new IncomingKeyBlob(keyId.GetString()!, Convert.FromBase64String(blobB64.GetString()!));
+    }
+
+    private static MergeOutcomeInfo DecodeMergeOutcome(JsonElement obj)
+    {
+        if (!obj.TryGetProperty("warnings", out var warningsEl) || warningsEl.ValueKind != JsonValueKind.Array ||
+            !obj.TryGetProperty("id_remap", out var remapEl) || remapEl.ValueKind != JsonValueKind.Array)
+        {
+            throw new FacadeException.Failed("malformed merge result");
+        }
+        var warnings = warningsEl.EnumerateArray().Select(DecodeDuplicateWarning).ToArray();
+        var idRemap = remapEl.EnumerateArray().Select(DecodeIdRemapEntry).ToArray();
+        return new MergeOutcomeInfo(warnings, idRemap);
+    }
+
+    private static DuplicateWarningInfo DecodeDuplicateWarning(JsonElement obj)
+    {
+        if (!obj.TryGetProperty("incoming_key_id", out var incomingKeyId) || incomingKeyId.ValueKind != JsonValueKind.String ||
+            !obj.TryGetProperty("matched_local_key_id", out var matchedLocalKeyId) || matchedLocalKeyId.ValueKind != JsonValueKind.String ||
+            !obj.TryGetProperty("matched_in_compartment", out var matchedInCompartment) || matchedInCompartment.ValueKind != JsonValueKind.String ||
+            !obj.TryGetProperty("reason", out var reason) || reason.ValueKind != JsonValueKind.String)
+        {
+            throw new FacadeException.Failed("malformed merge warning");
+        }
+        return new DuplicateWarningInfo(incomingKeyId.GetString()!, matchedLocalKeyId.GetString()!, matchedInCompartment.GetString()!, reason.GetString()!);
+    }
+
+    private static IdRemapEntry DecodeIdRemapEntry(JsonElement obj)
+    {
+        if (!obj.TryGetProperty("old_key_id", out var oldKeyId) || oldKeyId.ValueKind != JsonValueKind.String ||
+            !obj.TryGetProperty("new_key_id", out var newKeyId) || newKeyId.ValueKind != JsonValueKind.String)
+        {
+            throw new FacadeException.Failed("malformed id_remap entry");
+        }
+        return new IdRemapEntry(oldKeyId.GetString()!, newKeyId.GetString()!);
     }
 }

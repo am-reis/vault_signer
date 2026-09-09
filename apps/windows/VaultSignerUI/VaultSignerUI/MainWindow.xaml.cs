@@ -21,6 +21,17 @@ public sealed partial class MainWindow : Window
 
         AppWindow.SetIcon("Assets/AppIcon.ico");
 
+        // Spec §5.0's screen-capture blocking, applied per-page since
+        // this app is one Window with a Frame swapping Pages (see
+        // ScreenCaptureProtection.cs) — toggle it on the window itself
+        // as navigation lands on/leaves a page that implements
+        // ISensitiveScreen.
+        RootFrame.Navigated += (_, e) =>
+        {
+            if (e.Content is ISensitiveScreen) ScreenCaptureProtection.Apply(this);
+            else ScreenCaptureProtection.Clear(this);
+        };
+
         // Navigate the root frame to the welcome page on startup; it
         // redirects straight to VaultHomePage itself if the agent
         // already has a vault open.

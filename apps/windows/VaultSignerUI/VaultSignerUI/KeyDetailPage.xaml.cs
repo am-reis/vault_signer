@@ -16,7 +16,7 @@ internal sealed record KeyDetailNavArgs(string CompartmentId, KeyInfo Key);
 /// its danger-zone framing for Discard (spec's "reveal-raw-key's
 /// danger-zone framing" convention, applied here to the destructive
 /// discard action instead).
-public sealed partial class KeyDetailPage : Page
+public sealed partial class KeyDetailPage : Page, ISensitiveScreen
 {
     private KeyDetailNavArgs? _args;
 

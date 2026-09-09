@@ -84,6 +84,16 @@
                     </ListView>
                 </StackPanel>
 
+                <StackPanel x:Name="VaultActionsSection" Spacing="8" Visibility="Collapsed">
+                    <TextBlock Text="Import &amp; backup" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Import…" Click="ImportButton_Click" />
+                        <Button Content="Export Keys…" Click="ExportKeysButton_Click" />
+                        <Button Content="Back Up Everything…" Click="BackUpEverythingButton_Click" />
+                        <Button Content="Back Up Master Key Only…" Click="BackUpMasterKeyOnlyButton_Click" />
+                    </StackPanel>
+                </StackPanel>
+
             </StackPanel>
         </ScrollViewer>
 

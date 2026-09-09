@@ -8,7 +8,7 @@ namespace VaultSignerUI;
 /// Standalone create-key screen, navigated to from VaultHomePage with
 /// the target compartment's id as the nav parameter. Mirrors
 /// apps/macos/VaultSigner/Sources/CreateKeyView.swift's role.
-public sealed partial class CreateKeyPage : Page
+public sealed partial class CreateKeyPage : Page, ISensitiveScreen
 {
     private string _compartmentId = "";
 

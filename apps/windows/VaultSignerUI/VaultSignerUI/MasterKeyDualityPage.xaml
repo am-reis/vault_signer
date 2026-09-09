@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="VaultSignerUI.MasterKeyDualityPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:VaultSignerUI"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid>
+        <ScrollViewer x:Name="DecisionScroll">
+            <StackPanel Padding="32,24,32,32" Spacing="18" MaxWidth="560" HorizontalAlignment="Center">
+
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon Glyph="&#xE7BA;" Foreground="{ThemeResource SystemFillColorCautionBrush}" FontSize="22" />
+                    <TextBlock Text="This import includes another vault's master key" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap" />
+                </StackPanel>
+                <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                           Text="Choose what to do with it. This decision can't be skipped, and there's no default selected — read each option before choosing." />
+
+                <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
+
+                <!-- Option 1 -->
+                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Re-encrypt &amp; discard incoming master key" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="10" Padding="8,2">
+                                <TextBlock Text="Recommended" FontSize="11" Foreground="White" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
+                                   Text="Your keys will only need your existing master password. The imported vault's master password will not be kept." />
+                        <TextBlock x:Name="Option1NoCompartmentText" Text="No unlocked compartment to merge into." Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                   FontSize="12" Visibility="Collapsed" />
+                        <StackPanel x:Name="Option1Form" Spacing="8">
+                            <ComboBox x:Name="Option1CompartmentCombo" Header="Merge into" DisplayMemberPath="label" HorizontalAlignment="Stretch" />
+                            <Button Content="Use This Option" Style="{StaticResource AccentButtonStyle}" Click="Option1Button_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Option 2 -->
+                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Keep both master keys side by side" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.8" FontSize="12"
+                                   Text="You'll keep two separate master passwords for this vault, one for each set of keys. Nothing is merged." />
+                        <TextBox x:Name="Option2LabelBox" PlaceholderText="New compartment name" Text="Imported vault" />
+                        <PasswordBox x:Name="Option2PassphraseBox" PlaceholderText="New master passphrase for it" />
+                        <Button Content="Use This Option" Style="{StaticResource AccentButtonStyle}" Click="Option2Button_Click" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Option 3 -->
+                <Border Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}" BorderBrush="{ThemeResource SystemFillColorCriticalBrush}"
+                        BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Replace local master key with incoming master key" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" />
+                        <TextBlock TextWrapping="Wrap" Opacity="0.85" FontSize="12"
+                                   Text="This will replace the password protecting ALL your existing keys, including ones you did not just import, with a different password. If you don't have both passwords available right now, stop." />
+                        <TextBlock x:Name="Option3NoCompartmentText" Text="No unlocked compartment to replace." Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                   FontSize="12" Visibility="Collapsed" />
+                        <StackPanel x:Name="Option3Form" Spacing="8">
+                            <ComboBox x:Name="Option3CompartmentCombo" Header="Replace" DisplayMemberPath="label" HorizontalAlignment="Stretch" />
+                            <PasswordBox x:Name="Option3PassphraseBox" PlaceholderText="Incoming vault's master passphrase" PasswordChanged="Option3PassphraseBox_PasswordChanged" />
+                            <TextBox x:Name="Option3ConfirmBox" PlaceholderText="Type REPLACE MY MASTER KEY to confirm" TextChanged="Option3ConfirmBox_TextChanged" />
+                            <Button x:Name="Option3Button" Content="Use This Option" IsEnabled="False"
+                                    Foreground="{ThemeResource SystemFillColorCriticalBrush}" Click="Option3Button_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Button Content="Cancel Import" HorizontalAlignment="Left" Click="CancelButton_Click" />
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel x:Name="DoneStep" Spacing="12" Padding="32" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" MaxWidth="440">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <FontIcon Glyph="&#xE73E;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" FontSize="24" />
+                <TextBlock Text="Import complete" FontSize="20" FontWeight="SemiBold" />
+            </StackPanel>
+            <TextBlock x:Name="DoneWarningsText" Opacity="0.75" TextWrapping="Wrap" Visibility="Collapsed" />
+            <Button Content="Done" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" Click="DoneButton_Click" />
+        </StackPanel>
+
+        <ProgressRing x:Name="BusyRing" IsActive="False" Width="32" Height="32"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Grid>
+</Page>

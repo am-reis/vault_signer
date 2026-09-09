@@ -1381,6 +1381,184 @@ further changes (more polish, a different flow, an actual
 animations, whatever), treat this checkpoint as a first structural
 pass, not a finished redesign.
 
+### Session checkpoint (this entry): known-vaults management, export/import/backup, and screen-capture blocking
+
+Same VM, same session, continuing directly from the checkpoint above
+after the user reviewed it live and confirmed the navigation split
+"fits our goals ... fast building to matching minimal UI/UX
+expectations" — then flagged three things missing relative to spec and
+the macOS build: known-vaults management ("forget"), import/export of
+keys and whole vaults, and (separately) that vault creation shouldn't
+require typing a full path. All three are done this entry. Per the
+user's explicit instruction this session, the export/import behavior
+was implemented against **spec §5.2/5.2.1/5.2.2/5.3/5.4 read directly**
+(not inferred from the macOS app) — macOS's Swift was then cross-checked
+only for wire-format/field-name consistency (spec §5.3.6: "implemented
+once in vaultcore ... invoked identically by every platform"), and
+matched on every point checked.
+
+**1. Known vaults (spec §5.6).** `KnownVaultsStore.cs` — a new,
+UI-side-only JSON store at `%LOCALAPPDATA%\VaultSigner\known_vaults.json`
+(never touched by the agent; this is local device state, never vault
+content, per spec) — mirrors `apps/macos/Shared/KnownVaultsStore.swift`
+field-for-field. `WelcomePage` now leads with a recent-vaults list
+(most-recently-opened first, one click to open, an inline "forget"
+button, an unavailable-file warning icon), and a new `ManageVaultsPage`
+(reachable from Welcome; spec says it should also be reachable from
+Settings, but there's no Settings screen on Windows yet to add that
+second entry point to) provides add-without-opening and forget.
+
+**2. Folder-then-filename vault creation**, replacing the old raw
+path `TextBox`, per direct user request: `FilePickers.cs` wraps
+`Windows.Storage.Pickers.FolderPicker`/`FileOpenPicker`/`FileSavePicker`
+with the `WinRT.Interop.InitializeWithWindow` HWND association this
+unpackaged app needs for any picker to activate at all. Create Vault is
+now "choose a folder, type only a file name"; Open Vault, "add a known
+vault," and the file side of every export/import/backup flow below all
+use the same real native picker, matching how
+`CreateVaultView.swift`/`ImportPacketView.swift`/`ExportPacketView.swift`
+use `NSSavePanel`/`NSOpenPanel`. **Not personally click-tested this
+session** — verified to compile and (for `PickExistingFileAsync`, via
+`ManageVaultsPage`'s "Add a Known Vault…") to be reachable without a
+build error, but the actual native picker dialogs were never opened and
+clicked through by either the automation or a human this session. This
+is exactly the kind of thing the user said they want to personally
+verify — flag it as the first thing to try.
+
+**3. Export / import / merge / backup (spec §5.2-§5.4, spec item 3.1's
+"mirroring 2.1-2.5"), fully wired end-to-end** — agent, client, and UI,
+where before none of it existed on Windows at all:
+- `VaultSignerAgent/ManagementHandlers.cs`: six new `internal.*`
+  handlers (`export_packet`, `export_single_key`, `import_packet`,
+  `merge_reencrypt_discard_incoming`, `merge_side_by_side`,
+  `merge_replace_local_with_incoming`), each a direct mechanical port
+  of `ManagementHandlers.swift`'s equivalent — same method names, same
+  wire field names (`incoming_key_blobs`'s `key_id`/`blob_bytes_b64`
+  shape, `encryption`'s `{"type": ...}` discriminator, etc.) — calling
+  straight into the generated `Vault.ExportPacket`/`ImportPacket`/
+  `Merge*` bindings. No merge/export logic written here; it's
+  vaultcore's, unchanged, per spec §5.3.6.
+- `VaultSignerUI/ManagementClient.cs`: matching client-side methods,
+  decoding into the generated `ImportedPacketInfo`/`MergeOutcomeInfo`/
+  `IncomingKeyBlob`/`DuplicateWarningInfo`/`IdRemapEntry`/
+  `FacadeExportEncryption` types directly (all already present in
+  `Generated/vaultcore.cs` — no new DTOs needed).
+- `ExportKeysPage` — key selection (multi-select list), the
+  include-master-key toggle (§5.2.1), and all three §5.2.2 encryption
+  choices as three distinct, always-visible options with **no default
+  pre-selected** (exact spec UI-label wording used verbatim: "Just
+  package the keys as-is" / "Re-encrypt for the destination vault's
+  master password" / "Protect with a one-time transfer password", each
+  with its own inline password field(s) and the exact disclosure text
+  spec §5.2.2 specifies for option 1). Also serves spec §5.4's "back up
+  everything" via an `ExportPageArgs.BackupMode` flag — same page, keys
+  pre-selected and master-key-inclusion forced, mirroring
+  `ExportPacketView.swift`'s own `lockSelectionToAllKeys`/
+  `forceIncludeMasterKey` reuse rather than a separate implementation.
+- `BackupMasterKeyOnlyPage` — spec §5.4's other backup shortcut,
+  deliberately its own small page (no key list, the explicit
+  does-not-protect-anything warning is the whole point), always
+  one-time-transfer-password-protected.
+- `ImportPacketPage` — choose a `.vltpack`, decrypt the transfer layer
+  if the first attempt fails (offering the password prompt rather than
+  a raw error, exactly matching `ImportPacketView.swift`'s
+  `tryImport` fallback logic), then either merge directly (no embedded
+  master key) or hand off to:
+- `MasterKeyDualityPage` — spec §5.3's unskippable screen, shown only
+  when `ImportedPacketInfo.embeddedMasterCompartmentId` is non-null.
+  Three cards, each independently actionable (no shared radio group, so
+  nothing is pre-selectable by construction — satisfies "no default
+  pre-selected" structurally rather than by convention), option 1
+  marked "Recommended," option 3 given distinct red/warning card
+  styling and gated on typing the exact phrase `"REPLACE MY MASTER
+  KEY"` (spec's exact required phrase) plus a non-empty passphrase
+  before its button enables.
+- One architectural note worth remembering: `MasterKeyDualityPage`
+  finishes the whole import flow itself (navigates straight back to
+  `VaultHomePage`, clearing the back stack) rather than calling
+  `Frame.GoBack()` to let `ImportPacketPage` show a shared "done" step
+  — `Frame.GoBack()` recreates the target page fresh from its stored
+  nav parameter (`NavigationCacheMode` is `Disabled` by default), which
+  would have thrown away exactly the in-flight state (which step, which
+  warnings) needed to show a meaningful completion screen. Two small
+  independent "done" confirmations (one on `ImportPacketPage` for the
+  no-duality path, one on `MasterKeyDualityPage` for the duality path)
+  sidesteps this entirely rather than fighting the Frame's default
+  caching behavior.
+
+**Verified for real, not just built** — the agent-side plumbing, via
+raw named-pipe calls directly against the running (rebuilt) agent, all
+against the real `test-vault.vsvault`:
+- `export_packet` with `encryption: as_is` on a real key → real
+  `.vltpack` bytes back (confirmed a real ZIP local-file-header magic
+  number and `packet.json`/`key_blobs/*.kblob` structure matching spec
+  §4.1's archive format).
+- Importing that exact packet back into the *same* compartment, then
+  `merge_reencrypt_discard_incoming` on the result: correctly detected
+  the collision (`warnings[0].reason: "key_id"`) and **kept both,
+  renamed the incoming one** (`id_remap` to a fresh key id, confirmed
+  via `list_keys` afterward showing both `export-test-key` and
+  `export-test-key (imported)`) — spec §5.3.5's exact required default,
+  not silent overwrite.
+- `export_packet` with `include_master_key: true` and
+  `encryption: one_time_transfer_password`: import without the
+  password correctly fails; import with the correct password succeeds
+  *and* returns a non-null `embedded_master_compartment_id` +
+  `embedded_master_kdf_params_json` — precisely the condition
+  `MasterKeyDualityPage` gates on, confirmed live rather than assumed
+  from reading the code.
+- All test keys discarded afterward; the real vault's state is back to
+  just its one pre-existing `test` key.
+
+**Verified structurally (UI, via UI Automation)**: `VaultSignerUI`
+builds clean (0 warnings, 0 errors) with every new page; launched the
+real app and drove navigation through `VaultHomePage` →
+`ExportKeysPage` (confirmed all three encryption cards render with the
+exact spec copy) → back → `ImportPacketPage` → back →
+`BackupMasterKeyOnlyPage` (confirmed the exact spec warning text) →
+back → the `WelcomePage`/known-vaults auto-redirect still correctly
+fires (confirms this change didn't regress the previous checkpoint's
+navigation). **Not evaluated**: whether any of this looks or feels
+right — same deliberate boundary as the previous checkpoint, now
+extended to cover all of this entry's new screens too.
+
+**Also closed a pre-existing spec gap noticed while doing this work**:
+spec §5.0's mandatory screen-capture blocking
+(`SetWindowDisplayAffinity`/`WDA_EXCLUDEFROMCAPTURE`) existed only for
+`VaultSignerAgent`'s sign-request dialog (`WinFormsPassphrasePrompter.cs`)
+— nothing in `VaultSignerUI` had it at all, despite already having
+passphrase fields and manifest detail before this session touched
+anything. Added `ScreenCaptureProtection.cs` (same P/Invoke constants
+as the agent's existing implementation) plus an `ISensitiveScreen`
+marker interface pages opt into; `MainWindow.xaml.cs` toggles window-level
+affinity on `RootFrame.Navigated` based on whether the newly-shown page
+implements it. Applied to every page with a passphrase field or
+manifest detail: `WelcomePage`, `VaultHomePage`, `CreateKeyPage`,
+`KeyDetailPage` (all pre-existing, not touched this session before
+now), plus every new page in this entry except `ManageVaultsPage`
+(paths and filenames only, matching `ManageVaultsView.swift` not
+calling `preventsScreenCapture()` either).
+
+**Known remaining gaps, not attempted this session** (noting so they
+aren't silently forgotten):
+- Spec §5.1's "Reveal raw key" screen — `internal.reveal_raw_key_hex`
+  and `ManagementClient.RevealRawKeyHex` already exist agent/client-side
+  (from an earlier session) but no UI ever calls it. Out of scope for
+  this entry (the user's ask was known-vaults + import/export + the
+  path-picker fix specifically).
+- No Settings screen yet, so: the auto-unlock enable/disable UI
+  (`internal.enable_auto_unlock`/`disable_auto_unlock`/
+  `is_auto_unlock_enabled` already exist agent/client-side too, unused
+  by any UI), and spec §5.6's second known-vaults entry point ("also...
+  from the app's settings").
+- Single-key export (`internal.export_single_key`/
+  `ManagementClient.ExportSingleKey`, the `.vltkey` shape) has agent
+  and client methods but no UI entry point (e.g. an "Export This Key"
+  button on `KeyDetailPage`) — only the packet-export path
+  (`ExportKeysPage`) is reachable from the UI.
+- Item 3.4 (WebAuthn plugin-authenticator COM registration) — still
+  open from earlier checkpoints, research only.
+
 ## Phase 4 — Android
 
 Not started.

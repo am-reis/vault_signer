@@ -9,35 +9,74 @@
     mc:Ignorable="d">
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
         <ScrollViewer>
             <StackPanel Padding="32,24,32,32" Spacing="20" MaxWidth="480" HorizontalAlignment="Center">
 
                 <StackPanel Spacing="4">
                     <TextBlock Text="VaultSigner" FontSize="32" FontWeight="SemiBold" />
-                    <TextBlock Text="Create a new vault, or open one you already have." Opacity="0.7" TextWrapping="Wrap" />
+                    <TextBlock Text="Open a vault you've used before, or create a new one." Opacity="0.7" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
 
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Vault file" FontWeight="SemiBold" />
-                    <TextBox x:Name="VaultPathBox" PlaceholderText="C:\Users\you\VaultSigner\vault.vsvault" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Recent vaults" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <HyperlinkButton Grid.Column="1" Content="Manage known vaults" Padding="0" Click="ManageVaultsLink_Click" />
+                    </Grid>
+
+                    <TextBlock x:Name="NoRecentVaultsText" Text="No recent vaults yet." Opacity="0.7" Visibility="Collapsed" />
+
+                    <ListView x:Name="RecentVaultsList" SelectionMode="None" IsItemClickEnabled="True" ItemClick="RecentVaultsList_ItemClick" MaxHeight="220">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:KnownVaultRow">
+                                <Grid Padding="4,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{x:Bind FileName}" FontWeight="SemiBold"
+                                                    Foreground="{x:Bind ForegroundBrush}" />
+                                        <TextBlock Text="{x:Bind Path}" Opacity="0.6" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <FontIcon Grid.Column="1" Glyph="&#xE7BA;" FontSize="14" Foreground="#F2A93B" Margin="8,0"
+                                              Visibility="{x:Bind UnavailableVisibility}" ToolTipService.ToolTip="This file couldn't be found" />
+                                    <Button Grid.Column="2" Background="Transparent" BorderThickness="0" Padding="6"
+                                            Click="ForgetButton_Click" Tag="{x:Bind Path}" ToolTipService.ToolTip="Forget this vault">
+                                        <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
                 </StackPanel>
 
-                <StackPanel x:Name="CreateOnlyFields" Spacing="8">
-                    <TextBlock Text="First compartment name" FontWeight="SemiBold" />
-                    <TextBox x:Name="CompartmentLabelBox" PlaceholderText="Personal" />
-                    <TextBlock Text="Master passphrase" FontWeight="SemiBold" Margin="0,8,0,0" />
-                    <PasswordBox x:Name="MasterPassphraseBox" PlaceholderText="Used only when creating a new vault" />
+                <StackPanel x:Name="CreateSection" Spacing="8">
+                    <TextBlock Text="Create a new vault" FontWeight="SemiBold" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="CreateFolderText" Text="No folder chosen" Opacity="0.7" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <Button Grid.Column="1" Content="Choose Folder…" Margin="8,0,0,0" Click="ChooseFolderButton_Click" />
+                    </Grid>
+                    <TextBox x:Name="NewVaultFileNameBox" PlaceholderText="File name, e.g. MyVault.vlt" Text="MyVault.vlt" />
+                    <TextBox x:Name="CompartmentLabelBox" PlaceholderText="First compartment name, e.g. Personal" Text="Personal" />
+                    <PasswordBox x:Name="MasterPassphraseBox" PlaceholderText="Master passphrase" />
+                    <Button x:Name="CreateVaultButton" Content="Create Vault" Style="{StaticResource AccentButtonStyle}"
+                            HorizontalAlignment="Right" Click="CreateVaultButton_Click" />
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
-                    <Button x:Name="OpenVaultButton" Content="Open Existing Vault" Click="OpenVaultButton_Click" />
-                    <Button x:Name="CreateVaultButton" Content="Create New Vault" Style="{StaticResource AccentButtonStyle}" Click="CreateVaultButton_Click" />
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Or open an existing vault file" FontWeight="SemiBold" />
+                    <Button x:Name="OpenVaultButton" Content="Browse for a Vault File…" Click="OpenVaultButton_Click" />
                 </StackPanel>
 
             </StackPanel>

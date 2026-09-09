@@ -24,7 +24,7 @@ internal sealed class KeyRow(KeyInfo info)
 /// mutation on a subpage. Mirrors
 /// apps/macos/VaultSigner/Sources/KeyListView.swift's role, merged with
 /// the compartment-unlock step apps/macos keeps as its own UnlockView.
-public sealed partial class VaultHomePage : Page
+public sealed partial class VaultHomePage : Page, ISensitiveScreen
 {
     private CompartmentInfo[] _compartments = [];
     private CompartmentInfo? SelectedCompartment =>
@@ -67,6 +67,7 @@ public sealed partial class VaultHomePage : Page
         {
             UnlockPanel.Visibility = Visibility.Collapsed;
             KeysSection.Visibility = Visibility.Collapsed;
+            VaultActionsSection.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -76,10 +77,12 @@ public sealed partial class VaultHomePage : Page
         {
             UnlockPanel.Visibility = Visibility.Visible;
             KeysSection.Visibility = Visibility.Collapsed;
+            VaultActionsSection.Visibility = Visibility.Collapsed;
             return;
         }
         UnlockPanel.Visibility = Visibility.Collapsed;
         KeysSection.Visibility = Visibility.Visible;
+        VaultActionsSection.Visibility = Visibility.Visible;
         RefreshKeys(compartment.compartmentId);
     }
 
@@ -131,6 +134,30 @@ public sealed partial class VaultHomePage : Page
     {
         Frame.Navigate(typeof(WelcomePage));
         Frame.BackStack.Clear();
+    }
+
+    private void ImportButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedCompartment is not { } compartment) return;
+        Frame.Navigate(typeof(ImportPacketPage), compartment.compartmentId);
+    }
+
+    private void ExportKeysButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedCompartment is not { } compartment) return;
+        Frame.Navigate(typeof(ExportKeysPage), new ExportPageArgs(compartment.compartmentId, BackupMode: false));
+    }
+
+    private void BackUpEverythingButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedCompartment is not { } compartment) return;
+        Frame.Navigate(typeof(ExportKeysPage), new ExportPageArgs(compartment.compartmentId, BackupMode: true));
+    }
+
+    private void BackUpMasterKeyOnlyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedCompartment is not { } compartment) return;
+        Frame.Navigate(typeof(BackupMasterKeyOnlyPage), compartment.compartmentId);
     }
 
     private void RunGuarded(Action action)

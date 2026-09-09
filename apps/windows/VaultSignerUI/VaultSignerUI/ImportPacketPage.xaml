@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="VaultSignerUI.ImportPacketPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:VaultSignerUI"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid>
+        <ScrollViewer>
+            <StackPanel Padding="32,24,32,32" Spacing="20" MaxWidth="440" HorizontalAlignment="Center">
+
+                <StackPanel Spacing="4">
+                    <HyperlinkButton Content="&#x2190; Back" Padding="0" Click="BackButton_Click" />
+                    <TextBlock Text="Import" FontSize="28" FontWeight="SemiBold" />
+                </StackPanel>
+
+                <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
+
+                <StackPanel x:Name="PickingFileStep" Spacing="12">
+                    <TextBlock TextWrapping="Wrap" Opacity="0.8"
+                               Text="Choose a .vltpack file exported from another VaultSigner vault (or a backup) to import its keys into this compartment." />
+                    <Button x:Name="ChooseFileButton" Content="Choose File…" Style="{StaticResource AccentButtonStyle}"
+                            HorizontalAlignment="Left" Click="ChooseFileButton_Click" />
+                </StackPanel>
+
+                <StackPanel x:Name="TransferPasswordStep" Spacing="12" Visibility="Collapsed">
+                    <TextBlock Text="This packet is protected with a transfer passphrase." FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <PasswordBox x:Name="TransferPasswordBox" PlaceholderText="Transfer passphrase" />
+                    <Button x:Name="ContinueButton" Content="Continue" Style="{StaticResource AccentButtonStyle}"
+                            HorizontalAlignment="Left" Click="ContinueButton_Click" />
+                </StackPanel>
+
+                <StackPanel x:Name="DoneStep" Spacing="12" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <FontIcon Glyph="&#xE73E;" Foreground="{ThemeResource SystemFillColorSuccessBrush}" FontSize="24" />
+                        <TextBlock Text="Import complete" FontSize="20" FontWeight="SemiBold" />
+                    </StackPanel>
+                    <TextBlock x:Name="DoneWarningsText" Opacity="0.75" TextWrapping="Wrap" Visibility="Collapsed" />
+                    <Button Content="Done" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Left" Click="DoneButton_Click" />
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <ProgressRing x:Name="BusyRing" IsActive="False" Width="32" Height="32"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Grid>
+</Page>

@@ -22,7 +22,13 @@ namespace VaultSignerUI;
 public partial class App : Application
 {
     private Window? _window;
-    
+
+    /// The app's single window — exposed so pages can pass it to
+    /// FilePickers.cs's picker calls, which need an HWND to associate
+    /// with (this is an unpackaged app; WinRT pickers otherwise fail to
+    /// activate at all). Set once in OnLaunched, never null afterward.
+    public static Window MainWindow { get; private set; } = null!;
+
     /// <summary>
     /// Initializes the singleton application object.  This is the first line of authored code
     /// executed, and as such is the logical equivalent of main() or WinMain().
@@ -39,6 +45,7 @@ public partial class App : Application
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         _window = new MainWindow();
+        MainWindow = _window;
         _window.Activate();
     }
 }

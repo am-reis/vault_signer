@@ -1,8 +1,10 @@
 # VaultSigner — macOS
 
-Phase 2 target (spec §12). See `/PROGRESS.md` at the repo root for the
-authoritative per-item status; this file covers macOS-specific setup and
-known architectural gaps not worth restating there.
+Phase 2 target (spec §12). `/PROGRESS.md` at the repo root is the
+detailed, kept-current record of per-item status — the summary below can
+lag it; when the two disagree, trust `PROGRESS.md`. This file covers
+macOS-specific setup and the things worth knowing before touching this
+app's code, not a second copy of that history.
 
 ## Project layout
 
@@ -78,144 +80,55 @@ this:
 
 ## Status against spec §12 Phase 2
 
-- **2.1 SwiftUI management UI** — **done and interactively verified**
-  for the core flow: launched the real app and drove it via the
-  Accessibility API (see above) through create-vault (including a real
-  `NSSavePanel` and the busy-indicator overlay during the real ~1s
-  Argon2id derivation) → empty key list → create-key → populated key
-  list → key detail → reveal-raw-key (a real decrypt with the correct
-  key passphrase, returning a real 64-hex-char private key) → lock →
-  unlock. Every screen's rendered content and structure matched source
-  exactly. **Not yet driven this way:** change-passphrase, discard-key —
-  same method, just not yet done.
-- **2.11 Known vaults (spec §5.6)** — **done and interactively
-  verified.** `WelcomeView` shows remembered vaults (most-recently-
-  accessed first) with one-click reopen and a "Forget" action;
-  `ManageVaultsView` is the dedicated management screen (add without
-  opening, forget), reachable from both the entry screen and Settings;
+Phase 2 is functionally complete through item 2.11 (everything spec §12
+assigns to this platform except live FIDO2 interop, which is blocked on
+Apple signing — see 2.7). This is a snapshot; `PROGRESS.md`'s Phase 2
+section carries the full narrative, exact verification steps, and the
+bugs found and fixed along the way, and is what to check for anything
+beyond the summary below.
+
+- **2.1–2.5** (management UI, screen-capture blocking, export, import,
+  backup) — done and interactively verified via the Accessibility API
+  (see "Verifying the UI without screenshots" above): create-vault →
+  key list → create-key → key detail → reveal-raw-key → lock/unlock, a
+  full export-then-import round trip between two separate real vaults,
+  and both backup shortcuts. Not yet driven this way: change-passphrase,
+  discard-key, and the master-key-duality screen's embedded-key path
+  (exercised directly via `vaultcore`'s own tests instead).
+- **2.6 `launchd` background service** — done and verified, including
+  fixing two real packaging bugs a genuine reboot exposed (an
+  absolute-path `vaultcore` dylib load that only worked by Xcode-Debug
+  coincidence, and a nested-app-bundle codesigning failure under
+  `launchd`) and a real architecture gap: `VaultSigner.app` used to hold
+  its own `Vault` instance instead of routing every mutation through the
+  agent, which `PeerAuthentication.swift` now authenticates for real
+  (`SecCode`-based, Release-only). One caveat from before the signing fix
+  — a first-run cross-app Keychain access prompt — hasn't been
+  specifically re-tested since; see `PROGRESS.md` item 2.6.
+- **2.7 `ASCredentialProviderExtension`** — real implementation, compiles
+  and type-checks against the actual AuthenticationServices SDK.
+  Conclusively confirmed blocked on a paid Apple Developer Program
+  membership for anything beyond that — tested three times against
+  Apple's own provisioning server, not assumed from a single failure.
+  Live Safari/Chrome interop remains untestable until that's resolved.
+- **2.8 Custom protocol** — done and verified two ways:
+  `uniffi-verify/agent_test_client.py` non-interactively against a real
+  running `VaultSignerAgent`, and separately, driving a real third-party
+  GUI (`demos/rpc-demo-client`) through the actual interactive passphrase
+  prompt end to end.
+- **2.9 i18n** — done. Every view in the app is migrated (162 English
+  keys; a 45-key Arabic subset scoped to the RTL-relevant import/export/
+  duality screens per spec §9); `i18n/lint-hardcoded-strings.py --strict`
+  finds zero remaining hardcoded literals.
+- **2.10 Full test/fuzz suite** — done, except interop (blocked on 2.7's
+  signing, same root cause as 2.7 itself).
+- **2.11 Known vaults (spec §5.6)** — done and interactively verified:
+  `WelcomeView` lists remembered vaults with one-click reopen and
+  "Forget"; `ManageVaultsView` adds a vault without opening it;
   `AppState.closeVault()` returns to the entry screen without quitting.
-  Verified via the Accessibility API: create → close → confirm it
-  reappears in "Recent Vaults" → reopen with one click, no file picker →
-  forget → confirm the entry disappears but the `.vlt` file on disk is
-  untouched → add it back via "Add Existing Vault…" without opening →
-  confirm it appears in both screens reactively.
-- **2.2 Screen-capture blocking** — `CaptureProtected.swift` sets
-  `NSWindow.sharingType = .none` (spec §5.0) and is applied to the main
-  window plus every sheet (sheets are separate `NSWindow`s on macOS, so
-  the main window's setting doesn't propagate to them). The mechanism
-  itself is exercised by every build; independent confirmation that a
-  real screenshot/recording tool sees nothing is implied by this
-  session's own screenshot attempts coming back blank against this exact
-  app, but wasn't a deliberate, isolated test — worth doing once
-  explicitly (screenshot, confirm blank, done) rather than resting on
-  that indirect evidence.
-- **2.3 Export flows, 2.4 Import flow, 2.5 Backup** — **UI built, not
-  interactively verified.** The `vaultcore` blocker is gone
-  (`vaultcore/src/packet.rs`, verified independently from Swift — see
-  `PROGRESS.md` item 2.3). On top of it: `ExportPacketView.swift` (the
-  three §5.2.2 encryption-choice cards, no default pre-selected, with
-  option 1's mandatory metadata-exposure disclosure, reused for §5.4's
-  "back up everything"), `BackupMasterKeyOnlyView.swift` (§5.4's other
-  shortcut), `ImportPacketView.swift` (file picker → transfer-password
-  prompt if needed → merge), and `MasterKeyDualityView.swift` (spec
-  §5.3's unskippable three-card duality screen, option 3 styled
-  distinctly with its exact confirmation phrase). Single-key export
-  (`.vltkey`) is a button on `KeyDetailView`. All of it builds cleanly
-  (`VaultSigner` and `VaultSignerAgent` both) and the app launches
-  without crashing, but none of these specific screens have been
-  interactively exercised — same Screen Recording/Accessibility
-  permission gap as 2.1/2.2, now blocking verification of noticeably
-  more UI than when that gap was first flagged. Worth prioritizing
-  granting it to `Claude.app` before trusting this flow with a real
-  vault.
-- **2.6 `launchd` background service** — **done and verified**, with one
-  disclosed caveat. `VaultSignerAgent` is a real process, embedded inside
-  `VaultSigner.app` (`Contents/Resources/VaultSignerAgent.app`) and
-  registered as a genuine `launchd` agent via `SMAppService.agent(plistName:)`
-  (`LoginItemManager.swift`, toggled from the real Settings screen —
-  `--test-login-item register/unregister/status` is the same call path
-  used to verify it headlessly). `RunAtLoad`/`KeepAlive` in the embedded
-  `com.vaultsigner.agent.plist` give real launchd-supervised
-  restart-on-failure: verified directly with `launchctl print` (real job,
-  `managed_by = com.apple.xpc.ServiceManagement`) and `launchctl kickstart`
-  (killed and watched launchd revive it, `runs` incrementing each time).
-  `AlertPassphrasePrompter`'s real `NSAlert` passphrase prompt was
-  verified interactively end to end: a `vaultsigner.sign` request for a
-  never-unlocked key showed the dialog, blocked until answered, and
-  returned a signature that independently verifies against the key's real
-  public key. "Auto-unlock on startup" (`AutoUnlockStore.swift`, Keychain-
-  backed, off by default, gated behind an in-app risk-explanation
-  confirmation screen that verifies the passphrase against the vault
-  *before* ever writing it to the Keychain) is also verified end to end: a
-  freshly-launched agent listed the real key over the socket with zero
-  `internal.unlock_*` calls ever sent to it. **Caveat, observed while
-  verifying, not just theorized:** the first time `VaultSignerAgent`
-  tried to read the Keychain item `VaultSigner.app` wrote, macOS's
-  `SecurityAgent` showed a real cross-app access-confirmation dialog
-  (`VaultSigner.app` and `VaultSignerAgent.app` are two separately
-  ad-hoc-signed binaries with no shared Team ID/keychain-access-group) —
-  denying it silently breaks auto-unlock (the agent just starts locked,
-  no error surfaced anywhere) until "Always Allow" is granted once. This
-  is exactly the gap `AutoUnlockStore`'s doc comment already predicted:
-  full parity with spec §8's "Keychain can scope decryption to the
-  requesting app/process" claim needs a real Team ID (same underlying
-  constraint as item 2.7's signing requirement) to set a proper
-  `kSecAttrAccessGroup`; until then, the first-launch prompt is expected,
-  and a denied prompt fails silently rather than with a visible error —
-  surfacing that failure in the UI is a good small follow-up.
-  **Resolved:** `VaultSigner.app` no longer holds a `Vault` of its own —
-  every mutation routes through the agent's `internal.*` namespace
-  (`Shared/ManagementClient.swift` / `VaultSignerAgent/Sources/ManagementHandlers.swift`),
-  matching spec §8 ("the management UI process never writes the
-  container directly ... requests mutations from the service"), with
-  real caller authentication (`PeerAuthentication.swift`, `SecCode`-based,
-  Release-only) closing the gap that made the original `internal.*`
-  namespace unsafe to rely on for anything beyond its original
-  test-only purpose. See PROGRESS.md item 2.6 for the full account and
-  what's deferred (`VaultSignerCredentialProvider` still holds its own
-  separate `Vault`, same issue, left alone since it can't be verified
-  live regardless of this fix — item 2.7).
-- **2.7 `ASCredentialProviderExtension`** — **real implementation,
-  compiler-verified; conclusively confirmed blocked on a paid Apple
-  Developer Program membership for anything beyond that.**
-  `VaultSignerCredentialProvider/` is a real `app-extension` target
-  (`ProvidesPasskeys` capability, the autofill-credential-provider
-  entitlement, `deploymentTarget: "14.0"` — the passkey APIs it's built
-  on are macOS 14+/iOS 17+ only) — deliberately **not** embedded in
-  `VaultSigner.app` (see the comment in `project.yml`: an embedded
-  dependency's signing failure previously broke the whole app's build).
-  `CredentialProviderViewController` opens the vault, unlocks
-  auto-unlock-configured compartments, prompts for the key passphrase via
-  an `NSAlert` (screen-capture-blocked per spec §5.0), and calls
-  vaultcore's `handleFido2MakeCredentialNative`/
-  `handleFido2GetAssertionNative` — added specifically so this extension
-  works from `ASPasskeyCredentialRequest`'s decomposed fields and never
-  hand-rolls CTAP2 CBOR itself (spec §2). Verified as far as possible
-  without the blocked entitlement: `xcodebuild build
-  CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO`
-  against the real AuthenticationServices SDK succeeds for all three
-  targets. **Known gap:** no master-passphrase prompt path exists yet
-  for compartments without auto-unlock configured — see the file's own
-  doc comment. Signing itself: tested three times (see PROGRESS.md item
-  2.7 for the full narrative) — with no Apple ID, with a free Personal
-  Team before a real signing certificate existed, and again with that
-  certificate present and valid — and Apple's provisioning server
-  rejected the entitlement identically every time a team was involved,
-  conclusively confirming a **paid** Apple Developer Program membership
-  is required; nothing about live enablement or Safari/Chrome interop
-  can be tested locally without it.
-- **2.8 Custom protocol verified against a minimal test client** —
-  **done and verified.** `uniffi-verify/agent_test_client.py` runs fully
-  non-interactively (~0.7s) against the real running `VaultSignerAgent`
-  over its Unix socket and checks: `vaultsigner.list_public_keys` never
-  leaks anything beyond `key_id`/`label`/`public_key_b64`/`resource`; an
-  unknown `key_id` returns `key_not_found`; and — after unlocking the key
-  via the `internal.unlock_key` bootstrap method (deliberately avoiding
-  the interactive `AlertPassphrasePrompter` path, which needs a human —
-  see 2.6) — `vaultsigner.sign` returns a signature that independently
-  verifies (via PyNaCl) against the key's real Ed25519 public key. Peer
-  identity for the confirmation-text caller name is resolved via
-  `LOCAL_PEERPID`/`proc_pidpath` (OS-level, per spec §7 — never a
-  self-reported name from the request payload).
-- **2.9 i18n, 2.10 full test/fuzz pass** — not started; depend on the
-  above.
+
+**Known gap, still open:** spec §4.5 calls for a user-configurable key
+retention timer (0-300s); there's no Settings control for it yet — every
+call site hardcodes 30 seconds (`AgentServer.swift`). `docs/user-guide.md`
+describes the current fixed behavior, not the configurable one spec §4.5
+asks for.

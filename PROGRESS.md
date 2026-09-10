@@ -1956,6 +1956,89 @@ the Phase 10 test/fuzz suite (item 3.8). The Personal/"test" passphrase
 anomaly two checkpoints up remains unexplained and should be mentioned
 to the user directly, not just left in this file.
 
+### Session checkpoint (this entry): Windows release-packaging scripts (`build-staging.ps1` / `package-release.ps1`)
+
+Picked up the `shared` branch's per-platform tagging switch (commit
+`2d93dd1`, merged into `platform/windows` as `cb0e81b`) and its item 0.4
+flag: Windows had no `package-release`/`build-staging` equivalent of
+`apps/macos/Scripts/{package-release,build-staging}.sh` at all. Added
+both, mirroring the macOS pair's shape and the two-argument
+`<windows-vX.Y.Z> <vaultcore-vA.B.C>` / two-artifact-zip convention from
+`CLAUDE.md`'s "Release artifacts" section (which currently only
+documents the macOS side — extend it with a Windows paragraph there,
+on `shared`, once one of these zips is actually published against a
+real tag).
+
+`Scripts/build-staging.ps1`: builds vaultcore release, regenerates
+`Generated/vaultcore.cs`, then `dotnet publish`es both
+`VaultSignerAgent` and `VaultSignerUI` Release/self-contained/win-x64,
+installing them to a stable `%LOCALAPPDATA%\VaultSigner\` path (stable
+for the same reason macOS installs to `/Applications`: `EnableAutostart`
+captures `Environment.ProcessPath` into the HKCU Run key at the moment
+the user turns it on, so a path that moves every rebuild would strand
+that entry).
+
+`Scripts/package-release.ps1`: zips the installed app into
+`VaultSigner-Windows-vX.Y.Z.zip` and a separate dev bundle
+(`vaultcore.dll`, `vaultcore.dll.lib`, `Generated/vaultcore.cs`) into
+`vaultcore-vA.B.C-windows.zip`, under `.release-artifacts/` — same
+naming pattern as macOS's two files, no signing (no Authenticode cert
+set up for this project yet, documented in both scripts' own comments
+and in the script's printed output, the same honest treatment
+`CLAUDE.md` already gives Gatekeeper for macOS).
+
+**Two real bugs found by actually running this, not just reading the
+code — both fixed, both confirmed fixed by relaunching and checking
+the Windows Event Log / a live pipe round-trip:**
+
+1. The first version of `build-staging.ps1` merged both publish outputs
+   into one flat install folder (macOS's single-.app-bundle model).
+   That's wrong for two independent self-contained .NET publishes: each
+   carries its own private copy of the entire runtime, and copying one
+   over the other with `-Force` lets whichever copies second silently
+   overwrite the first's runtime DLLs with its own (different-patch,
+   and in the UI's case trimmed) versions. Hit for real: the merged
+   install's `VaultSignerAgent.exe` launched, then crashed immediately
+   with `System.MissingMethodException: Method not found:
+   'System.IO.TextWriter System.Console.get_Error()'` — confirmed via
+   `Get-WinEvent`, not guessed. Fixed by installing each into its own
+   `Agent\`/`UI\` subfolder; re-verified with a real
+   `vaultsigner.list_public_keys` call over the named pipe against the
+   rebuilt agent (correct `no_vault_open` JSON-RPC response, not a
+   crash).
+2. `VaultSignerUI.csproj` enables `PublishTrimmed` for Release by
+   default (it already flags the risk itself, via IL2026 warnings on
+   `KnownVaultsStore`'s/`ManagementClient`'s JSON calls) — but the
+   actual failure was more fundamental than those warnings suggested: a
+   trimmed publish crashed on launch with exception code `0xc000027b`
+   inside `Microsoft.UI.Xaml.dll` itself, confirmed via `Get-WinEvent`
+   from the correct interactive session (`query session` confirmed
+   session 1, active console — ruling out the session-mismatch red
+   herring from an earlier checkpoint above). WinUI3's XAML runtime
+   depends on reflection-based type activation the trimmer can't
+   statically see through. Fixed by publishing the UI with
+   `-p:PublishTrimmed=false`; re-verified live — process stays up
+   (memory grows past the crash-point baseline instead of dying), and
+   UI Automation found a real top-level window (`VaultSignerUI` /
+   `AppWindow Custom Title Bar`) where the trimmed build had none.
+   Revisit only with a real trimmer-descriptor investment, not by
+   re-enabling this blind.
+
+Full pipeline re-run clean after both fixes: `build-staging.ps1` exit 0,
+both exes launched together for real (Agent ~30MB, UI ~112MB resident —
+consistent with a genuine WinUI3 render, not a stub), then
+`package-release.ps1` run with `windows-v0.1.0`/`vaultcore-v0.1.0` as a
+dry run (no tag actually cut — versions are placeholders for testing
+the script, not a real release).
+
+**Not done in this checkpoint**: no actual git tag was cut, no
+`CHANGELOG.md` entry added, no GitHub Release published — this was
+scripting the missing tooling and proving it works, not executing a
+release cycle. `CLAUDE.md`'s Release artifacts section still only
+documents macOS; the Windows paragraph there is `shared`-branch scope
+and deliberately left for whenever a real Windows release actually
+ships.
+
 ## Phase 4 — Android
 
 Not started.

@@ -33,6 +33,28 @@ Phase 1.
       starts, and none of them may vendor or fork `vaultcore` logic
       (spec §2, §11). Revisit only if a concrete cross-platform
       orchestration need appears. (`eaa66fd`)
+- [x] 0.4 Revisit release-tag scheme now that a second platform (Windows)
+      is genuinely close to shipping — the original single-global-tag
+      scheme (still described as the plan in `CLAUDE.md` up to this
+      point) said explicitly to revisit once that happened. **Decision:**
+      switched to per-platform tags (`macos-vX.Y.Z`, `windows-vX.Y.Z`, …),
+      each an independent SemVer line — a shared tag reads to an outside
+      developer as "every platform this project supports," and a
+      platform-only release under a shared tag silently re-published
+      every other platform's artifacts as if they'd changed too.
+      `vaultcore` gets independent **versioning** (its own `Cargo.toml`
+      number, reasoned about by its own changes) and a plain, lightweight
+      `vaultcore-vA.B.C` tag when that number moves — but not an
+      independent **release process**: it's never published on its own
+      (`publish = false`, no crates.io), only ever bundled inside a
+      platform's own release artifacts, so a third full release cadence
+      to coordinate would be pure overhead. Full rules in `CLAUDE.md`'s
+      Versioning section; this entry is the "why," not the rulebook.
+      **Flagging, not building here:** there's no
+      `apps/windows/Scripts/package-release.ps1` (or a `build-staging`
+      equivalent) yet at all — needed before a Windows release can
+      actually be cut. Left for whoever's already working directly on
+      `platform/windows` rather than built as part of this change.
 
 ## Phase 1 — vaultcore (shared, built once, platform-agnostic)
 

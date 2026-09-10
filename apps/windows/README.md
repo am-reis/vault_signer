@@ -4,15 +4,21 @@ Phase 3 target (spec §12, items 3.1–3.11). Core functionality is real
 and verified: the management UI (`VaultSignerUI`, WinUI 3), the
 background agent (`VaultSignerAgent`) hosting the named-pipe custom
 protocol and retention cache, vault/compartment/key lifecycle,
-export/import/merge/backup, and screen-capture blocking are all built,
-built clean, and exercised live against a real vault on a real Windows
-machine — see `PROGRESS.md`'s Phase 3 session checkpoints for exactly
-what was verified and how. Still open: FIDO2 plugin-authenticator
-registration (3.4), a Settings screen (autostart/auto-unlock have
-agent-side support but no UI yet), and the Phase 10 test/fuzz suite
-(3.8). This file covers setup/architecture for someone building this
-app from source; everything in it was actually run and verified where
-stated, and anything not verified says so explicitly.
+export/import/merge/backup, screen-capture blocking, a Settings screen
+(autostart + DPAPI auto-unlock, both agent-side and UI), and
+reveal-raw-key/single-key-export UI are all built, built clean, and
+exercised live against a real vault on a real Windows machine — see
+`PROGRESS.md`'s Phase 3 session checkpoints for exactly what was
+verified and how. Release packaging exists too: `Scripts/build-staging.ps1`
+and `Scripts/package-release.ps1` (mirroring macOS's pair — see
+CLAUDE.md's Release artifacts section for the artifact-naming
+convention), both run live end-to-end, not just written. Still open:
+FIDO2 plugin-authenticator registration (3.4, blocked on this VM's
+Windows build being behind the Plugin Authenticator API's minimum —
+see PROGRESS.md), i18n (3.7, no locale work started), and the Phase 10
+test/fuzz suite (3.8). This file covers setup/architecture for someone
+building this app from source; everything in it was actually run and
+verified where stated, and anything not verified says so explicitly.
 
 No Windows machine on hand? [`docs/qemu-vm-setup.md`](docs/qemu-vm-setup.md)
 covers running one on Debian via QEMU/OVMF/swtpm (UEFI + Secure Boot +
@@ -99,18 +105,34 @@ correctly under .NET 8+.
 
 1. `git clone` the repo, `git checkout platform/windows`.
 2. Install the prerequisites above.
-3. `cargo build --release --manifest-path vaultcore/Cargo.toml --target x86_64-pc-windows-msvc` — confirm vaultcore itself builds for Windows before touching any C#/UI code. **Done, for real, on a real Windows machine — see PROGRESS.md's Phase 3 session-checkpoint entry.** Builds clean; `cargo test --workspace` is 117/117 green, including the new Windows `VirtualLock` memory-locking fix (`vaultcore/src/mem_lock.rs`, on the `shared` branch).
-4. Run `Scripts/generate-csharp-bindings.ps1`, confirm `Generated/vaultcore.cs` compiles in a throwaway class library project before building anything on top of it. **Not yet done from this repo** — the session that did step 3 ran out of safe disk headroom before installing `uniffi-bindgen-cs`; see PROGRESS.md's exact resume steps.
-5. Start on spec §12 items 3.1–3.8 in order — `PROGRESS.md` tracks status the same way it does for macOS's Phase 2. **`VaultSignerAgent/` (3.3-ish scope) and the start of `VaultSignerUI/` (3.1) exist**, written against the Rust source and macOS's proven Swift shape, but **not yet compiled** (blocked on step 4) — treat as a checkpoint, not verified progress, until they've actually built once real bindings exist.
+3. `powershell -File Scripts/generate-csharp-bindings.ps1` — builds
+   vaultcore release and regenerates `Generated/vaultcore.cs` from it.
+4. Build and run directly for iterative dev work: `dotnet build` each
+   of `VaultSignerAgent/` and `VaultSignerUI/VaultSignerUI/`, then
+   launch `VaultSignerAgent.exe` followed by `VaultSignerUI.exe` from
+   their respective `bin\Debug\...\win-x64\` output folders (two
+   separate processes — the UI doesn't launch the agent for you yet).
+5. For a realistic, Release-configuration install instead:
+   `powershell -File Scripts/build-staging.ps1` — builds vaultcore
+   release, regenerates bindings, publishes both projects
+   self-contained, and installs them to `%LOCALAPPDATA%\VaultSigner\`
+   (`Agent\` and `UI\` subfolders — kept separate on purpose; see that
+   script's own comments for a real, hit-live bug this avoids). Then
+   `powershell -File Scripts/package-release.ps1 <vX.Y.Z> <vA.B.C>`
+   zips that install into the two artifacts CLAUDE.md's Release
+   artifacts section documents.
 
 ## What's genuinely unverified
 
-This section is stale as of several sessions ago — the things it used
-to list (bindings compiling, WinUI 3 actually running, the agent
-serving real requests) are now all verified live; see `PROGRESS.md`'s
-Phase 3 checkpoints for exactly what and how, rather than trusting a
-summary here that will only go stale again. Currently open, per
-`PROGRESS.md`: FIDO2 plugin-authenticator registration (3.4), the
-Settings screen (autostart/auto-unlock have agent-side support but no
-UI), single-key export UI, reveal-raw-key UI, and DPAPI auto-unlock has
-agent-side support but is untested end-to-end.
+Kept current as of the release-packaging-scripts checkpoint in
+`PROGRESS.md` (Phase 3) — check there for anything newer than this
+file, rather than trusting a summary here that will only go stale
+again. Currently open: FIDO2 plugin-authenticator registration (3.4,
+blocked on this VM's Windows build version), i18n (3.7, not started),
+and the Phase 10 test/fuzz suite (3.8). One known tooling limitation,
+not a product gap: `System.Windows.Automation` can't reliably drive a
+`PasswordBox` inside a dynamically-created `ContentDialog` (WinUI3
+doesn't expose a settable value to automation for password fields) —
+confirmed by testing the same agent calls via a raw pipe instead, which
+worked immediately, so this only affects UI-Automation-driven testing,
+not the app itself.

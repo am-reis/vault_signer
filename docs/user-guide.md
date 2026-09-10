@@ -54,7 +54,7 @@ Once a key exists, you don't usually go looking for it — it comes to you:
 - **Signing in somewhere with a passkey:** your browser or an app will show its own "choose a passkey" prompt, and VaultSigner will be offered as an option. Pick it, and VaultSigner will ask for that key's passphrase (unless you've used it recently — see "staying unlocked" below), then hand back a signed response. You never see or copy anything yourself.
 - **An app asking VaultSigner to sign something directly:** some apps that aren't websites can also ask VaultSigner to sign on their behalf. VaultSigner will always show you which app is asking and which key it wants, before asking for that key's passphrase. If you don't recognize the app or didn't expect the request, decline it.
 
-**Staying unlocked for a little while:** after you type a key's passphrase once, VaultSigner keeps that key ready to use for a short time (up to five minutes, and you can set it shorter) so you're not retyping it for every single action in a row. After that time, or as soon as you lock your vault, it's forgotten again.
+**Staying unlocked for a little while:** after you type a key's passphrase once, VaultSigner keeps that key ready to use for about 30 seconds, so you're not retyping it if you need it again right away. After that (there's no setting to change this yet), or as soon as you lock your vault, it's forgotten again.
 
 ---
 

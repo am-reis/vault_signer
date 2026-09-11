@@ -34,10 +34,12 @@ class ManagementHandlers(private val context: Context) {
         return try {
             val result = dispatch(method, params)
                 ?: return buildRpcError(id, "method_not_found", "unknown internal method: $method")
+            android.util.Log.i("ManagementHandlers", "OK $method -> $result")
             buildRpcSuccess(id, result)
         } catch (e: NoVaultOpenException) {
             buildRpcError(id, InternalErrorCodes.NO_VAULT_OPEN, e.message ?: "no vault is open")
         } catch (e: Exception) {
+            android.util.Log.e("ManagementHandlers", "FAILED $method params=$params", e)
             buildRpcError(id, "invalid_params", e.message ?: e.toString())
         }
     }

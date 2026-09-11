@@ -32,9 +32,11 @@ Creating one asks for:
 
 That's it — your vault is created empty, ready for you to add keys to it.
 
-**You won't be asked where it is again.** VaultSigner remembers every vault you create or open, and shows them under **Recent Vaults** on that same opening screen — click one to unlock it directly, no browsing to the file again. If you use more than one vault (say, a personal one and a work one), switch between them with **Close This Vault** in Settings, which takes you back to that same list without quitting the app.
+**You won't be asked where it is again.** VaultSigner remembers every vault you create or open, and shows them under **Recent Vaults** on that same opening screen — click one to unlock it directly, no browsing to the file again. If you use more than one vault (say, a personal one and a work one), switch between them with **Close This Vault**/**Open a different vault** (in Settings on some platforms, directly on the main screen on others), which takes you back to that same list without quitting the app.
 
-If a listed vault shows a warning triangle, its file couldn't be found where VaultSigner last saw it — it may have moved or been deleted. Use **Manage Known Vaults…** (from either the opening screen or Settings) to add a vault you keep somewhere without opening it right away, or to **Forget** an entry you no longer want listed. Forgetting only removes it from this list — it never touches or deletes the actual file.
+If a listed vault shows a warning triangle, its file couldn't be found where VaultSigner last saw it — it may have moved or been deleted. Use **Manage Known Vaults…** (reachable from the opening screen everywhere, and also from Settings on platforms that have it) to add a vault you keep somewhere without opening it right away, or to **Forget** an entry you no longer want listed. Forgetting only removes it from this list — it never touches or deletes the actual file.
+
+*Windows note: keys are also organized into "compartments" — independent sets of keys, each with its own master passphrase, inside the same vault file. Most people only ever need one ("Personal"), created automatically with your vault; add another from **New Compartment…** next to the compartment picker if you want a separate set (say, "Work") with its own password.*
 
 ---
 
@@ -56,7 +58,7 @@ Once a key exists, you don't usually go looking for it — it comes to you:
 - **Signing in somewhere with a passkey:** your browser or an app will show its own "choose a passkey" prompt, and VaultSigner will be offered as an option. Pick it, and VaultSigner will ask for that key's passphrase (unless you've used it recently — see "staying unlocked" below), then hand back a signed response. You never see or copy anything yourself.
 - **An app asking VaultSigner to sign something directly:** some apps that aren't websites can also ask VaultSigner to sign on their behalf. VaultSigner will always show you which app is asking and which key it wants, before asking for that key's passphrase. If you don't recognize the app or didn't expect the request, decline it.
 
-**Staying unlocked for a little while:** after you type a key's passphrase once, VaultSigner keeps that key ready to use for a short time (up to five minutes, and you can set it shorter) so you're not retyping it for every single action in a row. After that time, or as soon as you lock your vault, it's forgotten again.
+**Staying unlocked for a little while:** after you type a key's passphrase once, VaultSigner keeps that key ready to use for about 30 seconds, so you're not retyping it if you need it again right away. After that (there's no setting to change this yet), or as soon as you lock your vault, it's forgotten again.
 
 ---
 
@@ -100,6 +102,8 @@ Two separate switches, each with a real tradeoff:
 
 - **Start VaultSigner automatically** — so it's ready to answer sign-in requests even when you haven't opened the app yourself. This is on by default, and is what most people want.
 - **Auto-unlock on startup** — off by default, and worth thinking about before turning on. Normally, your vault stays locked (showing nothing but a password prompt) until you type your master password. Turning this on stores that password on your device so the vault unlocks itself automatically. That's convenient, but it does mean your device itself now holds a way to unlock your vault without you — so it's only as safe as your device's own login security. It does **not** expose your individual keys; those still need their own passphrases regardless of this setting.
+
+*Windows note: this setting is stored a little differently than on other platforms — it uses Windows's own per-user data protection (DPAPI) rather than a dedicated secure enclave, which means any process running as your Windows user account could, in principle, access the stored password too, not just VaultSigner itself. VaultSigner shows this exact tradeoff before you confirm turning it on.*
 
 ---
 

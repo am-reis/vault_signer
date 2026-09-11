@@ -408,6 +408,9 @@ Each platform phase must produce a complete, independently functional, demonstra
 - [ ] 2.9 i18n resource-file scaffolding wired up, at least one locale populated.
 - [ ] 2.10 macOS build passes the Phase 10 test/fuzz suite, including self-import/export exercising the shared merge logic.
 - [ ] 2.11 Known-vaults list (5.6): entry screen shows remembered vaults most-recently-opened first, each openable in one action; a management screen (reachable from both the entry screen and Settings) to add a vault by browsing without opening it and to forget entries; a way to close the current vault and return to the entry screen without quitting.
+- [ ] 2.12 `docs/user-guide.md` written (this is the first platform, so this is authoring it, not just reconciling it) and verified against the real, shipped macOS UI (Section 14).
+- [ ] 2.13 `apps/macos/docs/protocol-integration.md` written: macOS's real transport/discovery details and a working code example, linked from `docs/protocol-integration/README.md`'s platform-guides list (Section 14).
+- [ ] 2.14 Documentation site rebuilt and published (`Scripts/build-docs-site.sh`, from a branch with this phase's docs merged in) including this phase's new/changed docs (Section 14).
 
 **Phase 3 — Windows**
 - [ ] 3.1 WinUI 3 (or native) management UI, mirroring 2.1–2.5 functionality.
@@ -418,6 +421,9 @@ Each platform phase must produce a complete, independently functional, demonstra
 - [ ] 3.6 Custom protocol verified against a minimal test client app.
 - [ ] 3.7 i18n parity with macOS build.
 - [ ] 3.8 Windows build passes the Phase 10 test/fuzz suite.
+- [ ] 3.9 `docs/user-guide.md` reconciled against the real, shipped Windows UI — same content, verified accurate for Windows, with a per-platform addendum only where the flow genuinely differs from macOS (Section 14).
+- [ ] 3.10 `apps/windows/docs/protocol-integration.md` written: Windows's real transport/discovery details and a working code example, linked from `docs/protocol-integration/README.md`'s platform-guides list (Section 14).
+- [ ] 3.11 Documentation site rebuilt and published (`Scripts/build-docs-site.sh`, from a branch with this phase's docs merged in) including this phase's new/changed docs (Section 14).
 
 **Phase 4 — Android**
 - [ ] 4.1 Compose management UI mirroring 2.1–2.5 functionality.
@@ -428,6 +434,9 @@ Each platform phase must produce a complete, independently functional, demonstra
 - [ ] 4.6 Custom protocol verified against a minimal test client app.
 - [ ] 4.7 i18n parity with prior builds.
 - [ ] 4.8 Android build passes the Phase 10 test/fuzz suite.
+- [ ] 4.9 `docs/user-guide.md` reconciled against the real, shipped Android UI, with a per-platform addendum only where the flow genuinely differs (Section 14).
+- [ ] 4.10 `apps/android/docs/protocol-integration.md` written: Android's real transport/discovery details and a working code example, linked from `docs/protocol-integration/README.md`'s platform-guides list (Section 14).
+- [ ] 4.11 Documentation site rebuilt and published (`Scripts/build-docs-site.sh`, from a branch with this phase's docs merged in) including this phase's new/changed docs (Section 14).
 
 **Phase 5 — iOS/iPadOS**
 - [ ] 5.1 SwiftUI management UI, reusing macOS Swift code where the underlying logic is identical.
@@ -437,6 +446,9 @@ Each platform phase must produce a complete, independently functional, demonstra
 - [ ] 5.5 Import/export/master-key-duality flows verified end-to-end on-device.
 - [ ] 5.6 i18n parity with prior builds.
 - [ ] 5.7 iOS build passes the Phase 10 test/fuzz suite.
+- [ ] 5.8 `docs/user-guide.md` reconciled against the real, shipped iOS/iPadOS UI, including the App Intents-based custom-protocol handoff's own addendum paragraph (7.1) this section already calls out (Section 14).
+- [ ] 5.9 `apps/ios/docs/protocol-integration.md` written: iOS's real (materially narrower, App Intents-based) discovery/integration model and a working example, linked from `docs/protocol-integration/README.md`'s platform-guides list (Section 14).
+- [ ] 5.10 Documentation site rebuilt and published (`Scripts/build-docs-site.sh`, from a branch with this phase's docs merged in) including this phase's new/changed docs (Section 14).
 
 **Phase 6 — Linux**
 - [ ] 6.1 GTK4 management UI mirroring 2.1–2.5 functionality.
@@ -446,6 +458,9 @@ Each platform phase must produce a complete, independently functional, demonstra
 - [ ] 6.5 Custom protocol verified against a minimal test client app.
 - [ ] 6.6 i18n parity with prior builds.
 - [ ] 6.7 Linux build passes the Phase 10 test/fuzz suite.
+- [ ] 6.8 `docs/user-guide.md` reconciled against the real, shipped Linux UI, with a per-platform addendum only where the flow genuinely differs (Section 14).
+- [ ] 6.9 `apps/linux/docs/protocol-integration.md` written: Linux's real transport/discovery details and a working code example, linked from `docs/protocol-integration/README.md`'s platform-guides list (Section 14).
+- [ ] 6.10 Documentation site rebuilt and published (`Scripts/build-docs-site.sh`, from a branch with this phase's docs merged in) including this phase's new/changed docs (Section 14).
 
 **Phase 7 — Cross-platform security hardening & review**
 - [ ] 7.1 Memory-zeroing code-review pass across every FFI boundary on every platform (native code copying bytes out of Rust buffers is the highest-risk leak point).
@@ -459,7 +474,7 @@ Each platform phase must produce a complete, independently functional, demonstra
 - [ ] 8.2 RTL verification of import/export screens on every platform.
 - [ ] 8.3 Additional target locales translated.
 - [ ] 8.4 First-run disclosure screens finalized on every platform (autostart default, no-telemetry statement, plain-language threat-model summary).
-- [ ] 8.5 User-facing documentation (Section 14) complete and current against the shipped UI on every platform, with per-platform addenda only where a flow genuinely differs.
+- [ ] 8.5 Final cross-platform documentation consistency sweep (Section 14) — not the first pass at any of this (each of Phases 2-6 already required its own user guide, protocol integration addendum, and docs-site publish as that platform shipped); this item catches drift *between* platforms' addenda that individual phases, done in sequence, couldn't have caught (e.g. two platforms' addenda describing the same underlying behavior inconsistently, or a wording fix made on one platform's addendum that should have propagated to the shared core text).
 
 ---
 
@@ -492,3 +507,9 @@ Everything above this section specifies the product for the people building it. 
 **Scope: what this guide does not cover.** Anything in Sections 2–4 and 6 (algorithms, wire formats, the threat model's adversary classes, protocol internals). If a reviewer needs that, Sections 2–4 and 6 are the reference, not this guide.
 
 **Where it lives, and how it stays current.** One `docs/user-guide.md` at the repository root, written platform-generically (referring to actions like "the Settings screen" or "the Create Key button" rather than platform-specific chrome), with a short per-platform addendum only where the flow genuinely differs (e.g. iOS's App Intents-based custom-protocol handoff, Section 7.1, is a different enough experience to need its own paragraph). Treat it the same way as the in-app first-run disclosure screens (Phase 8 item 8.4): both are user-facing explanations of the same behavior, and a change to one that isn't reflected in the other is a bug. Update it as part of finishing each platform phase (Section 12's Phases 2–6), not as a single end-of-project task — a guide written once at the end tends to describe the UI as it was, not as it shipped.
+
+**Two sibling deliverables travel with this guide, on the same per-phase cadence, for the same reason (written once at the end describes the UI as it was, not as it shipped):**
+- **The developer-facing protocol integration guide** (`docs/protocol-integration/README.md`'s platform-agnostic core, plus one `apps/<platform>/docs/protocol-integration.md` addendum per platform covering that platform's real transport, discovery, and a working code example — see `apps/macos/docs/protocol-integration.md` for the shape). A platform phase whose custom-protocol item (2.8/3.6/4.6/5.4/6.5) is done but whose addendum isn't written is not actually done — a third-party developer on that platform has nothing to build against yet.
+- **The published documentation site** (`Scripts/build-docs-site.sh`, publishing to the `gh-pages` branch): add that platform's new docs (README, protocol-integration addendum) to the script's file list, then run it and push `gh-pages`, from a branch with every completed platform's docs actually merged in (staging, release, or main — never `shared` alone, which never receives platform-only paths). Skipping this leaves the public site silently behind what's actually shipped.
+
+Section 12's per-phase checklists carry the enforcement for all three of these (each of Phases 2-6 ends with a documentation trio: user guide, protocol integration addendum, docs site) — a phase is not complete while any of them is unchecked.

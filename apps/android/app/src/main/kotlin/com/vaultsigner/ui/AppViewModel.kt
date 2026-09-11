@@ -49,6 +49,7 @@ data class UiState(
     val keys: List<KeyUi> = emptyList(),
     val selectedKeyId: String? = null,
     val autostartEnabled: Boolean = true,
+    val autoUnlockEnabledCompartmentIds: Set<String> = emptySet(),
     val pendingImport: ImportedPacketUi? = null,
     val lastMergeOutcome: MergeOutcomeUi? = null,
     val lastRevealedHex: String? = null,
@@ -154,6 +155,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun selectCompartment(compartmentId: String) = launchCall {
         _state.update { it.copy(selectedCompartmentId = compartmentId) }
         refreshKeys(compartmentId)
+        refreshAutoUnlockStatus(compartmentId)
+    }
+
+    private suspend fun refreshAutoUnlockStatus(compartmentId: String) {
+        val params = JSONObject().put("compartment_id", compartmentId)
+        val result = ManagementClient.call(InternalMethods.IS_AUTO_UNLOCK_ENABLED, params)
+        _state.update {
+            val ids = it.autoUnlockEnabledCompartmentIds.toMutableSet()
+            if (result.getBoolean("enabled")) ids.add(compartmentId) else ids.remove(compartmentId)
+            it.copy(autoUnlockEnabledCompartmentIds = ids)
+        }
     }
 
     private suspend fun refreshKeys(compartmentId: String) {
@@ -306,11 +318,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun enableAutoUnlock(compartmentId: String, passphrase: String, onDone: () -> Unit) = launchCall {
         val params = JSONObject().put("compartment_id", compartmentId).put("passphrase", passphrase)
         ManagementClient.call(InternalMethods.ENABLE_AUTO_UNLOCK, params)
+        refreshAutoUnlockStatus(compartmentId)
         onDone()
     }
 
     fun disableAutoUnlock(compartmentId: String) = launchCall {
         val params = JSONObject().put("compartment_id", compartmentId)
         ManagementClient.call(InternalMethods.DISABLE_AUTO_UNLOCK, params)
+        refreshAutoUnlockStatus(compartmentId)
     }
 }

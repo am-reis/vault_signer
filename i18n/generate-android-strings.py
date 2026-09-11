@@ -42,6 +42,11 @@ def convert_placeholders(value: str) -> str:
 
 def escape(value: str) -> str:
     value = convert_placeholders(value)
+    # XML entity escaping first (order matters: "&" must be escaped
+    # before introducing any other "&...;" sequence) — Android string
+    # resources are XML text content, on top of the '\' and quote escapes
+    # Android's own resource string-literal syntax additionally expects.
+    value = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     value = value.replace("\\", "\\\\").replace('"', '\\"').replace("'", "\\'")
     value = value.replace("\n", "\\n")
     # A bare '%' Android doesn't recognize as a format spec would still be

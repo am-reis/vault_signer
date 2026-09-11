@@ -191,12 +191,16 @@ private fun NewPasskeyPassphraseDialog(rpId: String, onSubmit: (String) -> Unit,
     var passphrase by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("New passkey for $rpId") },
+        title = { Text(androidx.compose.ui.res.stringResource(com.vaultsigner.R.string.android_new_passkey_title_format, rpId)) },
         text = {
-            OutlinedTextField(passphrase, { passphrase = it }, label = { Text("Key passphrase") }, visualTransformation = PasswordVisualTransformation())
+            OutlinedTextField(
+                passphrase, { passphrase = it },
+                label = { Text(androidx.compose.ui.res.stringResource(com.vaultsigner.R.string.createkey_passphrase_field)) },
+                visualTransformation = PasswordVisualTransformation(),
+            )
         },
-        confirmButton = { TextButton(onClick = { onSubmit(passphrase) }) { Text("Create") } },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = { onSubmit(passphrase) }) { Text(androidx.compose.ui.res.stringResource(com.vaultsigner.R.string.createkey_create_button)) } },
+        dismissButton = { TextButton(onClick = onCancel) { Text(androidx.compose.ui.res.stringResource(com.vaultsigner.R.string.common_cancel_button)) } },
     )
 }
 

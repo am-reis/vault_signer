@@ -13,6 +13,7 @@
     <string name="android_prompt_deny">Deny</string>
     <string name="android_settings_enable_credential_provider_button">Enable in system settings</string>
     <string name="android_settings_enable_credential_provider_footer">Opens the system\'s Passwords &amp; accounts settings so you can turn on VaultSigner as a passkey provider.</string>
+    <string name="android_new_passkey_title_format">New passkey for %1$s</string>
     <string name="welcome_subtitle">Create a new vault, or open one you already have.</string>
     <string name="welcome_create_button">Create New Vault…</string>
     <string name="welcome_open_button">Open Existing Vault…</string>

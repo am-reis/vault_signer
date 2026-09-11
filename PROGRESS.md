@@ -2199,6 +2199,113 @@ covers 3.7.
       separately** — likely by having the agent expose a real
       "is a vault currently open" check rather than inferring it from
       whether the compartment list happens to be non-throwing.
+      **Actually fixed in the next checkpoint below**, since it turned
+      out to block item 3.8's own verification too.
+
+### Session checkpoint (this entry): item 3.8, Windows build passes the Phase 10 test/fuzz suite
+
+Second of the three items asked for directly ("complete items 3.7,
+3.8, and 3.11"). Scope mirrors macOS's own item 2.10 exactly (see that
+entry above): the shared `vaultcore` unit/crash-safety/fuzz/throttling
+tests are platform-agnostic Rust, already verified once (fuzzing) or
+routinely (unit tests) and don't need redoing per-platform, since every
+platform links the identical binary. What's actually specific to
+Windows is (a) a fresh confirmation the shared suite still passes on
+this platform, and (b) the "including self-import/export exercising
+the shared merge logic" clause, driven through the real Windows UI.
+
+- **Fresh confirmation, this session, on real Windows**: `cargo test
+  --workspace --target x86_64-pc-windows-msvc` — 116 passed, 0 failed,
+  1 ignored (404.82s). `-- --ignored` then ran the two deliberately-slow
+  excluded tests: the KDF real-benchmark test, and — spec §10's crash-
+  safety requirement specifically — `repeated_random_kill_mid_write_never_corrupts_container`,
+  both green. 117 total, all passing on Windows. Fuzzing (container
+  parser, JSON-RPC parser) is **not** re-run here: already done for
+  real in Phase 1 (item 1.12 — 200k iterations each under
+  AddressSanitizer, a real bug found and fixed) on whatever platform
+  that session used; `cargo-fuzz`/libFuzzer has poor-to-no Windows
+  support regardless, and this is the same platform-agnostic parser
+  code either way — not a gap specific to Windows.
+- **Self-export/import through the real UI, exceeding the bar macOS's
+  own 2.10 set** (that entry drove both directions through the real UI;
+  this one does too, plus creates the source vault and its key through
+  the real UI as well, not seeded via raw pipe calls): created a
+  disposable vault (`VaultA.vlt`, `WelcomePage`'s real inline
+  create-vault form — folder picker, filename, compartment label, both
+  passphrase fields), created a real key in it (`CreateKeyPage`,
+  driven end-to-end including the native folder/passphrase fields),
+  exported it via the real `ExportKeysPage` (selected the key, checked
+  "Include master key in export", chose "package as-is", real
+  `FileSavePicker`) to a real `.vltpack` file on disk, created a second
+  disposable vault (`VaultB.vlt`, this half via raw pipe — see below
+  for why) to switch the agent's active vault, then imported the real
+  exported file via the real `ImportPacketPage` (real `FileOpenPicker`)
+  — landed on `MasterKeyDualityPage` for real, selected "Re-encrypt &
+  discard incoming master key" with the real destination compartment,
+  clicked "Use This Option", got a real "Import Complete", clicked
+  Done, and confirmed the imported key ("TestKey · example.com ·
+  Ed25519 · CustomSigning") now shows in `VaultB`'s compartment on
+  `VaultHomePage`. All driven via `System.Windows.Automation` +
+  `SendKeys`/simulated mouse clicks (`WelcomePage`'s and
+  `CreateKeyPage`'s `PasswordBox` fields don't support `ValuePattern`,
+  confirmed again — same limitation recorded in an earlier checkpoint;
+  worked around the same way, by clicking the field's real coordinates
+  and typing). All test vaults, the exported packet, the scratch
+  folder, and `config.json` (which `internal.create_vault` had
+  overwritten to point at the disposable vaults) deleted afterward,
+  restoring the exact pre-checkpoint state.
+- **Interop tests (spec §10: "register and authenticate against at
+  least two to three real-world relying parties... using an actual
+  browser") remain explicitly blocked** — same as macOS's own 2.10 —
+  since FIDO2 isn't implemented on Windows yet (item 3.4, blocked on
+  this VM's Windows build version; see the FIDO2-research checkpoint
+  earlier in this phase). **Item 3.8 status: Windows build passes the
+  Phase 10 test/fuzz suite, except interop** — identical phrasing to
+  macOS's own 2.10, for the identical reason.
+
+**A real, severe bug found and fixed while setting up this
+verification** (not previously known — this session's earlier i18n
+checkpoint had only worked around it with a temporary flag): the
+`WelcomePage_Loaded` bug recorded in the checkpoint above didn't just
+mean `WelcomePage` couldn't be *observed* — it meant a fresh Windows
+install currently has **no way to create a first vault through the UI
+at all**. Every launch bounced straight to `VaultHomePage` before the
+user could interact with the create-vault form, because
+`ManagementHandlers.ListCompartments` never throws (`Vault?
+.ListCompartments() ?? []`), so `WelcomePage`'s only check for
+"is a vault already open" (did the call throw) was always false. Fixed
+by checking the actual result instead: `if (compartments.Length == 0)
+return;` — every vault has at least one compartment by construction
+(`CreateVault` requires one), so a non-empty result is a reliable proxy
+for "a vault is genuinely open," with no new agent-side method needed.
+Verified live: a completely fresh agent (no config file, no vault ever
+created) now shows `WelcomePage`'s real create-vault form and stays on
+it, instead of bouncing away — confirmed by then actually using that
+exact form to create `VaultA.vlt` for this checkpoint's own test, no
+workaround flag needed this time.
+
+**A related, still-open gap, found but out of scope to fix here**:
+`WelcomePage`'s fix above is correct for a vault that's already open at
+launch, but it means **switching away from an already-open vault
+currently doesn't work either** — `SwitchVaultLink_Click`
+("Open a different vault" on `VaultHomePage`) is pure client-side
+`Frame.Navigate(typeof(WelcomePage))` with no agent-side call at all,
+so the agent still reports the same vault open, and `WelcomePage`
+correctly (now) bounces straight back to `VaultHomePage` again. This
+was equally broken *before* today's fix too (every `WelcomePage` visit
+bounced back regardless of vault state then), so it's not a regression
+introduced here — just a pre-existing gap this session's testing
+happened to surface clearly for the first time. Worked around for this
+checkpoint's own vault-B creation by using a raw pipe
+`internal.create_vault` call instead (switches the agent's active
+vault directly) rather than going through `WelcomePage`'s UI a second
+time. A real fix needs either a client-side "forget the current vault"
+state reset (mirroring macOS's `AppState.closeVault()`, which is also
+pure client-side per an earlier checkpoint) that `WelcomePage` then
+respects, or an agent-side `internal.close_vault` method — worth
+raising with the user rather than deciding unilaterally, since it's a
+product-shape question (does "switching vaults" mean the agent forgets
+the vault too, or only the UI's view of it?).
 
 ## Phase 4 — Android
 

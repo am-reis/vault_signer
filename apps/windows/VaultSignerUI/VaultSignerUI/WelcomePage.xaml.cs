@@ -63,9 +63,22 @@ public sealed partial class WelcomePage : Page, ISensitiveScreen
         // to VaultHomePage rather than showing this screen at all, and
         // drop this page from the back stack so "back" from there
         // can't return to a stale Welcome screen.
+        //
+        // Real bug found and fixed here (spec item 3.8's verification):
+        // ManagementHandlers.ListCompartments does `Vault?.ListCompartments()
+        // ?? []` agent-side, which never throws, even with no vault open
+        // at all — it just returns an empty array. Checking only "did the
+        // call throw" made this unconditionally true, so this page could
+        // never actually be seen: a fresh install bounced straight to
+        // VaultHomePage before a first vault could ever be created.
+        // Checking the result is non-empty instead is a reliable proxy
+        // for "a vault is genuinely open" — every vault has at least one
+        // compartment by construction (CreateVault requires one), so a
+        // real open vault can never legitimately report zero.
         try
         {
-            ManagementClient.ListCompartments();
+            var compartments = ManagementClient.ListCompartments();
+            if (compartments.Length == 0) return;
             Frame.Navigate(typeof(VaultHomePage));
             Frame.BackStack.Clear();
         }

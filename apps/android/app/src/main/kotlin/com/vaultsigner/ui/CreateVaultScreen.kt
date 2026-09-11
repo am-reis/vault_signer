@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -36,33 +37,46 @@ fun CreateVaultScreen(navController: NavHostController, viewModel: AppViewModel,
     Scaffold { padding ->
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.createvault_title))
-            OutlinedTextField(value = fileName, onValueChange = { fileName = it }, label = { Text(stringResource(R.string.welcome_filename_placeholder)) })
-            OutlinedTextField(value = compartmentLabel, onValueChange = { compartmentLabel = it }, label = { Text(stringResource(R.string.createvault_compartment_label_field)) })
+            OutlinedTextField(
+                value = fileName, onValueChange = { fileName = it },
+                label = { Text(stringResource(R.string.welcome_filename_placeholder)) },
+                modifier = Modifier.testTag(TestTags.CREATE_VAULT_FILENAME),
+            )
+            OutlinedTextField(
+                value = compartmentLabel, onValueChange = { compartmentLabel = it },
+                label = { Text(stringResource(R.string.createvault_compartment_label_field)) },
+                modifier = Modifier.testTag(TestTags.CREATE_VAULT_COMPARTMENT_LABEL),
+            )
             OutlinedTextField(
                 value = passphrase, onValueChange = { passphrase = it },
                 label = { Text(stringResource(R.string.createvault_master_passphrase_field)) },
                 visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.testTag(TestTags.CREATE_VAULT_MASTER_PASSPHRASE),
             )
             OutlinedTextField(
                 value = confirmPassphrase, onValueChange = { confirmPassphrase = it },
                 label = { Text(stringResource(R.string.createvault_confirm_passphrase_field)) },
                 visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.testTag(TestTags.CREATE_VAULT_CONFIRM_PASSPHRASE),
             )
             if (mismatch) Text(stringResource(R.string.common_passphrases_dont_match))
             if (state.error != null) Text(state.error)
 
-            Button(onClick = {
-                if (passphrase != confirmPassphrase) {
-                    mismatch = true
-                    return@Button
-                }
-                mismatch = false
-                val destDir = context.getExternalFilesDir(null) ?: context.filesDir
-                val path = File(destDir, fileName).absolutePath
-                viewModel.createVault(path, compartmentLabel.ifBlank { "Personal" }, passphrase) {
-                    navController.navigate(Routes.KEY_LIST) { popUpTo(Routes.WELCOME) { inclusive = true } }
-                }
-            }) {
+            Button(
+                onClick = {
+                    if (passphrase != confirmPassphrase) {
+                        mismatch = true
+                        return@Button
+                    }
+                    mismatch = false
+                    val destDir = context.getExternalFilesDir(null) ?: context.filesDir
+                    val path = File(destDir, fileName).absolutePath
+                    viewModel.createVault(path, compartmentLabel.ifBlank { "Personal" }, passphrase) {
+                        navController.navigate(Routes.KEY_LIST) { popUpTo(Routes.WELCOME) { inclusive = true } }
+                    }
+                },
+                modifier = Modifier.testTag(TestTags.CREATE_VAULT_SUBMIT),
+            ) {
                 Text(stringResource(R.string.createvault_create_button))
             }
         }

@@ -100,10 +100,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun createVault(path: String, compartmentLabel: String, masterPassphrase: String, onDone: () -> Unit) = launchCall {
         val params = JSONObject()
             .put("path", path).put("compartment_label", compartmentLabel).put("master_passphrase", masterPassphrase)
-        ManagementClient.call(InternalMethods.CREATE_VAULT, params)
+        val result = ManagementClient.call(InternalMethods.CREATE_VAULT, params)
         knownVaultsStore.recordAccess(path)
         _state.update { it.copy(vaultOpen = true, vaultPath = path, knownVaults = knownVaultsStore.list()) }
         refreshCompartments()
+        // Select the (single, just-created) compartment immediately from
+        // this response rather than leaving it to KeyListScreen's
+        // LaunchedEffect -> selectCompartment() round trip — that path is
+        // async and briefly leaves selectedCompartmentId null right after
+        // navigating to the key list, which is a real race a fast enough
+        // caller (an instrumented test, or just a quick tap) can hit:
+        // CreateKeyScreen's submit silently no-ops on a null compartment
+        // id instead of erroring, so a key creation could be dropped with
+        // no visible feedback at all.
+        result.getJSONArray("compartments").optJSONObject(0)?.let { selectCompartment(it.getString("compartment_id")) }
         onDone()
     }
 

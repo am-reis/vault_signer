@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -51,7 +52,10 @@ fun WelcomeScreen(navController: NavHostController, viewModel: AppViewModel, sta
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.welcome_subtitle))
 
-            Button(onClick = { navController.navigate(Routes.CREATE_VAULT) }) {
+            Button(
+                onClick = { navController.navigate(Routes.CREATE_VAULT) },
+                modifier = Modifier.testTag(TestTags.WELCOME_CREATE_VAULT_BUTTON),
+            ) {
                 Text(stringResource(R.string.welcome_create_button))
             }
             OutlinedButton(onClick = { openDocumentLauncher.launch(arrayOf("*/*")) }) {

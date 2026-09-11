@@ -34,6 +34,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // Two flavors of the *same app*, from the same commit, same version
@@ -149,8 +150,18 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+
+    // Instrumented tests (spec item 4.8's Android-specific test coverage
+    // gap): real Compose semantics-tree interaction against the actual
+    // MainActivity, running on a real device/emulator — not adb/
+    // uiautomator pixel-coordinate taps, which this project's own
+    // PROGRESS.md records losing real time to (a field's on-screen
+    // position shifting once the keyboard covers part of the layout).
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 // ---- vaultcore UniFFI Kotlin bindings: generated, never checked in ----

@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -44,7 +45,11 @@ fun CreateKeyScreen(navController: NavHostController, viewModel: AppViewModel, s
     Scaffold { padding ->
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.createkey_title))
-            OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text(stringResource(R.string.createkey_label_field)) })
+            OutlinedTextField(
+                value = label, onValueChange = { label = it },
+                label = { Text(stringResource(R.string.createkey_label_field)) },
+                modifier = Modifier.testTag(TestTags.CREATE_KEY_LABEL),
+            )
             OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(stringResource(R.string.createkey_description_field)) })
             OutlinedTextField(value = resource, onValueChange = { resource = it }, label = { Text(stringResource(R.string.createkey_resource_field)) })
             OutlinedTextField(value = tags, onValueChange = { tags = it }, label = { Text(stringResource(R.string.createkey_tags_field)) })
@@ -62,31 +67,36 @@ fun CreateKeyScreen(navController: NavHostController, viewModel: AppViewModel, s
                 value = passphrase, onValueChange = { passphrase = it },
                 label = { Text(stringResource(R.string.createkey_passphrase_field)) },
                 visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.testTag(TestTags.CREATE_KEY_PASSPHRASE),
             )
             Text(stringResource(R.string.createkey_passphrase_explanation))
             OutlinedTextField(
                 value = confirmPassphrase, onValueChange = { confirmPassphrase = it },
                 label = { Text(stringResource(R.string.createkey_confirm_passphrase_field)) },
                 visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.testTag(TestTags.CREATE_KEY_CONFIRM_PASSPHRASE),
             )
             if (mismatch) Text(stringResource(R.string.common_passphrases_dont_match))
             if (state.error != null) Text(state.error)
 
-            Button(onClick = {
-                if (passphrase != confirmPassphrase) {
-                    mismatch = true
-                    return@Button
-                }
-                mismatch = false
-                val compartmentId = state.selectedCompartmentId ?: return@Button
-                viewModel.createKey(
-                    compartmentId,
-                    if (ed25519) "ed25519" else "ecdsa-p256",
-                    label, description, resource,
-                    tags.split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                    passphrase,
-                ) { navController.popBackStack() }
-            }) {
+            Button(
+                onClick = {
+                    if (passphrase != confirmPassphrase) {
+                        mismatch = true
+                        return@Button
+                    }
+                    mismatch = false
+                    val compartmentId = state.selectedCompartmentId ?: return@Button
+                    viewModel.createKey(
+                        compartmentId,
+                        if (ed25519) "ed25519" else "ecdsa-p256",
+                        label, description, resource,
+                        tags.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+                        passphrase,
+                    ) { navController.popBackStack() }
+                },
+                modifier = Modifier.testTag(TestTags.CREATE_KEY_SUBMIT),
+            ) {
                 Text(stringResource(R.string.createkey_create_button))
             }
         }

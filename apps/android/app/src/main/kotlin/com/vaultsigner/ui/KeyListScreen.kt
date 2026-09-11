@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavHostController
 import com.vaultsigner.R
@@ -44,9 +45,12 @@ fun KeyListScreen(navController: NavHostController, viewModel: AppViewModel, sta
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.keylist_default_title)) },
+                title = { Text(stringResource(R.string.keylist_default_title), modifier = Modifier.testTag(TestTags.KEY_LIST_TITLE)) },
                 actions = {
-                    IconButton(onClick = { navController.navigate(Routes.CREATE_KEY) }) {
+                    IconButton(
+                        onClick = { navController.navigate(Routes.CREATE_KEY) },
+                        modifier = Modifier.testTag(TestTags.KEY_LIST_NEW_KEY_BUTTON),
+                    ) {
                         Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.keylist_new_key_button))
                     }
                     IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
@@ -69,7 +73,10 @@ fun KeyListScreen(navController: NavHostController, viewModel: AppViewModel, sta
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize()) {
             if (state.keys.isEmpty()) {
-                Text(stringResource(R.string.keylist_no_keys_combined), modifier = Modifier.fillMaxSize())
+                Text(
+                    stringResource(R.string.keylist_no_keys_combined),
+                    modifier = Modifier.fillMaxSize().testTag(TestTags.KEY_LIST_NO_KEYS_TEXT),
+                )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(state.keys) { key ->

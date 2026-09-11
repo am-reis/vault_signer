@@ -10,6 +10,7 @@ A portable, compact, multi-platform cryptographic signer.
 - [Protocol Integration](docs/protocol-integration/README.md) — for developers building an app that asks VaultSigner to sign something.
   - [macOS specifics](apps/macos/docs/protocol-integration.md)
   - [Windows specifics](apps/windows/docs/protocol-integration.md)
+  - [Formal protocol specification](docs/protocol-integration/PROTOCOL-SPEC.md) — the normative wire-format reference.
 
 ## Reference
 

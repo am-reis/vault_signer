@@ -297,11 +297,12 @@ Phase 1.
 
 ## Phase 2 — macOS (first fully shipped platform)
 
-In progress. See spec §12 for the full item list (2.1–2.10) and
-`apps/macos/README.md` for the detailed per-item status this section
-summarizes — that file is the one to keep current as this phase
-continues, since it also covers macOS-specific setup that doesn't belong
-here.
+Functionally complete through item 2.11, blocked past that on Apple
+Developer Program signing (2.7's live interop). See spec §12 for the full
+item list (2.1–2.11, plus 2.12–2.14 tracked as 8.5/8.6 below rather than
+here) and `apps/macos/README.md` for macOS-specific setup — this section
+is the detailed, kept-current record; that file carries only a summary
+and points back here for anything more.
 
 - [x] 2.1 SwiftUI management UI. **Done, interactively verified for the
       core flow.** Real `Vault`-backed screens (create/open vault,

@@ -1,0 +1,119 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>VaultSignerUI</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x86;x64;ARM64</Platforms>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString().ToLowerInvariant())</RuntimeIdentifier>
+    <PublishProfile Condition="Exists('Properties\PublishProfiles\win-$(Platform).pubxml')">win-$(Platform).pubxml</PublishProfile>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Same reasoning as VaultSignerAgent.csproj: the generated UniFFI
+         bindings use unsafe pointer code for buffer marshalling. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Real, hit-for-real deployment issue: running this unpackaged
+         (bin\...\VaultSignerUI.exe directly, or `dotnet run`) against
+         the system-installed Windows App Runtime failed every time
+         with `COMException 0x80040154 Class not registered` at
+         DeploymentInitializeOptions/AutoInitialize, regardless of
+         installing the exact matching windowsappruntimeinstall-x64.exe
+         (1.8.260317003) or enabling Developer Mode; neither fixed it.
+         Self-contained deployment bundles the Windows App SDK runtime
+         directly into the app's own output folder and uses
+         registration-free WinRT activation instead of relying on any
+         system-wide COM/MSIX registration, which sidesteps this
+         failure mode entirely rather than chasing the actual root
+         cause further. -->
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The UI links the generated bindings only for their plain data
+         shapes (KeyInfo, FacadeKeyType, CompartmentInfo, ...) — never
+         to open a Vault or call any cryptographic method directly.
+         Every real mutation goes through ManagementClient's named-pipe
+         call to VaultSignerAgent (spec §8). Mirrors how
+         apps/macos/VaultSigner (the UI target, not the agent) also
+         links vaultcore's Swift bindings for the same reason. Not
+         checked in, same as VaultSignerAgent.csproj. -->
+    <Compile Include="..\..\Generated\vaultcore.cs" Condition="Exists('..\..\Generated\vaultcore.cs')" />
+  </ItemGroup>
+
+  <Target Name="CopyVaultcoreNativeLib" AfterTargets="Build">
+    <!-- Copied even though the UI never calls into vaultcore's real
+         crypto: the generated bindings' static initializers register
+         UniFFI callback vtables at class-load time (see
+         _UniFFILib's static constructor in Generated/vaultcore.cs),
+         which P/Invokes into vaultcore.dll as soon as any generated
+         type is touched — not yet confirmed whether a plain enum
+         reference alone triggers this, but copying the DLL here costs
+         nothing and avoids finding out via a DllNotFoundException. -->
+    <ItemGroup>
+      <VaultcoreDll Include="..\..\..\..\target\release\vaultcore.dll" Condition="Exists('..\..\..\..\target\release\vaultcore.dll')" />
+      <VaultcoreDll Include="..\..\..\..\target\debug\vaultcore.dll" Condition="!Exists('..\..\..\..\target\release\vaultcore.dll') AND Exists('..\..\..\..\target\debug\vaultcore.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(VaultcoreDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(VaultcoreDll)' != ''" />
+  </Target>
+
+  <ItemGroup>
+    <Content Include="Assets\SplashScreen.scale-200.png" />
+    <Content Include="Assets\LockScreenLogo.scale-200.png" />
+    <Content Include="Assets\Square150x150Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+    <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\AppIcon.ico" />
+    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <!--
+    Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
+    Tools extension to be activated for this project even if the Windows App SDK Nuget
+    package has not yet been restored.
+  -->
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <ProjectCapability Include="Msix"/>
+  </ItemGroup>
+
+  <!--
+    Microsoft.Windows.SDK.BuildTools.WinApp adds first-class support for
+    `dotnet run` on packaged WinUI apps: it hooks the .NET CLI Run target to
+    register a debug identity via the winapp CLI and launch the app with
+    package identity (AUMID).
+    Set <EnableWinAppRunSupport>false</EnableWinAppRunSupport> in a
+    <PropertyGroup> above to opt out.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.3.1" />
+  </ItemGroup>
+
+  <!--
+    Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
+    Explorer "Package and Publish" context menu entry to be enabled for this project even if
+    the Windows App SDK Nuget package has not yet been restored.
+  -->
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+
+  <!-- Publish Properties -->
+  <PropertyGroup>
+    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
+    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
+    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+  </PropertyGroup>
+</Project>

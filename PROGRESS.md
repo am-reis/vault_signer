@@ -764,7 +764,1567 @@ and points back here for anything more.
 
 ## Phase 3 — Windows
 
-Not started.
+**This intro paragraph is the oldest text in this phase's section,
+written before any real Windows-side work happened — kept below for
+history, but it is no longer an accurate status summary.** For current
+status, read the session checkpoints further down in date order (each
+is a real, dated snapshot of what was actually verified when), or the
+condensed item-by-item status right before this phase's final
+checkpoint entry. Short version as of the most recent checkpoint: the
+core app is real and working (management UI, background agent, named
+pipe protocol, vault/key/compartment lifecycle, export/import/merge/
+backup, screen-capture blocking); still open are FIDO2 registration
+(3.4), a Settings screen, and the Phase 10 test/fuzz suite (3.8).
+
+Initial groundwork done and verified from macOS ahead of the actual
+Windows-side work, since the implementation itself needs a Windows
+machine this repo wasn't developed on. See `apps/windows/README.md` for
+the full detail; summary here:
+
+- **Confirmed uniffi (vaultcore's own dependency) does not generate C#
+  bindings** — `uniffi-bindgen generate --help` lists only
+  kotlin/swift/python/ruby. Installed and verified the separate
+  community tool `uniffi-bindgen-cs` (pinned to v0.10.0+v0.29.4,
+  matching vaultcore's exact uniffi 0.29.5), confirmed it supports
+  library mode (reads the compiled cdylib directly — no `.udl` file
+  needed, consistent with how every other platform uses vaultcore),
+  and generated a real, complete `vaultcore.cs` from vaultcore's actual
+  compiled library.
+- **Found and documented a real, non-obvious blocker**: the generated
+  C# uses C# 12 collection-expression syntax (`return [];`), which
+  fails to compile under the .NET 7 SDK (the only one available on
+  this Mac) with `error CS1525: Invalid expression term '['` —
+  confirmed by actually trying it, not assumed. **The Windows machine
+  needs .NET 8 SDK or newer**, not just "a recent .NET." This is now
+  documented as a hard prerequisite in `apps/windows/README.md` instead
+  of being discovered as a surprise later.
+- Added `apps/windows/Scripts/generate-csharp-bindings.ps1` (PowerShell,
+  since that's what actually runs on the target machine — mirrors
+  `apps/macos/Scripts/generate-bindings.sh`'s role).
+- Fixed a real, pre-existing inaccuracy found while checking this:
+  `vaultcore/src/bin/uniffi_bindgen.rs`'s own doc comment claimed C#
+  and Python support that was never actually true for C# (Python is
+  real; C# was always going to need the separate tool above).
+- **Explicitly not attempted, and said so plainly in
+  `apps/windows/README.md`** rather than guessed at: cross-compiling
+  vaultcore itself for `x86_64-pc-windows-msvc`, and anything about
+  WinUI 3, the Windows Service, DPAPI auto-unlock, or WebAuthn
+  plugin-authenticator registration (spec §6.2) — all of that needs a
+  real Windows machine.
+- Created the `platform/windows` branch (from `shared`, per
+  `CLAUDE.md`'s branch model) as the starting point for that work.
+- **QEMU Windows VM host environment now actually provisioned** on the
+  real target Debian server (not just written up): `libtpms`/`swtpm`
+  built from source (bullseye never packaged either — a real gap the
+  original guide's "Debian 11's ... swtpm ... packages are old but
+  fully adequate" claim got wrong, now corrected), VM disk + per-VM
+  OVMF vars + TPM state dir created, and `start-tpm.sh`/`install.sh`/
+  `run.sh` scripts ready to go. See `apps/windows/docs/qemu-vm-setup.md`
+  for the full detail, including the exact path deviation (disk-space-
+  driven: the VM lives on this server's `/home/blackshark/backup`
+  spinning disk, not `/`). **Not done yet**: the Windows 11 ISO itself
+  and the actual (interactive, VNC-driven) OS install — left for a
+  human, since installer GUI interaction isn't something this session
+  can drive.
+
+### Session checkpoint (this entry): first real work from an actual Windows machine
+
+Done on a real Windows 11 laptop (not the QEMU VM above — a different,
+already-available physical machine), explicitly **not** the project's
+main Windows dev machine and not intended to keep the checkout — the
+point of this session was to do the steps that need a real Windows
+environment, verify them for real, and push. Stopped mid-session (disk
+space, below) with a clear resume point rather than pushing on and
+risking unverified work.
+
+**Verified, real, and pushed (on `shared`, not this branch — see that
+branch's own PROGRESS.md entry for item 1.6):** vaultcore builds clean
+for `x86_64-pc-windows-msvc` and all 117 tests pass, including the new
+`VirtualLock`-based memory-locking fix for the retention cache. This
+closes the very first unchecked box in this file's "Getting started"
+step 3 above — genuinely done now, not just documented as a plan.
+
+**Written this session, on this branch, but NOT YET COMPILED/VERIFIED**
+(uniffi-bindgen-cs was never run — see the disk-space blocker below —
+so `Generated/vaultcore.cs` doesn't exist yet and nothing here has
+actually built against it): `apps/windows/VaultSignerAgent/` (C#, .NET
+8) and the start of `apps/windows/VaultSignerUI/` (WinUI 3). Treat
+everything below as "written against the Rust source and the macOS
+Swift equivalent's proven shape, not yet build-verified" — the exact
+opposite of how the rest of this file reports progress, flagged
+explicitly because of that.
+
+- **`VaultSignerAgent`** (spec item 3.3, and item 3.3's DPAPI
+  disclosure): named-pipe transport (`AgentServer.cs`) with the same
+  newline-delimited-JSON framing and `internal.*`/`vaultsigner.*`
+  method-namespace split as macOS's `AgentServer.swift`;
+  `ManagementHandlers.cs` covers vault/compartment/key lifecycle and
+  auto-unlock (mirrors macOS's Phase 2 item 2.1 core) — **export/
+  import/merge (macOS's 2.3-2.5) intentionally not ported yet**, to
+  keep this session's surface small enough to actually verify rather
+  than guess at in bulk; `DpapiAutoUnlockStore.cs` (DPAPI
+  `CurrentUser`-scope, with the exact spec §8 disclosure written into
+  its doc comment, not just implied); `WinFormsPassphrasePrompter.cs`
+  (real modal dialog + `SetWindowDisplayAffinity` screen-capture
+  blocking, spec item 3.2); `AutostartManager.cs` (HKCU `Run` key, off
+  by default).
+  **Real architecture finding, not in the spec's own wording**: spec
+  item 3.3 says "Windows Service," but a real SCM-managed Windows
+  Service runs in Session 0 with no desktop access and cannot show the
+  interactive passphrase prompt spec §7/§8 require — Session 0
+  isolation, not a workaround-able limitation. macOS's own "background
+  service" is actually a **per-user `launchd` agent**, not a system
+  daemon, specifically so it can show a real `NSAlert`. This is
+  implemented as the direct Windows equivalent of that: a per-user
+  background process started at logon in the interactive session (see
+  `AgentServer.cs`'s doc comment), not an SCM service — DPAPI
+  `CurrentUser` scope only makes sense paired with this model too.
+  **`PeerAuthentication.cs` is honestly weaker than macOS's**: macOS
+  validates the caller's real code signature; this checks the caller's
+  resolved executable path against `VaultSignerUI.exe`'s expected
+  install location, which stops accidental callers but not a
+  deliberately malicious co-resident process — a real gap, not silently
+  accepted (see the file's own doc comment for what closing it would
+  need: a real code-signing certificate, not yet researched for
+  Windows the way macOS's Apple Developer Program requirement was).
+- **`VaultSignerUI`**: scaffolded via the official
+  `Microsoft.WindowsAppSDK.WinUI.CSharp.Templates` `winui` template
+  (not hand-rolled — `dotnet new search winui` found the real package
+  after `Microsoft.WindowsAppSDK.ProjectTemplates`, the first guess,
+  turned out not to exist). **NuGet restore did not finish** (disk
+  space, below) — the template's own generated files exist on disk but
+  nothing has been customized yet: no screens, no `ManagementClient`
+  wired up. This is a scaffold checkpoint, not a started UI.
+- **Real, non-obvious environment problems found and fixed on this
+  machine** (worth keeping in mind for whoever next sets up a Windows
+  box for this project): (1) this machine's `NuGet.Config` at
+  `%APPDATA%\NuGet\NuGet.Config` was a bare `<configuration />` with no
+  `<packageSources>` at all — not "using defaults," genuinely zero
+  sources, which fails every `dotnet new`/`restore` with "No NuGet
+  sources are defined" until `nuget.org` is added back explicitly
+  (`dotnet nuget add source https://api.nuget.org/v3/index.json --name
+  nuget.org`) — fixed. (2) `Microsoft.WindowsAppSDK.ProjectTemplates` is
+  not a real package name despite being a natural guess; the real one
+  is `Microsoft.WindowsAppSDK.WinUI.CSharp.Templates`, found via
+  `dotnet new search winui` rather than assumed.
+- **Disk space: the actual reason this session stopped.** This
+  machine's `C:` drive was already down to 5.1GB free before any of
+  this session's installs. Installing the MSVC C++ Build Tools (needed
+  for both Rust's `x86_64-pc-windows-msvc` linker and, it turned out,
+  not actually needed by the WinUI 3 restore itself) was redirected to
+  `D:` explicitly (`--installPath D:\VSBuildTools`, `$env:TEMP` also
+  redirected to `D:\VSTemp` for that install) specifically to avoid
+  this — but Visual Studio's installer still leaves some shared-
+  component footprint on `C:` regardless of `--installPath`, and the
+  subsequent `dotnet new winui` NuGet restore (defaults to
+  `%userprofile%\.nuget\packages` on `C:`, ~1.5GB+ for the Windows App
+  SDK alone) pushed `C:` to **0 bytes free** mid-restore, failing with
+  `There is not enough space on the disk` on
+  `Microsoft.WindowsAppSDK.Runtime.2.4.0`. Fixed the immediate crisis
+  by clearing this session's own installer/package caches (~1.6GB:
+  VS's `Package Cache`, NuGet's `v3-cache`/`plugins-cache`, stale
+  `%TEMP%` installer leftovers) and setting `NUGET_PACKAGES=D:\nuget-
+  packages` (user env var, persists) so future restores land on `D:`
+  instead — but that only recovered ~0.83GB free, not enough headroom
+  to safely finish the WinUI 3 restore or install `uniffi-bindgen-cs`
+  (another `cargo install`, more disk). The user (personal laptop, not
+  a disposable test machine) chose to stop for the day rather than
+  either clear the two big pre-existing consumers found
+  (`C:\Windows\Installer` at 15.64GB — MSI cache, not safely rm-able
+  directly — and `C:\Windows\SoftwareDistribution` at 4.32GB — Windows
+  Update's download cache, safe to clear) or push further on 0.83GB of
+  headroom.
+- **Also unresolved, found while trying to push this branch and
+  `shared`**: this machine's git credential manager (`manager-core`)
+  rejected with "Invalid username or token. Password authentication is
+  not supported for Git operations" — stored GitHub credentials on this
+  machine are stale/invalid. Needs the user to re-authenticate
+  interactively (this session did not attempt to work around it, since
+  that needs the user's own browser-based login). **As of this
+  checkpoint, this session's commits are local-only on both `shared`
+  and `platform/windows` — not yet pushed to `origin`.**
+
+### Session checkpoint (this entry): VaultSignerAgent compiles clean against real bindings
+
+Done on a dedicated QEMU test VM (Windows 11, installed fresh onto a
+physical SSD passed through to the VM directly — see
+`apps/windows/docs/qemu-vm-setup.md` — not the personal laptop from the
+previous entry). Picked up exactly at that entry's resume steps 3–4;
+steps 1–2 (disk space, git re-auth) didn't apply here since this VM's
+disk is dedicated and empty, and this session's own git identity was
+set up fresh (SSH deploy key, not the credential-manager path that
+blocked the personal laptop).
+
+**Verified, real, and now pushed:**
+- `cargo install uniffi-bindgen-cs --git https://github.com/NordSecurity/uniffi-bindgen-cs --tag v0.10.0+v0.29.4`
+  and `apps/windows/Scripts/generate-csharp-bindings.ps1` both run
+  clean, producing a real `Generated/vaultcore.cs` (163KB) from
+  vaultcore's actual compiled `uniffi`-feature build.
+- **`VaultSignerAgent` now builds with 0 errors, 0 warnings** against
+  those real bindings — the previous entry's guessed
+  method/type/property names needed several real, mechanical fixes
+  (below), now confirmed correct rather than assumed.
+- vaultcore's own build+test suite re-verified on this machine too
+  (113 passed, 0 failed, 1 intentionally ignored), independent of the
+  personal-laptop session's earlier confirmation — a second real data
+  point on a different machine.
+
+**Real bugs found and fixed, not guessed at:**
+- `generate-csharp-bindings.ps1` itself had a latent bug: `uniffi-
+  bindgen-cs --library` runs `cargo metadata` internally, resolved
+  from the **current working directory**, not from the dylib's path.
+  Running the script from outside the repo tree failed with "could not
+  find `Cargo.toml`" even though the dylib built fine. Fixed by
+  `Push-Location`ing into `vaultcore/` before that specific call.
+- **Namespace mismatch**: the hand-written C# assumed `VaultSigner.Core`;
+  the real generated namespace is `uniffi.vaultcore`. One-line fix,
+  four files (`AgentServer.cs`, `ManagementHandlers.cs`, `Program.cs`,
+  `WinFormsPassphrasePrompter.cs`).
+- **Exception type**: assumed `VaultException`; the real generated type
+  is `FacadeException` (matching the `Facade`-prefixed naming already
+  correctly guessed for `FacadeKeyType`/`FacadePurpose`/
+  `FacadeDeviceProfile`). Fixed in `ManagementHandlers.cs`, `Program.cs`.
+- **Callback interface name**: assumed `IPassphrasePrompter` (C#
+  convention); the real generated interface is `PassphrasePrompter`, no
+  `I` prefix (uniffi-bindgen-cs doesn't apply C# naming conventions to
+  Rust trait names). One-line fix in `WinFormsPassphrasePrompter.cs`;
+  the method signature itself (`string? Prompt(string, string)`) was
+  already exactly right.
+- **`CompartmentInfo`/`KeyInfo` field casing**: these are C# `record`s
+  with positional-parameter properties, which take the **exact
+  parameter name given** — uniffi-bindgen-cs emits camelCase parameter
+  names (`@compartmentId`, `@label`, ...), so the real properties are
+  `compartmentId`/`label`/`unlocked`/etc., not the PascalCase
+  `CompartmentId`/`Label`/`Unlocked` that would be conventional
+  hand-written C#. Fixed every access site in `ManagementHandlers.cs`.
+- **`ListCompartments()`/`ListKeys()` return plain arrays**
+  (`CompartmentInfo[]`/`KeyInfo[]`), not `List<T>` — so
+  `.ConvertAll(...)` (a `List<T>` instance method) doesn't resolve the
+  way it would on a list; fixed to the static `Array.ConvertAll(array,
+  converter)` form. Same reasoning fixed a `List<string>` passed where
+  `CreateKey`'s `tags` parameter needs `string[]` — changed
+  `GetStringArray`'s return type to `string[]` directly.
+- **Missing `<AllowUnsafeBlocks>true</AllowUnsafeBlocks>`**: the
+  generated bindings use `unsafe` pointer code for buffer marshalling;
+  without this the build fails with `CS0227` at several points.
+  Genuinely missing from `VaultSignerAgent.csproj`, not something the
+  previous session could have caught without a real compile.
+- **A real `uniffi-bindgen-cs` v0.10.0+v0.29.4 codegen bug**, not a
+  vaultcore or hand-written-code issue: any Rust `Vec<Vec<u8>>` (used
+  for incoming key blobs in the not-yet-ported merge functions) emits
+  an invalid jagged-array allocation — `new byte[][(length)]`, which
+  isn't legal C# (the rank specifier lands in the wrong bracket pair).
+  Worked around with a targeted post-generation regex patch in
+  `generate-csharp-bindings.ps1` (`new byte[][(length)]` →
+  `new byte[length][]`) rather than hand-editing `Generated/`, since
+  that directory is regenerated from scratch every run. Worth reporting
+  upstream at some point; not blocking in the meantime.
+
+**Not yet done, still open:**
+- `PeerAuthentication.cs`'s path-based caller check (already documented
+  as weaker than macOS's code-signature check) — unchanged this
+  session, still a known real gap.
+- Everything below in "Exact resume steps" — `VaultSignerUI`, a real
+  named-pipe round trip test, and WebAuthn research — none of that was
+  attempted this session; this checkpoint is scoped to getting
+  `VaultSignerAgent` itself to actually compile against real bindings.
+
+### Session checkpoint (this entry): VaultSignerUI is real and functional; one serious open bug blocks reliable testing
+
+Done on the same QEMU test VM as the previous entry (`C:\dev\vault_signer`,
+`platform/windows`, machine name `DESKTOP-MK95E27`, Windows user
+`diana`). This entry exists because the session doing this work ended
+with the environment in a live, uncommitted-at-the-time state and no
+continuity into the next session — everything below is written so a
+completely fresh session, on this same Windows machine, with **no
+access to any prior conversation**, can pick up correctly. Read this
+whole entry before doing anything.
+
+**Verified, real, and pushed this session:**
+- **`ManagementClient.cs`** (new, `apps/windows/VaultSignerUI/VaultSignerUI/`):
+  full named-pipe JSON-RPC client mirroring
+  `apps/macos/Shared/ManagementClient.swift`, covering the same core
+  surface `ManagementHandlers.cs` implements (vault/compartment/key
+  lifecycle, auto-unlock). Compiled clean on the first real attempt.
+- **`MainPage.xaml`/`MainPage.xaml.cs`**: a real, working UI — one
+  scrollable page covering all of macOS's four screens' functionality
+  (create/open vault, compartment unlock, key list, create key, key
+  detail, discard key) rather than separate navigated pages. This was
+  a deliberate scoping call for a first pass, not a design decision —
+  splitting into real pages later is a refactor, not new functionality.
+- **A real vault was created through the real UI and confirmed to
+  exist on disk** — `C:\Users\diana\test-vault.vsvault`, compartment
+  label `Personal`, master passphrase `test`. This is a genuine,
+  working file — reuse it (via "Open Vault") rather than recreating,
+  unless it's confirmed corrupted.
+- **`VaultSignerUI.csproj`**: added the same `Generated/vaultcore.cs`
+  compile item + native-DLL-copy target pattern `VaultSignerAgent.csproj`
+  already had (the UI links vaultcore's generated bindings only for
+  plain data types — `KeyInfo`, `FacadeKeyType`, etc. — never to touch
+  a `Vault` directly), plus `AllowUnsafeBlocks`. Also added
+  `<WindowsPackageType>None</WindowsPackageType>` +
+  `<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>` —
+  **this was a real, hard-won fix**: running the UI unpackaged against
+  the system-installed Windows App Runtime failed every time with
+  `COMException 0x80040154 Class not registered` (at
+  `DeploymentManagerCS.AutoInitialize`) or, after installing the exact
+  matching runtime version, a native crash in `Microsoft.UI.Xaml.dll`
+  (`0xC000027B`, WinRT's generic "stowed exception" code — not
+  specific enough to diagnose from the code alone). Self-contained
+  deployment (bundles the Windows App SDK runtime into the app's own
+  output folder, uses registration-free WinRT) fixed it — **but this
+  was only ever confirmed working when launched from the real
+  interactive session** (see the environment note below); every test
+  of it from a non-interactive context showed the same crash, which
+  turned out to be a red herring caused by that context lacking any
+  display/GPU access at all, not the self-contained fix being wrong.
+- **`AgentServer.cs`**: fixed a real, previously-undiscovered bug —
+  `JsonSerializer.Deserialize<RawRequest>` used default case-*sensitive*
+  matching, but `RawRequest`'s properties are PascalCase
+  (`Method`/`Params`/`Id`) while every real client, including this
+  session's own `ManagementClient.cs` and the documented wire protocol
+  (`docs/protocol-integration/README.md`), sends lowercase JSON keys.
+  This meant **every single request had always failed** with
+  `parse_error: missing method` — the whole `internal.*`/`vaultsigner.*`
+  surface had never actually been reachable by any real client before
+  this session found it. Fixed with
+  `PropertyNameCaseInsensitive = true`.
+- **`PeerAuthentication.cs`**: added a `#if DEBUG` bypass around the
+  path-based caller check, mirroring
+  `PeerAuthentication.swift`'s own already-established pattern. The
+  path check assumes a packaged install (`VaultSignerUI.exe` sitting
+  next to `VaultSignerAgent.exe`), which a dev build never has — each
+  project builds to its own separate `bin/` folder. Without this, every
+  `internal.*` call from a Debug UI build was rejected with
+  `unauthorized_caller`, confirmed by hitting it for real.
+- `generate-csharp-bindings.ps1`: fixed a real `Push-Location`-into-
+  `vaultcore/`-before-calling-`uniffi-bindgen-cs` bug (it runs
+  `cargo metadata` internally, resolved from CWD, not from the dylib
+  path) and added a documented regex patch for a real
+  `uniffi-bindgen-cs` v0.10.0+v0.29.4 codegen bug (`Vec<Vec<u8>>`
+  produces invalid `new byte[][(length)]` instead of
+  `new byte[length][]`).
+- vaultcore re-verified independently on this VM: builds clean,
+  113/113 tests pass.
+
+**The one serious, NOT YET RESOLVED bug: `VaultSignerAgent.exe` dies
+unpredictably, with zero trace.** This is the actual blocker, and
+whoever picks this up should treat it as the top priority — nothing
+else can be reliably tested until it's understood.
+
+Symptoms: the UI (or a raw named-pipe test) intermittently reports
+`VaultSignerAgent isn't running` even though `Get-Process
+-Name VaultSignerAgent` shows it alive. Checking
+`[System.IO.Directory]::GetFiles('\\.\pipe\')` for `VaultSignerAgent`
+at that moment shows **no listening pipe at all**, despite the process
+existing. There is no crash: `Get-WinEvent` (both the generic
+Application log, id 1000, and the full `.NET Runtime` provider) shows
+nothing for these incidents, and Windows Defender's own history
+(`Get-MpThreatDetection`, the Defender Operational log) shows no
+detections either. The process is not crashing — something is either
+killing it cleanly with no trace, or (less likely, given
+`AgentServer`'s 4 concurrent `AcceptLoopAsync` loops) all 4 named-pipe
+listener instances are somehow getting stuck simultaneously.
+
+**One real, already-fixed contributing cause, ruled out but worth
+knowing about:** earlier in this session, *multiple* `VaultSignerAgent`
+processes ended up running simultaneously (each `Start-Process` call
+left the previous instance running instead of replacing it), all
+listening on the same pipe name with independent, inconsistent
+in-memory vault state — a request would land on whichever instance
+happened to accept next. **Always run
+`Get-Process -Name VaultSignerAgent` and kill any existing instance
+before starting a new one** — this is necessary but was not
+sufficient; the disappearing-pipe symptom recurred even with
+confirmed-single instances.
+
+**A real, controlled test that isolated part of the mechanism** (done
+from an SSH connection, not the interactive session — see the
+environment note below for why that distinction matters less here
+than it does for GUI rendering): launching `VaultSignerAgent.exe` via
+`Start-Process` from a short-lived PowerShell process (one that exits
+right after issuing the command, e.g. a single non-interactive
+`ssh host "powershell -Command '...'"` invocation) reliably let the
+agent die within moments of that launching PowerShell process exiting
+— no crash log, process just gone. Keeping the *launching* PowerShell
+process alive indefinitely (via a `while ($true) { Start-Sleep 5; ... }`
+loop in the same script, checked repeatedly over 20+ seconds) let the
+*same* agent process and its pipe survive the whole time without
+issue. This strongly suggests a **Job Object tying the child process's
+lifetime to whatever process launched it** — a real, known Windows/
+PowerShell behavior, not unique to this project's code.
+
+**What's NOT yet confirmed**: whether this same mechanism explains the
+failures seen from the user's own single, continuously-open
+interactive PowerShell window (as opposed to a short-lived scripted
+launch) — that window never closed, yet the agent still seemed to die
+between UI interactions. It's possible the zombie-process confusion
+above was the *entire* explanation for those specific incidents and
+this is a separate, second issue; it's also possible interactive
+PowerShell/Windows Terminal sessions have their own, different
+job-object association per command that also triggers this. **Do not
+assume either way — verify first**, with the isolated test below.
+
+**Exact resume steps, next session, in order:**
+
+1. **First, isolate the real mechanism before touching any code.**
+   From a single, freshly-opened PowerShell window (not reused, not
+   via SSH), run exactly:
+   ```
+   Get-Process -Name VaultSignerAgent -ErrorAction SilentlyContinue | Stop-Process -Force
+   Start-Process "C:\dev\vault_signer\apps\windows\VaultSignerAgent\bin\Debug\net8.0-windows\VaultSignerAgent.exe"
+   [System.IO.Directory]::GetFiles('\\.\pipe\') | Select-String VaultSigner
+   ```
+   Run that last line again every 15-30 seconds for a few minutes,
+   *without* running any other command in between, and watch whether
+   the pipe stays present or disappears. This settles the open
+   question above. If it disappears even with nothing else happening
+   in that window, the Job Object theory extends to interactive use
+   too, and the real fix needs research into one of:
+   (a) a Task Scheduler task with an interactive-session trigger (this
+   session tried `/SC ONCE /IT /RU diana` — it ran, but landed in a
+   *different* session ID than the interactive desktop, so its window
+   wasn't visible; needs more investigation, possibly `/SC ONLOGON`
+   matching the real eventual `AutostartManager.cs` deployment path,
+   tested at an actual fresh logon rather than on-demand);
+   (b) explicitly breaking the child out of its parent's Job Object at
+   creation time (there is a real Win32 mechanism for this —
+   `CREATE_BREAKAWAY_FROM_JOB` — research whether it's reachable from
+   `Process.Start`/`ProcessStartInfo` in .NET, or whether it needs a
+   native `CreateProcess` call);
+   (c) accepting this as a known dev-environment-only quirk (real
+   deployment uses an HKCU Run-key at logon, a fundamentally different
+   launch path than any of this session's manual testing) and treating
+   the *actual* deployment mechanism, not manual `Start-Process`
+   testing, as the thing that needs to work — in which case, test via
+   `AutostartManager`'s own registration instead of manual launches.
+2. Once the agent reliably stays up, retry the real flow: launch
+   `VaultSignerAgent.exe`, then `VaultSignerUI.exe`
+   (`apps\windows\VaultSignerUI\VaultSignerUI\bin\Debug\net8.0-windows10.0.26100.0\win-x64\VaultSignerUI.exe`),
+   click **Open Vault** with path `C:\Users\diana\test-vault.vsvault`
+   (already exists, passphrase `test`), unlock the `Personal`
+   compartment, create a key, confirm it lists and shows detail
+   correctly.
+3. Run a real `vaultsigner.sign` round trip (spec item 3.6) — this
+   will trigger `WinFormsPassphrasePrompter`'s real dialog; confirm it
+   renders correctly (it uses plain WinForms, not WinUI3/
+   DirectComposition, so it may not be affected by the same rendering
+   path the UI's earlier crash was, but this has not been separately
+   confirmed) and that answering it returns a real signature.
+4. Item 3.4 (WebAuthn plugin-authenticator COM registration) —
+   research only so far; do not register anything system-wide without
+   the user's explicit sign-off.
+
+**Environment notes for whoever resumes:**
+- GUI rendering (any window, any dialog) only works when the process
+  is launched from within the actual interactive logon session — a
+  process launched via SSH, or via a Task Scheduler task without the
+  right session targeting, runs in a different, non-interactive
+  session (confirmed via `[System.Diagnostics.Process]::GetCurrentProcess().SessionId`
+  — SSH-launched processes on this box landed in session 0; the real
+  interactive desktop was session 3 at last check, but this number can
+  change across logons). This is why several of this session's
+  earlier diagnostic crashes (the WinUI3 `Class not registered`/
+  `0xC000027B` errors) turned out to be partly artifacts of testing
+  from the wrong session, not purely code bugs — though the
+  self-contained-deployment fix was real and still needed.
+- A `.gitignore`'d `apps/windows/Generated/vaultcore.cs` must exist
+  before either project builds — regenerate it with
+  `apps/windows/Scripts/generate-csharp-bindings.ps1` if missing.
+- `git` on this machine authenticates to GitHub via a dedicated SSH
+  deploy key already configured (`~/.ssh/config` has a `Host github.com`
+  entry pointing at `~/.ssh/github_deploy_key`) — this should already
+  work with no further setup.
+
+### Session checkpoint (this entry): the "VaultSignerAgent isn't running" bug is root-caused and fixed
+
+Same QEMU VM as the two previous entries. **The top-priority blocker from
+the previous checkpoint is resolved** — root cause found via a real
+reproduction (not just log reading), fixed, and verified end-to-end
+through the actual UI. The earlier checkpoint's Job-Object/session
+theories were a red herring — real, useful debugging that ruled things
+out, but not the actual mechanism. Thank the user for the correction
+that redirected this session: the process was never dying: only the
+UI's own error message said so.
+
+**Root cause**: `AgentServer.AcceptLoopAsync` (`apps/windows/VaultSignerAgent/AgentServer.cs`)
+called `NamedPipeServerStreamAcl.Create(..., pipeSecurity: BuildPipeSecurity())`
+on *every* loop iteration — i.e. for every instance of the named pipe,
+not just the first. Windows only honors an ACL on the first-ever
+instance of a given pipe name; every instance created after that must
+omit the security descriptor, or `NamedPipeServerStreamAcl.Create`
+throws `System.UnauthorizedAccessException` ("Access to the path is
+denied"). That's a sibling of `IOException`, not a subclass, so the
+existing `catch (IOException)` around that call never caught it. Since
+each `AcceptLoopAsync` is launched fire-and-forget
+(`_ = Task.Run(AcceptLoopAsync)`, 4 of them, never awaited or observed),
+the escaping exception silently ended whichever loop hit it — no crash,
+no log, process stays alive, confirmed via a live `dotnet-dump` stack
+capture showing zero threads doing anything related once all 4 loops
+had died.
+
+This is exactly why it looked "idle-stable" in isolated liveness
+testing but died under real use: at most one of the 4 loops' very first
+`Create` call could ever win the race to be genuinely first; the other
+3 died on their first iteration, before any client had even connected.
+The winner survived until a client consumed its instance, then died too
+the moment it looped back to create a replacement. The pipe only went
+fully dark once all 4 original instances had each been connected-to
+exactly once — reproduced deterministically this session: a **single**
+`internal.list_compartments` call (no KDF, no vault mutation) against a
+freshly-started agent was enough to start the collapse, and it was
+fully, permanently dead (verified via
+`[System.IO.Directory]::GetFiles('\\.\pipe\')` showing no
+`VaultSignerAgent` entry at all, process still alive/responding, 0ms
+CPU) after 4 total real requests.
+
+**Fix**: `_firstPipeInstanceCreated` (an `int` guarded by
+`Interlocked.CompareExchange`) tracks which single call — across all 4
+loops, whichever wins the race — is allowed to supply the ACL via
+`NamedPipeServerStreamAcl.Create`; every other instance, from then on,
+is created via the plain `NamedPipeServerStream` constructor with no
+security descriptor. Also added (belt-and-suspenders, kept
+permanently): both `AcceptLoopAsync` and `HandleConnectionAsync` now
+catch and log any unexpected exception type instead of only the ones
+each was originally written to expect, so a *different* future edge
+case can't silently kill a fire-and-forget accept loop again with zero
+trace the way this one did.
+
+**Verified this session**, all against the real built agent (not just
+reasoning about the code):
+- 20 sequential real pipe calls: all fast (0-1ms round trip after the
+  first), zero errors.
+- An 8-way concurrent burst (PowerShell background jobs hitting the
+  pipe simultaneously): all succeeded, pipe stayed listed and
+  reachable throughout.
+- `internal.unlock_compartment` with the real `test-vault.vsvault`
+  passphrase: succeeded, `unlocked: true` confirmed by a follow-up
+  `list_compartments`.
+- **The real UI, for real** (resume step 2 from the previous
+  checkpoint): launched `VaultSignerUI.exe` against the fixed agent,
+  drove it via UI Automation (`System.Windows.Automation` — screenshots
+  of this window came back stale/blank all session, a `CopyFromScreen`-
+  vs-DirectComposition capture quirk on this VM, *not* an app rendering
+  failure; the live accessibility tree was always fully populated and
+  correct) — created a real key (`claude-test-key`, Ed25519 /
+  CustomSigning), confirmed it appeared in the key list, selected it
+  and confirmed the detail panel populated correctly (label,
+  description, a real 64-hex-char public key), then discarded it via
+  the same confirm-text flow the UI requires. Pipe stayed healthy
+  throughout the whole flow.
+- vaultcore itself was not touched — this was entirely a
+  `VaultSignerAgent`/.NET-side bug.
+
+**Resume step 3 also completed this session**: a real end-to-end
+`vaultsigner.sign` round trip. Created a second key
+(`sign-test-key`, Ed25519 / CustomSigning) directly via
+`internal.create_key`, then called `vaultsigner.sign` from a raw
+PowerShell pipe client (deliberately *not* `VaultSignerUI` — proves
+`vaultsigner.*` really is reachable by an arbitrary third-party
+caller, per spec/the protocol doc, not just the first-party UI). The
+call blocks correctly until answered: `WinFormsPassphrasePrompter`'s
+real dialog appeared (found by window title via `EnumWindows`,
+confirmed visible on-screen by the user, not just detected
+programmatically), correctly named the *real* calling process —
+"`powershell.exe` wants to sign with a VaultSigner key" — not
+anything from the request itself, matching spec's requirement that
+the shown identity come from OS-level process identity. Answered it
+for real via UI Automation (`ValuePattern.SetValue` on the passphrase
+field, `InvokePattern.Invoke()` on Allow) rather than skipping/mocking
+it. Got back a real signature: `signature_b64` decodes to 64 bytes
+(a raw Ed25519 signature, matching the protocol doc's documented
+format), and `public_key_b64` decodes to the exact same 32 bytes
+`internal.create_key` had returned as `public_key_hex` for that key.
+Test key discarded afterward.
+
+One practical lesson from driving this: a `Start-Job` background job
+and any UI Automation interaction with what it triggers must happen
+within *one* PowerShell invocation/process — job state doesn't survive
+across separate process launches, so answering the dialog has to be
+scripted inline (poll for the window, then act on it, then
+`Wait-Job`/`Receive-Job`) rather than split across steps.
+
+**Not attempted this session**: step 4 (WebAuthn plugin-authenticator
+COM registration research) from the previous checkpoint — still open,
+research only, no system-wide registration without the user's explicit
+sign-off.
+
+The pipe fix itself (`apps/windows/VaultSignerAgent/AgentServer.cs`)
+plus this checkpoint's first half were committed on `platform/windows`
+as `7fe9efb`. The `vaultsigner.sign` verification recorded just above
+was written up after that commit and committed separately as
+`db876b5`, code-change-free — no source changed for step 3, only this
+file.
+
+### Session checkpoint (this entry): real Windows demos, and VaultSignerUI split into actual navigated pages
+
+Same VM, continuing directly from the pipe-fix session above (`7fe9efb`,
+`db876b5`, both pushed to `origin/platform/windows` this session too).
+Two more things done at the user's request:
+
+**1. Both `demos/` apps now work on Windows**, not just macOS —
+`demos/rpc-demo-client/demo_sign_client.py` (Python+Tkinter) and
+`demos/rpc-demo-nodejs/server.js` (Node, browser-based). Neither needed
+real logic changes: each already isolated its local-transport
+connection into one place (`_connect()`/`TRANSPORT_PATH` now), and that
+was the only platform-specific line — request encoding, response
+parsing, error handling, and the whole UI stayed identical, which is
+itself the point these demos exist to prove (spec §7: the wire format
+is language- *and* transport-agnostic). Windows needs no extra
+dependency for either: the Python client opens
+`\\.\pipe\VaultSignerAgent` via plain `open()` (no pywin32), and
+Node's `net.createConnection` already treats a `\\.\pipe\` path as a
+named pipe natively. Verified live: the Node demo's plumbing (page
+loads, a real `vaultsigner.list_public_keys` round trip over the pipe)
+was confirmed from this session directly; the actual
+sign-and-approve-the-real-dialog step was deliberately left for the
+user to click through themselves rather than scripted — see the
+note below.
+
+**Installing Python and Node on this VM was its own small saga**,
+worth recording since it may recur: the official python.org MSI
+installer failed repeatedly and non-deterministically (`0x80070003`,
+`ERROR_PATH_NOT_FOUND`, plus a separate `tcltk` payload verify failure
+on a different attempt) trying to read its own just-cached `core.msi`
+out of `%LOCALAPPDATA%\Package Cache` — looks like flaky disk I/O on
+this VM (matches this session's own earlier `dotnet-dump` runs taking
+18+ minutes of real CPU time over a 36MB working set for no good
+reason), not a real Python/MSI bug. Switching to the official
+no-install zip distributions (Node's "Windows Binary (.zip)"; Python
+has a "Windows embeddable package (zip)" too, though note its README
+caveat about that one excluding Tcl/Tk) sidesteps the flaky installer
+path entirely and is the more robust choice on this specific machine
+going forward.
+
+**2. `VaultSignerUI` split into real navigated pages** — the deferred
+refactor `MainPage.xaml.cs`'s own doc comment flagged from the start
+("splitting into real pages later is a refactor, not new
+functionality"). `MainPage.xaml`/`.xaml.cs` are gone; in their place,
+using `MainWindow.xaml`'s existing (previously unused for this)
+`RootFrame`:
+- `WelcomePage` — create/open vault; auto-skips itself straight to
+  `VaultHomePage` (clearing the back stack) if the agent already has a
+  vault open, so it never flashes on a normal launch.
+- `VaultHomePage` — compartment picker + inline unlock, key list. Hub
+  page: everything routes back here. Re-fetches state in
+  `OnNavigatedTo` (not just first load) so it's never stale after
+  `Frame.GoBack()` from a subpage.
+- `CreateKeyPage` — standalone create-key form, takes the compartment
+  id as its nav parameter.
+- `KeyDetailPage` — standalone detail view with the discard-key danger
+  zone, takes a new `KeyDetailNavArgs(CompartmentId, KeyInfo)` record
+  as its nav parameter (a bare `KeyInfo` isn't enough to call
+  `internal.discard_key`, which also needs the owning compartment id).
+
+Same underlying functionality as before (nothing new added or
+removed), but real per-screen navigation instead of one panel-toggling
+scroll, plus a first real visual pass: `InfoBar` for errors instead of
+a plain red `TextBlock`, a `ProgressRing` + disabled buttons during any
+in-flight call (relevant now that KDF-backed calls can genuinely take
+real time — see the pipe-fix checkpoint above), an empty-state message
+on the key list, `AccentButtonStyle` on primary actions, and simple
+`FontIcon` glyphs (Segoe Fluent Icons) on Lock All / New Key. Deliberately
+did *not* reach for a `NavigationView` shell — this flow is a linear
+drill-down (Welcome → Home → Create/Detail, with back navigation), not
+a persistent multi-section app, so the existing `Frame` back stack plus
+a plain in-page "← Back" link per subpage fits better than a sidebar
+would.
+
+Built clean (0 warnings, 0 errors) and verified live this session —
+but only the *structure*: launched the real app, confirmed
+`WelcomePage` correctly auto-redirects to `VaultHomePage` when a vault
+is already open, confirmed the real key list renders, and drove
+navigation into `KeyDetailPage` and `CreateKeyPage` and back via UI
+Automation to confirm nothing crashes and each page's controls are
+genuinely present (not just that VaultOpenPanel-style visibility
+toggling still works). **Deliberately did not evaluate whether this
+actually looks/feels better** — the user was explicit this session
+that UX judgment should come from them actually using it, not from
+automation. See the resume note directly below.
+
+**Resume note, next session or later today:** the user should
+literally open the app and click through it — Welcome → create/open →
+Home → New Key → back → click a key → Detail → back — and say what
+does and doesn't work for them. Nothing about this pass should be
+assumed "done" from a UX standpoint until that happens. If they want
+further changes (more polish, a different flow, an actual
+`NavigationView`/breadcrumb shell after all, page transition
+animations, whatever), treat this checkpoint as a first structural
+pass, not a finished redesign.
+
+### Session checkpoint (this entry): known-vaults management, export/import/backup, and screen-capture blocking
+
+Same VM, same session, continuing directly from the checkpoint above
+after the user reviewed it live and confirmed the navigation split
+"fits our goals ... fast building to matching minimal UI/UX
+expectations" — then flagged three things missing relative to spec and
+the macOS build: known-vaults management ("forget"), import/export of
+keys and whole vaults, and (separately) that vault creation shouldn't
+require typing a full path. All three are done this entry. Per the
+user's explicit instruction this session, the export/import behavior
+was implemented against **spec §5.2/5.2.1/5.2.2/5.3/5.4 read directly**
+(not inferred from the macOS app) — macOS's Swift was then cross-checked
+only for wire-format/field-name consistency (spec §5.3.6: "implemented
+once in vaultcore ... invoked identically by every platform"), and
+matched on every point checked.
+
+**1. Known vaults (spec §5.6).** `KnownVaultsStore.cs` — a new,
+UI-side-only JSON store at `%LOCALAPPDATA%\VaultSigner\known_vaults.json`
+(never touched by the agent; this is local device state, never vault
+content, per spec) — mirrors `apps/macos/Shared/KnownVaultsStore.swift`
+field-for-field. `WelcomePage` now leads with a recent-vaults list
+(most-recently-opened first, one click to open, an inline "forget"
+button, an unavailable-file warning icon), and a new `ManageVaultsPage`
+(reachable from Welcome; spec says it should also be reachable from
+Settings, but there's no Settings screen on Windows yet to add that
+second entry point to) provides add-without-opening and forget.
+
+**2. Folder-then-filename vault creation**, replacing the old raw
+path `TextBox`, per direct user request: `FilePickers.cs` wraps
+`Windows.Storage.Pickers.FolderPicker`/`FileOpenPicker`/`FileSavePicker`
+with the `WinRT.Interop.InitializeWithWindow` HWND association this
+unpackaged app needs for any picker to activate at all. Create Vault is
+now "choose a folder, type only a file name"; Open Vault, "add a known
+vault," and the file side of every export/import/backup flow below all
+use the same real native picker, matching how
+`CreateVaultView.swift`/`ImportPacketView.swift`/`ExportPacketView.swift`
+use `NSSavePanel`/`NSOpenPanel`. **Not personally click-tested this
+session** — verified to compile and (for `PickExistingFileAsync`, via
+`ManageVaultsPage`'s "Add a Known Vault…") to be reachable without a
+build error, but the actual native picker dialogs were never opened and
+clicked through by either the automation or a human this session. This
+is exactly the kind of thing the user said they want to personally
+verify — flag it as the first thing to try.
+
+**3. Export / import / merge / backup (spec §5.2-§5.4, spec item 3.1's
+"mirroring 2.1-2.5"), fully wired end-to-end** — agent, client, and UI,
+where before none of it existed on Windows at all:
+- `VaultSignerAgent/ManagementHandlers.cs`: six new `internal.*`
+  handlers (`export_packet`, `export_single_key`, `import_packet`,
+  `merge_reencrypt_discard_incoming`, `merge_side_by_side`,
+  `merge_replace_local_with_incoming`), each a direct mechanical port
+  of `ManagementHandlers.swift`'s equivalent — same method names, same
+  wire field names (`incoming_key_blobs`'s `key_id`/`blob_bytes_b64`
+  shape, `encryption`'s `{"type": ...}` discriminator, etc.) — calling
+  straight into the generated `Vault.ExportPacket`/`ImportPacket`/
+  `Merge*` bindings. No merge/export logic written here; it's
+  vaultcore's, unchanged, per spec §5.3.6.
+- `VaultSignerUI/ManagementClient.cs`: matching client-side methods,
+  decoding into the generated `ImportedPacketInfo`/`MergeOutcomeInfo`/
+  `IncomingKeyBlob`/`DuplicateWarningInfo`/`IdRemapEntry`/
+  `FacadeExportEncryption` types directly (all already present in
+  `Generated/vaultcore.cs` — no new DTOs needed).
+- `ExportKeysPage` — key selection (multi-select list), the
+  include-master-key toggle (§5.2.1), and all three §5.2.2 encryption
+  choices as three distinct, always-visible options with **no default
+  pre-selected** (exact spec UI-label wording used verbatim: "Just
+  package the keys as-is" / "Re-encrypt for the destination vault's
+  master password" / "Protect with a one-time transfer password", each
+  with its own inline password field(s) and the exact disclosure text
+  spec §5.2.2 specifies for option 1). Also serves spec §5.4's "back up
+  everything" via an `ExportPageArgs.BackupMode` flag — same page, keys
+  pre-selected and master-key-inclusion forced, mirroring
+  `ExportPacketView.swift`'s own `lockSelectionToAllKeys`/
+  `forceIncludeMasterKey` reuse rather than a separate implementation.
+- `BackupMasterKeyOnlyPage` — spec §5.4's other backup shortcut,
+  deliberately its own small page (no key list, the explicit
+  does-not-protect-anything warning is the whole point), always
+  one-time-transfer-password-protected.
+- `ImportPacketPage` — choose a `.vltpack`, decrypt the transfer layer
+  if the first attempt fails (offering the password prompt rather than
+  a raw error, exactly matching `ImportPacketView.swift`'s
+  `tryImport` fallback logic), then either merge directly (no embedded
+  master key) or hand off to:
+- `MasterKeyDualityPage` — spec §5.3's unskippable screen, shown only
+  when `ImportedPacketInfo.embeddedMasterCompartmentId` is non-null.
+  Three cards, each independently actionable (no shared radio group, so
+  nothing is pre-selectable by construction — satisfies "no default
+  pre-selected" structurally rather than by convention), option 1
+  marked "Recommended," option 3 given distinct red/warning card
+  styling and gated on typing the exact phrase `"REPLACE MY MASTER
+  KEY"` (spec's exact required phrase) plus a non-empty passphrase
+  before its button enables.
+- One architectural note worth remembering: `MasterKeyDualityPage`
+  finishes the whole import flow itself (navigates straight back to
+  `VaultHomePage`, clearing the back stack) rather than calling
+  `Frame.GoBack()` to let `ImportPacketPage` show a shared "done" step
+  — `Frame.GoBack()` recreates the target page fresh from its stored
+  nav parameter (`NavigationCacheMode` is `Disabled` by default), which
+  would have thrown away exactly the in-flight state (which step, which
+  warnings) needed to show a meaningful completion screen. Two small
+  independent "done" confirmations (one on `ImportPacketPage` for the
+  no-duality path, one on `MasterKeyDualityPage` for the duality path)
+  sidesteps this entirely rather than fighting the Frame's default
+  caching behavior.
+
+**Verified for real, not just built** — the agent-side plumbing, via
+raw named-pipe calls directly against the running (rebuilt) agent, all
+against the real `test-vault.vsvault`:
+- `export_packet` with `encryption: as_is` on a real key → real
+  `.vltpack` bytes back (confirmed a real ZIP local-file-header magic
+  number and `packet.json`/`key_blobs/*.kblob` structure matching spec
+  §4.1's archive format).
+- Importing that exact packet back into the *same* compartment, then
+  `merge_reencrypt_discard_incoming` on the result: correctly detected
+  the collision (`warnings[0].reason: "key_id"`) and **kept both,
+  renamed the incoming one** (`id_remap` to a fresh key id, confirmed
+  via `list_keys` afterward showing both `export-test-key` and
+  `export-test-key (imported)`) — spec §5.3.5's exact required default,
+  not silent overwrite.
+- `export_packet` with `include_master_key: true` and
+  `encryption: one_time_transfer_password`: import without the
+  password correctly fails; import with the correct password succeeds
+  *and* returns a non-null `embedded_master_compartment_id` +
+  `embedded_master_kdf_params_json` — precisely the condition
+  `MasterKeyDualityPage` gates on, confirmed live rather than assumed
+  from reading the code.
+- All test keys discarded afterward; the real vault's state is back to
+  just its one pre-existing `test` key.
+
+**Verified structurally (UI, via UI Automation)**: `VaultSignerUI`
+builds clean (0 warnings, 0 errors) with every new page; launched the
+real app and drove navigation through `VaultHomePage` →
+`ExportKeysPage` (confirmed all three encryption cards render with the
+exact spec copy) → back → `ImportPacketPage` → back →
+`BackupMasterKeyOnlyPage` (confirmed the exact spec warning text) →
+back → the `WelcomePage`/known-vaults auto-redirect still correctly
+fires (confirms this change didn't regress the previous checkpoint's
+navigation). **Not evaluated**: whether any of this looks or feels
+right — same deliberate boundary as the previous checkpoint, now
+extended to cover all of this entry's new screens too.
+
+**Also closed a pre-existing spec gap noticed while doing this work**:
+spec §5.0's mandatory screen-capture blocking
+(`SetWindowDisplayAffinity`/`WDA_EXCLUDEFROMCAPTURE`) existed only for
+`VaultSignerAgent`'s sign-request dialog (`WinFormsPassphrasePrompter.cs`)
+— nothing in `VaultSignerUI` had it at all, despite already having
+passphrase fields and manifest detail before this session touched
+anything. Added `ScreenCaptureProtection.cs` (same P/Invoke constants
+as the agent's existing implementation) plus an `ISensitiveScreen`
+marker interface pages opt into; `MainWindow.xaml.cs` toggles window-level
+affinity on `RootFrame.Navigated` based on whether the newly-shown page
+implements it. Applied to every page with a passphrase field or
+manifest detail: `WelcomePage`, `VaultHomePage`, `CreateKeyPage`,
+`KeyDetailPage` (all pre-existing, not touched this session before
+now), plus every new page in this entry except `ManageVaultsPage`
+(paths and filenames only, matching `ManageVaultsView.swift` not
+calling `preventsScreenCapture()` either).
+
+**Known remaining gaps, not attempted this session** (noting so they
+aren't silently forgotten):
+- Spec §5.1's "Reveal raw key" screen — `internal.reveal_raw_key_hex`
+  and `ManagementClient.RevealRawKeyHex` already exist agent/client-side
+  (from an earlier session) but no UI ever calls it. Out of scope for
+  this entry (the user's ask was known-vaults + import/export + the
+  path-picker fix specifically).
+- No Settings screen yet, so: the auto-unlock enable/disable UI
+  (`internal.enable_auto_unlock`/`disable_auto_unlock`/
+  `is_auto_unlock_enabled` already exist agent/client-side too, unused
+  by any UI), and spec §5.6's second known-vaults entry point ("also...
+  from the app's settings").
+- Single-key export (`internal.export_single_key`/
+  `ManagementClient.ExportSingleKey`, the `.vltkey` shape) has agent
+  and client methods but no UI entry point (e.g. an "Export This Key"
+  button on `KeyDetailPage`) — only the packet-export path
+  (`ExportKeysPage`) is reachable from the UI.
+- Item 3.4 (WebAuthn plugin-authenticator COM registration) — still
+  open from earlier checkpoints, research only.
+
+### Session checkpoint (this entry): standalone "add a compartment" UI
+
+Same VM, same session, immediately after the entry above. The user
+pointed out one more real gap on review: a vault can hold multiple
+independently-passphrased compartments (spec §4.1's header structure;
+"the user may have as many vaults [compartments] as they want," in
+their words — "vault" and "compartment" get used interchangeably
+day-to-day even though the spec keeps them distinct), but the only way
+to *create* one was buried inside the import master-key-duality flow's
+option 2. Checked first: **macOS doesn't have this either** —
+`internal.add_compartment`/`ManagementClient.AddCompartment` already
+existed on both platforms from earlier sessions, but grepping
+`apps/macos` turned up no call site for it outside
+`ManagementHandlers.swift`/`Shared/ManagementClient.swift` themselves.
+So this isn't a "port from macOS" — it's new product surface on top of
+an already-existing, already-tested vaultcore/agent primitive, on both
+this app's own established page-per-action pattern and (loosely)
+`CreateVaultView.swift`'s field shape.
+
+- `DeviceProfilePicker` (new, shared `UserControl`): the Desktop/Mobile
+  choice (spec §4.2 — controls Argon2id benchmark targets) that
+  `WelcomePage`'s Create Vault form was **missing** relative to
+  `CreateVaultView.swift` (which has it) — added there too while fixing
+  this, along with the confirm-passphrase field `CreateVaultView.swift`
+  also has and `WelcomePage` didn't. One control, not two copies of the
+  same picker + explanatory copy.
+- `CreateCompartmentPage` (new): label, passphrase, confirm passphrase,
+  device profile → `AddCompartment`. Reachable via a "New Compartment…"
+  link next to `VaultHomePage`'s compartment picker.
+- Verified live via raw pipe calls against the real agent:
+  `internal.add_compartment` (label "Work", real passphrase) succeeded
+  and the compartment showed up correctly in a follow-up
+  `list_compartments` (already unlocked, since its passphrase was just
+  supplied to create it) — first real exercise of this handler on
+  Windows since it was written. **Note for whoever picks up
+  `test-vault.vsvault` next**: it now has two compartments, "Personal"
+  and "Work," permanently — there's no remove-compartment operation to
+  clean this up with (compartments aren't deletable by design, only
+  individual keys are), and it's realistic state for this feature
+  anyway, so this was left as-is rather than treated as something to
+  undo.
+- Verified structurally (UI Automation): `CreateCompartmentPage`
+  navigates from `VaultHomePage` and renders all fields correctly,
+  including the shared `DeviceProfilePicker`. `WelcomePage`'s updated
+  Create Vault form was not separately re-verified live this entry
+  (the agent already has a vault open on this VM, so `WelcomePage`
+  auto-redirects before it can be reached) — the same
+  `DeviceProfilePicker` control rendering correctly on
+  `CreateCompartmentPage` is the closest live evidence for it. Worth
+  the user specifically checking Create Vault's new fields when they do
+  their hands-on pass.
+
+### Session checkpoint (this entry): a real bug fix, and the docs trio (spec §14) for the first time on this phase
+
+Same VM, same session, continuing directly from the checkpoint above.
+Two things, at the user's direct request:
+
+**1. Fixed a real bug the user found by hand**: selecting ECDSA +
+"Both" (or FIDO2) as a key's purpose in `CreateKeyPage` threw
+`vault_error: fido2 purpose requires fido2_rp_id`. Checked
+`CreateKeyView.swift` before writing a fix: macOS doesn't offer
+FIDO2/Both in its manual create-key form *at all*, by design — a
+bindable passkey needs a real relying-party ceremony
+(`Vault.handleFido2MakeCredential` supplies `rp_id`/`user_handle` from
+the live CTAP2 request), which a manual form has no way to provide.
+Removed the purpose picker entirely rather than adding rp_id/user-
+handle fields that don't belong in this flow — this manual path now
+always creates `CustomSigning` keys, matching macOS exactly. Verified
+live via UI Automation: key creation (Ed25519 and the ECDSA case that
+triggered the bug) now succeeds with no error. (`f9c4ed3`)
+
+**2. Spec §14's documentation trio, done for Windows for the first
+time** — the user asked for this explicitly, then separately asked to
+formalize it as a standing requirement for every future platform phase
+too (done first — see the `shared`-branch checkpoint this links to
+below — so this phase's own instance of the work could be checked
+against real, spec-mandated items rather than freelanced):
+
+- **Spec amendment** (on `shared`, `a60bff6`, merged into this branch
+  at `18b1819`): extended §14's already-existing "update per phase, not
+  as a single end-of-project task" mandate — previously scoped only to
+  `docs/user-guide.md` and only enforced by one Phase-8 end-of-project
+  checklist item (8.5) — to two more deliverables that had *no* spec
+  mention at all before (the per-platform protocol-integration.md
+  addendum, and rebuilding the published docs site), and added three
+  new checklist items to the end of each of Phases 2 through 6 as the
+  actual enforcement (see spec §12). Reframed 8.5 as a final cross-
+  platform consistency sweep, not the first pass.
+- **3.10 — `apps/windows/docs/protocol-integration.md` written**
+  (`005f9fa`): mirrors `apps/macos/docs/protocol-integration.md`'s
+  shape — transport (the named pipe + its owner-only ACL), discovery/
+  prerequisites, the `internal.*` boundary, FIDO2 status — with three
+  working examples (PowerShell, Python, Node.js). Verified live: the
+  PowerShell example's exact code, extracted straight from the doc file
+  and run against the real agent, returned real key data. The Node
+  example *is* `demos/rpc-demo-nodejs/server.js`'s already-verified
+  code. **The Python example was not independently re-run this
+  session** — this VM still has no working Python install (see the
+  install saga two checkpoints up); it uses the identical
+  `open()`-as-pipe-client technique already verified in
+  `demos/rpc-demo-client/`'s `_WindowsPipeConnection`, but that's
+  supporting evidence, not a live re-run. Linked from
+  `docs/protocol-integration/README.md`'s platform-guides list (shared
+  commit above).
+- **3.9 — `docs/user-guide.md` reconciled against Windows** (shared
+  commit above): the guide was already written platform-generically
+  and, after this session's work, is now mostly *accurate* for Windows
+  too, not just generic — added small `*Windows note: ...*` addenda
+  only where the app genuinely doesn't match the generic description
+  yet (no Settings screen, so no autostart/auto-unlock toggle or a
+  Settings-based "Close This Vault"; no Reveal Raw Key UI; no
+  single-key export UI) and one describing Windows's own standalone
+  "New Compartment" entry point, which — checked directly — macOS
+  doesn't have either.
+- **3.11 — docs site: prepared, not published.** `Scripts/build-docs-
+  site.sh` (shared commit above) now lists `apps/windows/README.md` and
+  `apps/windows/docs/protocol-integration.md` alongside the macOS
+  entries. **Deliberately did not run it or push `gh-pages` this
+  session** — the script itself requires running from staging, release,
+  or main (a branch with every completed platform's docs actually
+  merged in, which `platform/windows` alone is not), and pushing a
+  branch that's live-published as a public GitHub Pages site is exactly
+  the kind of action that should get the user's explicit go-ahead first
+  rather than happening as a side effect of finishing a checklist item.
+  **Also fixed first**: `apps/windows/README.md` was badly stale
+  (written before any real Windows work happened, still said "Not
+  started" and listed things as unverified that this session's own
+  checkpoints prove otherwise) — refreshed it (`005f9fa`) so it isn't
+  actively misleading whenever the site does get published.
+
+**Condensed status, spec items 3.1-3.11, as of this checkpoint** (see
+the dated checkpoints above for the verification evidence behind each):
+done — 3.1 (management UI), 3.2 (screen-capture blocking, this
+session's earlier checkpoint), 3.6 (custom protocol, verified via a
+real `vaultsigner.sign` round trip and now three more documented/
+verified examples), 3.9, 3.10. Prepared but not executed — 3.11 (script
+ready, publish step intentionally left for the user). Not started —
+3.4 (FIDO2 COM registration, research only so far), 3.5 (depends on
+3.4), 3.7 (i18n — Windows has no locale work yet at all), 3.8 (Phase 10
+test/fuzz suite). 3.3 is real (a per-user background process hosting
+the named-pipe listener and retention cache, DPAPI methods exist
+agent-side) but incomplete against its own text — no autostart/auto-
+unlock UI toggle exists yet, so treat 3.3 as partial, not done.
+
+### Session checkpoint (this entry): FIDO2 blocked on OS version; Settings screen closes out 3.3, plus the remaining minor UI gaps
+
+Same VM, same session. Two threads:
+
+**1. FIDO2 (spec item 3.4) — real research done, blocked on this VM's
+OS version, not abandoned.** At the user's request (motivated by
+wanting to avoid macOS's paid-Apple-ID gate — see Phase 2's item 2.7
+note), researched Windows's actual current third-party passkey
+registration mechanism rather than guessing from possibly-stale
+knowledge (spec §6.2 explicitly requires this: "verify the exact
+current registration APIs ... against current Microsoft documentation
+at implementation time"). Real findings:
+- It's called the **Windows passkey Plugin API** (`IPluginAuthenticator`,
+  `WebAuthNPluginAddAuthenticator` and friends) — GA since the November
+  2025 security update, not the older/vaguer `WebAuthNGetPlatformCredentialList`
+  spec's own §6.2 text names (that text may itself be dated; worth a
+  spec correction once someone actually implements this).
+- **Genuinely encouraging on the user's actual concern**: Microsoft's
+  own official sample (`microsoft/windows-classic-samples`,
+  `Samples/PasskeyManager` — real, downloadable, MIT-licensed reference
+  code) requires nothing beyond a self-generated GUID and local
+  registration to build and run. No paid developer account, no Apple-ID
+  equivalent gate found in its documented build/run steps.
+- **Real blocker found instead**: the sample's own stated OS
+  requirement is Windows 11 24H2 (build 26100.6725+) or 25H2 (build
+  26200.6725+). This VM is on build 22631 (Windows 11 23H2 — despite
+  `ProductName` in the registry confusingly still saying "Windows 10
+  Pro for Workstations"), confirmed via `[System.Environment]::OSVersion.Version`
+  and the registry directly. That's roughly a year of feature updates
+  short.
+- Also real: the sample is a **C++/WinRT, MSIX-packaged** app
+  (`Package.appxmanifest`, `App.xaml.cpp`) — a different stack from this
+  project's current pure-C#, deliberately-unpackaged `VaultSignerUI`
+  (see that project's own `WindowsAppSDKSelfContained` comment for why
+  it's unpackaged). Implementing the real thing will mean either a new
+  small packaged C++/WinRT component alongside the existing app, or
+  reworking packaging — a real design decision for whoever picks this
+  up, not a trivial add.
+- Attempted the OS upgrade this session via the official Windows 11
+  Installation Assistant (`download.microsoft.com`, verified official
+  link). **Did not complete** — a routine reboot happened (Windows'
+  own update service finishing unrelated cumulative updates,
+  independent of a separate manual download attempt that failed with
+  `0x80070044`, likely more of this VM's characteristic flakiness
+  rather than a real Windows Update problem), but the build number
+  never advanced and no `$WINDOWS.~BT` staging folder was ever created
+  — the actual feature-update attempt appears to have stalled or been
+  closed before real progress happened. **User explicitly deprioritized
+  chasing this further this session** ("leave it alone... a lot of
+  effort just to make this extension") — parked, not abandoned. Next
+  attempt should probably try the offline ISO/Media Creation Tool route
+  instead of the Installation Assistant, since the online path already
+  failed once without a clear cause.
+
+**2. The three remaining "minor UI gaps" the user asked to close out**
+(their words: "a Settings screen... and a couple of minor UI entry
+points for features that already work underneath"):
+
+- **`SettingsPage` (new)** — closes out spec item 3.3's missing half.
+  Two independent toggles per spec §8: "Start VaultSigner automatically"
+  (new agent-side `internal.enable_autostart`/`disable_autostart`/
+  `is_autostart_enabled` handlers, since nothing had ever called the
+  already-existing `AutostartManager.cs` from anywhere — confirmed via
+  grep before writing these, same diligence as the compartment-creation
+  gap two checkpoints up) and "Auto-unlock this compartment on startup"
+  (already had agent/client methods from an earlier session; this is
+  their first UI). Auto-unlock is gated behind a `ContentDialog`
+  requiring the compartment's passphrase — never enabled from a bare
+  toggle flip (spec §8: "requires explicit opt-in with an in-app risk
+  explanation") — carrying the *exact* DPAPI limitation disclosure
+  `DpapiAutoUnlockStore.cs`'s own doc comment says is required: that any
+  process running as the same Windows user, not just VaultSignerAgent,
+  can in principle decrypt the stored passphrase, materially weaker
+  than macOS Keychain. Also the second required entry point to
+  `ManageVaultsPage` (spec §5.6: "reachable both from the entry screen
+  and from the app's settings"). No i18n scaffolding exists on Windows
+  yet (item 3.7), so this is plain literal copy, not resource keys —
+  same choice already made for every other page this phase.
+- **`KeyDetailPage`: "Export This Key…" and "Reveal Raw Key…" added.**
+  Both already had agent/client methods (`export_single_key`,
+  `reveal_raw_key_hex`) from an earlier session with no UI ever calling
+  them — first real exercise of both this session. Reveal follows spec
+  §5.1's danger-zone requirement: warning text, per-key passphrase
+  entry, shown once, hex is selectable (so the user *can* copy it
+  manually) but nothing copies it for them automatically. Built as a
+  `ContentDialog` with a plain `Button` for the Reveal action rather
+  than `ContentDialog`'s own `PrimaryButton` — clicking Primary always
+  closes the dialog, and this needs to stay open afterward to actually
+  show the result.
+
+**Verified for real, not just built** — agent-side, via raw pipe calls
+(the security-critical part): `enable_autostart`/`disable_autostart`
+round-tripped against the real `HKCU\...\Run` registry key (confirmed
+present after enable, confirmed gone after disable — not just that the
+call returned success). `enable_auto_unlock`/`disable_auto_unlock`
+round-tripped against a real DPAPI file on disk the same way. A wrong
+passphrase to `reveal_raw_key_hex` correctly fails; the correct one
+returns real 32-byte hex for a real Ed25519 key; `export_single_key`
+returns a real packet. All test keys/state cleaned up afterward.
+**UI verified structurally** (renders, navigates, exact copy present)
+via UI Automation for all three: `SettingsPage` (both toggles, the
+DPAPI disclosure text verbatim), the auto-unlock `ContentDialog`
+(correct content, correct buttons), and `KeyDetailPage`'s two new
+buttons plus the reveal dialog's danger-zone content.
+
+**One real limitation hit while verifying, worth recording**:
+`System.Windows.Automation`'s `ValuePattern.SetValue` — and even
+simulated keystrokes via `SendKeys` — could not reliably get text into
+a `PasswordBox` created dynamically inside a `ContentDialog` (WinUI3
+appears to intentionally not expose a settable value for password
+fields to automation, a reasonable security choice, not a bug). Two
+attempts at driving the auto-unlock confirmation dialog end-to-end via
+UI Automation both silently no-opped (empty password read back,
+toggle correctly reverted, no error — the code behaved correctly given
+what it received, the *automation* was the thing that failed). Traced
+this by testing the exact same agent call via raw pipe instead, which
+worked immediately — isolated the failure to the test tooling, not the
+product, but cost real time before landing on that. Also incidentally
+useful: this is exactly the kind of interactive passphrase-entry moment
+[[human-driven-ux-testing]] says to leave for a human anyway, so the
+UI Automation limitation and the "let the user drive it" principle
+point the same direction here.
+
+**A real, currently-unexplained anomaly, found during this
+verification, not caused by anything identified**: the "Personal"
+compartment's master passphrase, `test` — used successfully **dozens
+of times** earlier this same session (see every earlier checkpoint
+above) — started failing with a genuine `incorrect master passphrase`
+error (not a throttle response) partway through this entry's testing.
+Ruled out: throttling (the error was the real
+"incorrect"/`vault_error` response, not `key_locked_retry_later`,
+until several of *this checkpoint's own* verification attempts
+themselves triggered a real lockout — confirming spec §5.5's throttle
+works correctly, but also meaning **Personal is now genuinely
+rate-limited and will need the backoff to elapse**, up to 5 minutes,
+before it's usable again). Ruled out: vault-wide corruption or a
+general agent bug — the `Work` compartment's real passphrase
+(`workpass123`) kept working throughout, including for everything this
+entry actually verified against. Ruled out (as far as checked): common
+whitespace/case variants of "test". No merge/replace operation was run
+against Personal at any point this session that would explain a
+changed master passphrase. **Root cause not found — flagging rather
+than guessing.** Not a blocker (`Work` and `ethereum` compartments are
+fine, and this is disposable test-vault data, not real user data), but
+whoever next reaches for `test-vault.vsvault`'s "Personal" compartment
+with passphrase "test" should expect it might not work, and should not
+assume data loss or a security incident without first checking whether
+this is reproducible from a clean state.
+
+### Session checkpoint (this entry): final Windows gap sweep, per the user's explicit "check if anything else is missing"
+
+Same VM, same session, immediately after the entry above. Rather than
+guess whether the three gaps just closed were the *only* ones, cross-
+checked systematically: grepped every `ManagementClient.cs` public
+method against actual call sites in every `.xaml.cs` file, and diffed
+`CreateKeyPage`/the key list row against `CreateKeyView.swift`/
+`KeyListView.swift` field-for-field rather than trusting memory. Found
+and closed three more real gaps, all the same shape as the last
+checkpoint's (a working agent/client method with zero UI ever calling
+it, or a field macOS's real UI collects/shows that Windows's didn't):
+
+- **`ChangeKeyPassphrase` had zero UI call sites** — spec §5.1: "standalone
+  action reachable from the key detail screen, independent of import/
+  export. Required for every imported key to be re-secured with a
+  locally-known passphrase." Added to `KeyDetailPage` as a
+  `ContentDialog` (current/new/confirm passphrase fields), this time
+  correctly using `ContentDialog.PrimaryButtonClick` with
+  `args.Cancel = true` on validation failure — a cleaner fit here than
+  the Reveal/auto-unlock dialogs' plain-inner-button pattern, since
+  Change Passphrase only needs to *stay open on failure*, not *show a
+  result after success*.
+- **The key list row was missing `resource`** — spec §5.1: "View list:
+  label, resource, key type, purpose." `KeyRow.TypeAndPurpose` (badly
+  named now, left as-is rather than a churn-only rename) showed only
+  `"{type} / {purpose}"`; `KeyListView.swift`'s real row format is
+  `"{resource} · {type} · {purpose}"`, including its own
+  `"(no resource)"` fallback text — matched exactly.
+- **`CreateKeyPage` was missing two fields `CreateKeyView.swift` has**:
+  a comma-separated Tags field (parsed with
+  `StringSplitOptions.TrimEntries | RemoveEmptyEntries`; `KeyInfo.tags`
+  already flowed correctly end-to-end otherwise — it was just always
+  sent empty) and a confirm-passphrase field (mismatch check before
+  create, same pattern already used for vault/compartment creation).
+  `KeyDetailPage` was also missing a Tags display row (only showing
+  when non-empty, matching the existing Last-Used row's pattern).
+
+**Also explicitly checked and confirmed *not* gaps** (worth recording
+so a future session doesn't re-derive this): every `internal.*` method
+the agent handles has exactly one corresponding `ManagementClient.cs`
+method (grepped both lists, diffed — no orphaned agent-side handlers).
+"Close vault"/"switch vault" needing an agent-side call — checked
+`AppState.swift`'s real `closeVault()`: it's pure client-side state
+reset, no RPC at all, matching `VaultHomePage`'s existing
+`SwitchVaultLink` exactly. `KeyListView.swift`'s "last used" field —
+despite spec §5.1's list literally naming it, macOS's own real
+implementation doesn't show it in the row either (only in detail),
+so Windows already matched real (not spec-aspirational) parity there.
+
+**Verified for real**: agent-side, via raw pipe calls — created a key
+with tags `["infra","deploy"]`, confirmed they round-tripped intact
+through `list_keys`; `change_key_passphrase` correctly rejected a wrong
+old passphrase, correctly succeeded with the right one, and the *old*
+passphrase correctly stopped working for `reveal_raw_key_hex`
+immediately afterward while the *new* one worked. UI verified
+structurally: the key list row now shows `"r.example.com · Ed25519 ·
+CustomSigning"`; `KeyDetailPage` shows `"a, b"` for tags and a working
+"Change Passphrase…" button alongside Export/Reveal. All test keys
+discarded afterward.
+
+**Status as of this checkpoint**: every `internal.*` method the agent
+implements now has a real UI entry point somewhere in `VaultSignerUI`
+— the "features that work underneath but have no UI" category the
+user asked about twice this session is now empty. What's left for
+Windows to reach macOS parity is architectural/research-scoped work,
+not missing UI wiring: FIDO2 (blocked on this VM's OS version, per the
+checkpoint above), i18n (item 3.7, no locale work started at all), and
+the Phase 10 test/fuzz suite (item 3.8). The Personal/"test" passphrase
+anomaly two checkpoints up remains unexplained and should be mentioned
+to the user directly, not just left in this file.
+
+### Session checkpoint (this entry): Windows release-packaging scripts (`build-staging.ps1` / `package-release.ps1`)
+
+Picked up the `shared` branch's per-platform tagging switch (commit
+`2d93dd1`, merged into `platform/windows` as `cb0e81b`) and its item 0.4
+flag: Windows had no `package-release`/`build-staging` equivalent of
+`apps/macos/Scripts/{package-release,build-staging}.sh` at all. Added
+both, mirroring the macOS pair's shape and the two-argument
+`<windows-vX.Y.Z> <vaultcore-vA.B.C>` / two-artifact-zip convention from
+`CLAUDE.md`'s "Release artifacts" section (which currently only
+documents the macOS side — extend it with a Windows paragraph there,
+on `shared`, once one of these zips is actually published against a
+real tag).
+
+`Scripts/build-staging.ps1`: builds vaultcore release, regenerates
+`Generated/vaultcore.cs`, then `dotnet publish`es both
+`VaultSignerAgent` and `VaultSignerUI` Release/self-contained/win-x64,
+installing them to a stable `%LOCALAPPDATA%\VaultSigner\` path (stable
+for the same reason macOS installs to `/Applications`: `EnableAutostart`
+captures `Environment.ProcessPath` into the HKCU Run key at the moment
+the user turns it on, so a path that moves every rebuild would strand
+that entry).
+
+`Scripts/package-release.ps1`: zips the installed app into
+`VaultSigner-Windows-vX.Y.Z.zip` and a separate dev bundle
+(`vaultcore.dll`, `vaultcore.dll.lib`, `Generated/vaultcore.cs`) into
+`vaultcore-vA.B.C-windows.zip`, under `.release-artifacts/` — same
+naming pattern as macOS's two files, no signing (no Authenticode cert
+set up for this project yet, documented in both scripts' own comments
+and in the script's printed output, the same honest treatment
+`CLAUDE.md` already gives Gatekeeper for macOS).
+
+**Two real bugs found by actually running this, not just reading the
+code — both fixed, both confirmed fixed by relaunching and checking
+the Windows Event Log / a live pipe round-trip:**
+
+1. The first version of `build-staging.ps1` merged both publish outputs
+   into one flat install folder (macOS's single-.app-bundle model).
+   That's wrong for two independent self-contained .NET publishes: each
+   carries its own private copy of the entire runtime, and copying one
+   over the other with `-Force` lets whichever copies second silently
+   overwrite the first's runtime DLLs with its own (different-patch,
+   and in the UI's case trimmed) versions. Hit for real: the merged
+   install's `VaultSignerAgent.exe` launched, then crashed immediately
+   with `System.MissingMethodException: Method not found:
+   'System.IO.TextWriter System.Console.get_Error()'` — confirmed via
+   `Get-WinEvent`, not guessed. Fixed by installing each into its own
+   `Agent\`/`UI\` subfolder; re-verified with a real
+   `vaultsigner.list_public_keys` call over the named pipe against the
+   rebuilt agent (correct `no_vault_open` JSON-RPC response, not a
+   crash).
+2. `VaultSignerUI.csproj` enables `PublishTrimmed` for Release by
+   default (it already flags the risk itself, via IL2026 warnings on
+   `KnownVaultsStore`'s/`ManagementClient`'s JSON calls) — but the
+   actual failure was more fundamental than those warnings suggested: a
+   trimmed publish crashed on launch with exception code `0xc000027b`
+   inside `Microsoft.UI.Xaml.dll` itself, confirmed via `Get-WinEvent`
+   from the correct interactive session (`query session` confirmed
+   session 1, active console — ruling out the session-mismatch red
+   herring from an earlier checkpoint above). WinUI3's XAML runtime
+   depends on reflection-based type activation the trimmer can't
+   statically see through. Fixed by publishing the UI with
+   `-p:PublishTrimmed=false`; re-verified live — process stays up
+   (memory grows past the crash-point baseline instead of dying), and
+   UI Automation found a real top-level window (`VaultSignerUI` /
+   `AppWindow Custom Title Bar`) where the trimmed build had none.
+   Revisit only with a real trimmer-descriptor investment, not by
+   re-enabling this blind.
+
+Full pipeline re-run clean after both fixes: `build-staging.ps1` exit 0,
+both exes launched together for real (Agent ~30MB, UI ~112MB resident —
+consistent with a genuine WinUI3 render, not a stub), then
+`package-release.ps1` run with `windows-v0.1.0`/`vaultcore-v0.1.0` as a
+dry run (no tag actually cut — versions are placeholders for testing
+the script, not a real release).
+
+**Not done in this checkpoint**: no actual git tag was cut, no
+`CHANGELOG.md` entry added, no GitHub Release published — this was
+scripting the missing tooling and proving it works, not executing a
+release cycle. `CLAUDE.md`'s Release artifacts section still only
+documents macOS; the Windows paragraph there is `shared`-branch scope
+and deliberately left for whenever a real Windows release actually
+ships.
+
+### Session checkpoint (this entry): item 3.7, i18n parity with macOS
+
+User asked directly to complete items 3.7, 3.8, and 3.11. This entry
+covers 3.7.
+
+- [x] 3.7 i18n parity with macOS build. Mirrors macOS's own scope
+      exactly (spec §12 items 2.9/2.11, see `i18n/README.md`): the same
+      four screens — `WelcomePage`, `ImportPacketPage`,
+      `MasterKeyDualityPage`, `ManageVaultsPage` — migrated to
+      `i18n/source/en.json`/`ar.json` resource keys, not full-app
+      coverage (66 hardcoded literals remain across the rest of the
+      Windows app, tracked the same way macOS's 88 are — see
+      `i18n/lint-hardcoded-strings.ps1 -Report`).
+      **New shared-source keys**: 15 new keys added to `en.json`/
+      `ar.json` for Windows-only UI concepts macOS's migrated screens
+      don't have (WelcomePage's inline vault-creation section — a
+      separate sheet on macOS, not part of that platform's migrated
+      set — plus a shared `nav.back_button` and a couple of
+      Windows-specific tooltip/empty-state strings). Everywhere a
+      Windows string already matched a shared key's meaning, Windows
+      adopted that exact English text rather than keeping independent
+      wording — e.g. "Browse for a Vault File…" became "Open Existing
+      Vault…", matching macOS's button — so this is genuine text
+      parity, not just architectural parity, wherever the two
+      platforms' screens actually correspond.
+      **Windows-side tooling, written in PowerShell, not Python** —
+      unlike every other `i18n/` script: this Windows dev box has no
+      working Python install (confirmed directly, not assumed —
+      `python`/`python3` only resolve to the Microsoft Store
+      app-execution-alias stub), and PowerShell is already this
+      project's own native Windows tooling choice. Shipping a `.py`
+      generator nobody on this box could actually run or verify would
+      contradict this project's practice of proving tooling live.
+      `i18n/generate-resx-strings.ps1` converts `source/*.json` into
+      .NET satellite `.resx` files under
+      `apps/windows/VaultSignerUI/VaultSignerUI/Resources/` (plain SDK
+      default embedded resources — confirmed via a real build that no
+      `.csproj` wiring is needed). `i18n/lint-hardcoded-strings.ps1` is
+      the Windows counterpart to spec §9's CI-lint requirement.
+      **`Strings.cs`** is a thin `ResourceManager` wrapper
+      (`Strings.Get("welcome.subtitle")`) mirroring how SwiftUI's
+      `Text(LocalizedStringKey)` resolves a flat key on macOS — the
+      same flat, dot-separated key namespace works unchanged on both
+      platforms, deliberately *not* WinRT's `x:Uid`/MRT resource
+      system (`ResourceLoader`), since that's built around package
+      identity this app doesn't have (it's unpackaged — see
+      `VaultSignerUI.csproj`'s `WindowsAppSDKSelfContained` comment for
+      why). `Strings.Format` handles the one `{0}`-interpolated key
+      (Apple's `%@` placeholder, converted by the generator).
+      **`App.xaml.cs`** gained a `--test-i18n <locale> <key>` headless
+      hook mirroring macOS's own (`VaultSignerApp.swift`) — allocates a
+      console (none exists by default for a `WinExe`), resolves the key
+      against an explicit culture, prints it, exits without ever
+      creating the UI window.
+
+      **Two real bugs found only by actually running things, not by
+      reading the code:**
+      1. The resx generator's own XML header comment used `--` as a
+         separator — invalid inside an XML comment (`MSB3103`/
+         `XmlException`, confirmed via a real build failure). Fixed by
+         removing the double-hyphen.
+      2. That same fix, first attempted with a literal em dash instead
+         of `--`, corrupted the `.ps1` script's own parsing — Windows
+         PowerShell 5.1 mis-decoded the non-ASCII character without a
+         BOM, breaking every line after it (confirmed by a real parser
+         error, not assumed). Fixed by keeping the generator's own
+         *source* to plain ASCII; non-ASCII content (the actual Arabic
+         strings) is fine as *data* written through `UTF8Encoding`,
+         just not as literal characters in the script file itself.
+
+      **Verified for real, in this exact order:**
+      1. `Strings.Get`/`Format` resolution, via the `--test-i18n` hook:
+         `en` and `ar` both resolve correctly (Arabic checked
+         byte-for-byte against `Strings.ar.resx`'s own UTF-8 bytes,
+         since a Windows console's default codepage visibly mangles
+         Arabic on *display* even when the underlying lookup is
+         correct — a real, initially-alarming false alarm, resolved by
+         comparing raw bytes instead of trusting the terminal
+         rendering); a missing key falls back to the raw key; the
+         `{0}`-interpolated key formats correctly.
+      2. `WelcomePage`, live, via `System.Windows.Automation`: every
+         migrated string confirmed rendering as its real, correct
+         text — but only after finding and working around a genuine,
+         pre-existing, unrelated bug this exposed (see below).
+      3. `ImportPacketPage` and `MasterKeyDualityPage`, live, via a
+         real two-vault scenario: created disposable vault A (raw pipe
+         calls, `internal.create_vault`/`create_key`), exported a
+         packet from it with `include_master_key: true`, created
+         disposable vault B (switches the one running agent's active
+         vault), launched the UI against B, clicked through to
+         `ImportPacketPage` (confirmed its text), used the real native
+         file picker (`System.Windows.Automation` + `SendKeys` to type
+         the path, since the picker's filename field doesn't support
+         `ValuePattern`) to import the packet, landed on
+         `MasterKeyDualityPage` for real (not simulated) — every
+         string confirmed correct, including the interpolated
+         confirmation phrase and both "no unlocked compartment"
+         messages correctly hidden (a real unlocked compartment was
+         available to merge into/replace). Then cleaned up: both
+         disposable vault files and the packet deleted, and
+         `config.json` — which `internal.create_vault` had pointed at
+         the disposable vaults — deleted too, restoring the exact
+         "no config file" state this box was in before this checkpoint
+         started (confirmed, not assumed, by checking before touching
+         anything).
+      4. `ManageVaultsPage`, live, reached from `SettingsPage`'s own
+         "Manage Known Vaults…" link (added in an earlier checkpoint):
+         every string confirmed correct.
+      5. `i18n/lint-hardcoded-strings.ps1 -Strict`: clean (exit 0) —
+         but only after fixing two real false positives the first run
+         caught in its own regex (flagging a plain `TextBox`'s own
+         `Text=` default value, e.g. `WelcomePage`'s `"MyVault.vlt"`,
+         as if it were label text; and flagging the literal
+         `"VaultSigner"` brand name, which spec §9 explicitly excludes
+         from localization) — both fixed by narrowing which
+         attribute/control-type pairs the lint actually checks, plus a
+         small brand-name exemption list.
+
+      **A real, pre-existing bug found and worked around (not fixed —
+      out of scope for this item), worth recording clearly**:
+      `ManagementHandlers.cs`'s `ListCompartments` handler does
+      `Vault?.ListCompartments() ?? []` — this **never throws**, even
+      with no vault open at all; it just returns an empty array.
+      `WelcomePage_Loaded`'s "does a vault happen to already be open"
+      check calls exactly this method and only treats a *thrown*
+      `FacadeException` as "no vault" — so with no vault open, the call
+      still succeeds (with an empty compartment list), and
+      `WelcomePage` unconditionally navigates itself straight to
+      `VaultHomePage` every single time, regardless of whether a vault
+      is actually open. In practice this means `WelcomePage` can never
+      currently be seen through normal navigation — confirmed by
+      relaunching a completely fresh agent with no config file and no
+      vault ever created, and observing the UI land on `VaultHomePage`
+      anyway. Worked around here only for verification purposes: a
+      temporary, reverted-before-committing opt-in command-line flag
+      (`--no-vault-skip`) forced the real "no vault" path so
+      `WelcomePage` could actually be observed rendering. **This is a
+      real product bug independent of i18n and should be fixed
+      separately** — likely by having the agent expose a real
+      "is a vault currently open" check rather than inferring it from
+      whether the compartment list happens to be non-throwing.
+      **Actually fixed in the next checkpoint below**, since it turned
+      out to block item 3.8's own verification too.
+
+### Session checkpoint (this entry): item 3.8, Windows build passes the Phase 10 test/fuzz suite
+
+Second of the three items asked for directly ("complete items 3.7,
+3.8, and 3.11"). Scope mirrors macOS's own item 2.10 exactly (see that
+entry above): the shared `vaultcore` unit/crash-safety/fuzz/throttling
+tests are platform-agnostic Rust, already verified once (fuzzing) or
+routinely (unit tests) and don't need redoing per-platform, since every
+platform links the identical binary. What's actually specific to
+Windows is (a) a fresh confirmation the shared suite still passes on
+this platform, and (b) the "including self-import/export exercising
+the shared merge logic" clause, driven through the real Windows UI.
+
+- **Fresh confirmation, this session, on real Windows**: `cargo test
+  --workspace --target x86_64-pc-windows-msvc` — 116 passed, 0 failed,
+  1 ignored (404.82s). `-- --ignored` then ran the two deliberately-slow
+  excluded tests: the KDF real-benchmark test, and — spec §10's crash-
+  safety requirement specifically — `repeated_random_kill_mid_write_never_corrupts_container`,
+  both green. 117 total, all passing on Windows. Fuzzing (container
+  parser, JSON-RPC parser) is **not** re-run here: already done for
+  real in Phase 1 (item 1.12 — 200k iterations each under
+  AddressSanitizer, a real bug found and fixed) on whatever platform
+  that session used; `cargo-fuzz`/libFuzzer has poor-to-no Windows
+  support regardless, and this is the same platform-agnostic parser
+  code either way — not a gap specific to Windows.
+- **Self-export/import through the real UI, exceeding the bar macOS's
+  own 2.10 set** (that entry drove both directions through the real UI;
+  this one does too, plus creates the source vault and its key through
+  the real UI as well, not seeded via raw pipe calls): created a
+  disposable vault (`VaultA.vlt`, `WelcomePage`'s real inline
+  create-vault form — folder picker, filename, compartment label, both
+  passphrase fields), created a real key in it (`CreateKeyPage`,
+  driven end-to-end including the native folder/passphrase fields),
+  exported it via the real `ExportKeysPage` (selected the key, checked
+  "Include master key in export", chose "package as-is", real
+  `FileSavePicker`) to a real `.vltpack` file on disk, created a second
+  disposable vault (`VaultB.vlt`, this half via raw pipe — see below
+  for why) to switch the agent's active vault, then imported the real
+  exported file via the real `ImportPacketPage` (real `FileOpenPicker`)
+  — landed on `MasterKeyDualityPage` for real, selected "Re-encrypt &
+  discard incoming master key" with the real destination compartment,
+  clicked "Use This Option", got a real "Import Complete", clicked
+  Done, and confirmed the imported key ("TestKey · example.com ·
+  Ed25519 · CustomSigning") now shows in `VaultB`'s compartment on
+  `VaultHomePage`. All driven via `System.Windows.Automation` +
+  `SendKeys`/simulated mouse clicks (`WelcomePage`'s and
+  `CreateKeyPage`'s `PasswordBox` fields don't support `ValuePattern`,
+  confirmed again — same limitation recorded in an earlier checkpoint;
+  worked around the same way, by clicking the field's real coordinates
+  and typing). All test vaults, the exported packet, the scratch
+  folder, and `config.json` (which `internal.create_vault` had
+  overwritten to point at the disposable vaults) deleted afterward,
+  restoring the exact pre-checkpoint state.
+- **Interop tests (spec §10: "register and authenticate against at
+  least two to three real-world relying parties... using an actual
+  browser") remain explicitly blocked** — same as macOS's own 2.10 —
+  since FIDO2 isn't implemented on Windows yet (item 3.4, blocked on
+  this VM's Windows build version; see the FIDO2-research checkpoint
+  earlier in this phase). **Item 3.8 status: Windows build passes the
+  Phase 10 test/fuzz suite, except interop** — identical phrasing to
+  macOS's own 2.10, for the identical reason.
+
+**A real, severe bug found and fixed while setting up this
+verification** (not previously known — this session's earlier i18n
+checkpoint had only worked around it with a temporary flag): the
+`WelcomePage_Loaded` bug recorded in the checkpoint above didn't just
+mean `WelcomePage` couldn't be *observed* — it meant a fresh Windows
+install currently has **no way to create a first vault through the UI
+at all**. Every launch bounced straight to `VaultHomePage` before the
+user could interact with the create-vault form, because
+`ManagementHandlers.ListCompartments` never throws (`Vault?
+.ListCompartments() ?? []`), so `WelcomePage`'s only check for
+"is a vault already open" (did the call throw) was always false. Fixed
+by checking the actual result instead: `if (compartments.Length == 0)
+return;` — every vault has at least one compartment by construction
+(`CreateVault` requires one), so a non-empty result is a reliable proxy
+for "a vault is genuinely open," with no new agent-side method needed.
+Verified live: a completely fresh agent (no config file, no vault ever
+created) now shows `WelcomePage`'s real create-vault form and stays on
+it, instead of bouncing away — confirmed by then actually using that
+exact form to create `VaultA.vlt` for this checkpoint's own test, no
+workaround flag needed this time.
+
+**A related, still-open gap, found but out of scope to fix here**:
+`WelcomePage`'s fix above is correct for a vault that's already open at
+launch, but it means **switching away from an already-open vault
+currently doesn't work either** — `SwitchVaultLink_Click`
+("Open a different vault" on `VaultHomePage`) is pure client-side
+`Frame.Navigate(typeof(WelcomePage))` with no agent-side call at all,
+so the agent still reports the same vault open, and `WelcomePage`
+correctly (now) bounces straight back to `VaultHomePage` again. This
+was equally broken *before* today's fix too (every `WelcomePage` visit
+bounced back regardless of vault state then), so it's not a regression
+introduced here — just a pre-existing gap this session's testing
+happened to surface clearly for the first time. Worked around for this
+checkpoint's own vault-B creation by using a raw pipe
+`internal.create_vault` call instead (switches the agent's active
+vault directly) rather than going through `WelcomePage`'s UI a second
+time. A real fix needs either a client-side "forget the current vault"
+state reset (mirroring macOS's `AppState.closeVault()`, which is also
+pure client-side per an earlier checkpoint) that `WelcomePage` then
+respects, or an agent-side `internal.close_vault` method — worth
+raising with the user rather than deciding unilaterally, since it's a
+product-shape question (does "switching vaults" mean the agent forgets
+the vault too, or only the UI's view of it?).
 
 ## Phase 4 — Android
 

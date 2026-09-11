@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="VaultSignerUI.DeviceProfilePicker"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:VaultSignerUI"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <StackPanel Spacing="4">
+        <TextBlock Text="Device profile" FontWeight="SemiBold" />
+        <RadioButtons x:Name="ProfileRadios" SelectedIndex="0">
+            <RadioButton Content="Desktop" />
+            <RadioButton Content="Mobile" />
+        </RadioButtons>
+        <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                   Text="Controls how expensive the passphrase-derivation step is (spec §4.2) — Desktop targets a stronger, slower derivation; Mobile trades some of that strength for speed and battery. This affects the master passphrase's protection, not the keys themselves." />
+    </StackPanel>
+</UserControl>

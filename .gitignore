@@ -51,6 +51,10 @@ apps/windows/**/obj/
 # Generated C# UniFFI bindings (see apps/windows/Scripts/generate-csharp-bindings.ps1
 # and the top-level UniFFI-bindings note above) — never hand-edited.
 apps/windows/Generated/
+# dotnet publish output (Scripts/build-staging.ps1) and packaged release
+# zips (Scripts/package-release.ps1) — build products, not source.
+apps/windows/**/.staging-build/
+apps/windows/.release-artifacts/
 
 # --- Android / Gradle ---
 apps/android/**/.gradle/

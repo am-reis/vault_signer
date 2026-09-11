@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="VaultSignerUI.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:VaultSignerUI"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid>
+        <ScrollViewer>
+            <StackPanel Padding="32,24,32,32" Spacing="20" MaxWidth="480" HorizontalAlignment="Center">
+
+                <StackPanel Spacing="4">
+                    <HyperlinkButton Content="&#x2190; Back" Padding="0" Click="BackButton_Click" />
+                    <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" />
+                </StackPanel>
+
+                <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
+
+                <StackPanel Spacing="4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Padding="16" CornerRadius="6">
+                    <ToggleSwitch x:Name="AutostartToggle" Header="Start VaultSigner automatically" OnContent="On" OffContent="Off" Toggled="AutostartToggle_Toggled" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
+                               Text="So it's ready to answer signing requests even when you haven't opened the app yourself. Recommended — signing availability depends on this being on." />
+                </StackPanel>
+
+                <StackPanel Spacing="4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Padding="16" CornerRadius="6">
+                    <ToggleSwitch x:Name="AutoUnlockToggle" Header="Auto-unlock this compartment on startup" OnContent="On" OffContent="Off" Toggled="AutoUnlockToggle_Toggled" />
+                    <TextBlock x:Name="AutoUnlockCompartmentText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <HyperlinkButton Content="Manage Known Vaults…" Padding="0" Click="ManageVaultsLink_Click" />
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <ProgressRing x:Name="BusyRing" IsActive="False" Width="32" Height="32"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Grid>
+</Page>

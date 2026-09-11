@@ -1070,6 +1070,79 @@ provisioning work the task brief's own environment notes didn't
 anticipate (the missing NDK, the AGP/JDK version ceiling) — see this
 section's own opening note.
 
+**Post-checklist product decision, this session: `full`/`lite` Gradle
+flavors.** Spec §12/§6.3's API-34+ floor is real (FIDO2/
+`CredentialProviderService` genuinely needs it) but was also, on
+reflection, too narrow a floor for the *whole app* to sit behind — API 34
+alone is ~54.5% of active devices (apilevels.com, April 2026 Statcounter
+figures), meaning the original scope would have made VaultSigner
+uninstallable on roughly half of all active Android phones. Split into
+two Gradle product flavors of the exact same app/commit/version number
+(not two products, not independently versioned — unlike `vaultcore`):
+`full` keeps the original API 34+/FIDO2 scope unchanged; `lite` drops
+only `CredentialProviderService` and reaches down to **API 23** — the
+real floor, not a guessed one: AndroidX itself has required minSdk 23+
+since June 2025, so this Compose/AndroidX-built app cannot go lower
+regardless of product choice, and 23 already covers ~98.0% of devices vs.
+~96.6% at 24 — there is no meaningful coverage between them to trade
+away. Full reasoning and the distribution-data table:
+`apps/android/docs/release-process.md`.
+
+Flavor-specific source sets hold *only* the FIDO2 code path
+(`VaultSignerCredentialProviderService.kt`, `PasskeyCompletionActivity.kt`,
+`provider.xml`, the manifest fragment declaring them, and the
+`fullImplementation`-only `androidx.credentials` dependency) — everything
+else (UI, `vaultcore`/UniFFI bindings, the custom protocol, i18n) is
+unmodified shared code compiled into both flavors. One genuine shared-code
+fix was required, not a flavor split: `VaultSignerService`'s foreground-
+service type is now chosen at runtime by SDK tier (`specialUse` on 34+,
+`dataSync` on 29-33, none below 29, via `ServiceCompat.startForeground`)
+since spec's original `specialUse` type is an API-34-only concept and
+`lite`'s entire reason to exist is running below that floor — getting
+this wrong would have crashed `lite` on startup for the whole audience it
+was built for.
+
+**Verified for real on both ends, not just "it compiles":**
+- `lite`: installed the actual debug build on a real, physically-confirmed
+  Android 13/API 33 device (`Samsung SM-A326B`, confirmed via
+  `getprop ro.build.version.sdk`, not an emulator) after a clean
+  uninstall. `dumpsys activity services` confirmed `VaultSignerService`
+  starts as a genuine running foreground service (`isForeground=true`,
+  real notification/channel) with no `IllegalArgumentException` and no
+  crash — exactly the failure mode an unverified type-value assumption
+  would have produced. Drove a real vault create → key list → Settings
+  flow through the actual UI and confirmed no Credential-Manager button
+  appears (the `lite`-flavor no-op `CredentialProviderSettingsSection()`
+  took effect, not just "compiled without the import").
+- `full`: `assembleFullDebug`/`bundleFullRelease` both build clean; not
+  independently re-verified on-device this session beyond that, since its
+  own code didn't change (only moved files, no logic edits) and the
+  shared code it depends on was exactly what `lite`'s real-device pass
+  above exercised. Its prior real-device/emulator verification earlier in
+  this Phase 4 section stands unchanged.
+
+Also earlier in this same real-device session (found and fixed before
+settling on the flavor split, while manually testing on the same
+physical phone): a UI-automation red herring initially misread as an
+app bug — typing a passphrase into a field, then a *second* field whose
+on-screen position had shifted once the keyboard covered part of the
+layout, landed the tap on the keyboard itself rather than the field,
+leaving the second field empty and tripping the "passphrases don't
+match" check. Not an app defect; the mismatch check was working
+correctly. Re-tested by re-reading field coordinates from a fresh
+accessibility-tree dump taken *after* the keyboard was showing, rather
+than reusing a pre-keyboard dump's coordinates — a real testing-technique
+fix, not a code fix, worth recording since it cost real time to track
+down and will recur for anyone else driving this app's forms via `adb
+shell input` + `uiautomator dump` instead of a real instrumented UI test.
+
+Added `apps/android/Scripts/package-release.sh` (builds and names both
+flavors' release `.aab`s under one `android-vX.Y.Z` tag) and
+`apps/android/docs/release-process.md`; `CLAUDE.md`'s Release artifacts
+section now documents Android's one-tag/two-artifact scheme alongside
+macOS's. **Known gap, disclosed in that doc**: Android release signing
+isn't set up at all yet — neither `.aab` is Play-Console-ready.
+
 ## Phase 5 — iOS/iPadOS
 
 Not started.

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spec §6.3 / androidx.credentials CredentialProviderService registration.
+     `android:settingsSubtitle` surfaces in the system's credential-provider
+     picker in Settings — sourced from the generated string (i18n/source),
+     not the literal app name. -->
+<credential-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsSubtitle="@string/android_credential_provider_settings_subtitle">
+    <capabilities>
+        <capability name="androidx.credentials.TYPE_PUBLIC_KEY_CREDENTIAL" />
+    </capabilities>
+</credential-provider>

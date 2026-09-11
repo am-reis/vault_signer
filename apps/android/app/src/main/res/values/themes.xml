@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.VaultSigner" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- PassphrasePromptActivity: a small dialog-styled window over
+         whatever app triggered the request, not a full-screen page. -->
+    <style name="Theme.VaultSigner.Dialog" parent="android:Theme.Material.Light.Dialog">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+</resources>

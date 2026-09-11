@@ -14,7 +14,7 @@ This file is loaded automatically at the start of every Claude Code session in t
 
 Path ownership is a convention, not a physical split — `shared`'s tree is not scrubbed of platform directories. Deleting them there would make every future `shared → platform/*` merge conflict permanently on those paths. Commit shared-scope changes only on `shared`; commit platform-scope changes only on the relevant `platform/*` branch.
 
-`PROGRESS.md` is a single cross-cutting project journal, edited from whichever branch the work happened on.
+`PROGRESS.md` is a single cross-cutting project journal, edited from whichever branch the work happened on. **It is the only place completion is tracked.** `spec/VaultSigner-Spec.md`'s own `## 12. Execution plan` checklist is a static plan — its `- [ ]` items are never checked off, even for items that are fully done and shipped (compare macOS's Phase 2 items there against `PROGRESS.md`'s own Phase 2 section, which marks the same items `- [x]` with the verification details). When an item is done, add or update its `- [x] N.M ...` entry in `PROGRESS.md` — don't edit the checkbox in the spec file itself.
 
 ## Flow
 

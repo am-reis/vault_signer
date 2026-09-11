@@ -71,6 +71,13 @@ Opening a downloaded copy on another Mac triggers Gatekeeper's "unidentified dev
 
 Publish via the GitHub web UI (Releases → Draft a new release → select the platform tag → upload its files → paste the corresponding `CHANGELOG.md` entries as the release notes), or with the `gh` CLI once installed: `gh release create macos-vX.Y.Z <files> --notes-file <changelog-section>`. `vaultcore-vA.B.C` tags never get a GitHub Release of their own — they're plain tags, not distribution events.
 
+**Android** ships as two Gradle product flavors of the same app — `full` (API 34+, includes `CredentialProviderService`/FIDO2) and `lite` (API 23+, everything else) — built from the identical commit and carrying the identical version number, so there is exactly **one** tag, `android-vX.Y.Z`, not a per-flavor pair. `apps/android/Scripts/package-release.sh <android-vX.Y.Z>` builds and names both artifacts against that one tag:
+
+- `VaultSigner-Android-full-vX.Y.Z.aab`
+- `VaultSigner-Android-lite-vX.Y.Z.aab`
+
+Unlike macOS's app-zip/vaultcore-zip pair, neither Android artifact is named for vaultcore's own version — `vaultcore` isn't flavored and doesn't change between them, so there is nothing distinct to name a second artifact after; both `.aab` files bundle the same cross-compiled `vaultcore` `.so` per ABI. See `apps/android/docs/release-process.md` for the full reasoning (why two flavors, why API 23 specifically for `lite`, and the one piece of shared code — `VaultSignerService`'s foreground-service type — that had to become SDK-version-aware rather than flavor-specific to make `lite` actually work below API 34). As with macOS, publish via the GitHub web UI or `gh release create android-vX.Y.Z <both .aab files> --notes-file <changelog-section>`; as of this writing, Android release signing is not yet set up (see that doc's "Known gaps" section) — neither artifact is Play-Console-ready yet.
+
 ## Finding things in history
 
 - Shared-code history: `git log shared`

@@ -47,50 +47,65 @@ key actually says.
 
 ## What's actually migrated
 
-**macOS** (spec §12 item 2.9), four screens: `WelcomeView`,
-`ImportPacketView`, `MasterKeyDualityView`, and `ManageVaultsView`
-(added later, item 2.11) — the first three chosen because spec §9
-explicitly calls out verifying right-to-left layout "specifically on
-the import/export decision screens, since they are dense, multi-choice,
-and safety-critical."
+**Both platforms are now fully migrated — every view/page, zero
+hardcoded UI literals remaining, per each platform's own lint script in
+`--strict`/`-Strict` mode.** `source/en.json` is 219 keys.
 
-**Windows** (spec §12 item 3.7), the same four screens' Windows
-equivalents for parity: `WelcomePage`, `ImportPacketPage`,
-`MasterKeyDualityPage`, `ManageVaultsPage`. Not always byte-identical
-English wording to macOS's — where a Windows screen's copy already
-differed (e.g. its own inline vault-creation section, which macOS
-handles as a separate, unmigrated sheet), it kept its own wording under
-new keys rather than being rewritten to match; where the concept and
-wording already lined up, Windows adopted the exact shared string. See
-`source/en.json`'s own top comment for the full reasoning and which
-keys are Windows-only.
+**macOS** (spec §12 item 2.9): all 13 view files — `WelcomeView`,
+`ImportPacketView`, `MasterKeyDualityView`, `ManageVaultsView`,
+`ContentView`, `BackupMasterKeyOnlyView`, `CreateKeyView`,
+`CreateVaultView`, `ExportPacketView`, `KeyDetailView`, `KeyListView`,
+`SettingsView`, `UnlockView`.
 
-`source/ar.json` (Arabic, RTL) covers exactly the same key set as
-`en.json`'s migrated screens on both platforms, not the whole app —
-this is spec §9's RTL-verification set, not a launch-language decision.
+**Windows** (spec §12 item 3.7): all 12 pages — the original four
+(`WelcomePage`, `ImportPacketPage`, `MasterKeyDualityPage`,
+`ManageVaultsPage`) plus `BackupMasterKeyOnlyPage`,
+`CreateCompartmentPage`, `CreateKeyPage`, `DeviceProfilePicker`,
+`ExportKeysPage`, `KeyDetailPage`, `SettingsPage`, `VaultHomePage`.
+Windows has no separate `CreateVaultPage` (that flow lives inline in
+`WelcomePage`) and has one screen macOS doesn't
+(`CreateCompartmentPage`, standalone compartment creation) — both
+platforms' key sets reflect their own real UI shape, not a forced 1:1
+screen mapping.
 
-**Not yet migrated (either platform):** every other screen — run
-`python3 i18n/lint-hardcoded-strings.py --report` (macOS, 88 literals
-as of item 2.9's writing) or `powershell -File
-i18n/lint-hardcoded-strings.ps1` (Windows, 66 literals as of item 3.7's
-writing) for the current list. Migrating a file means: add its strings
-to `source/en.json` (and `source/ar.json`, or drop that file's coverage
-from the RTL-verification set if Arabic isn't the priority for it),
-regenerate, replace the literals with the matching keys, and add the
-filename to the relevant lint script's migrated-files list so
-`--strict`/`-Strict` actually protects it from regressing.
+**A real gap existed here, found by a reviewer and worth recording**:
+an earlier pass through this file claimed Windows had reached "parity
+with macOS," but had actually only migrated the original four RTL-set
+screens, matching an *earlier* macOS milestone, not macOS's actual
+current state — macOS's own full 13-view migration (~100 more keys)
+had been committed directly on `platform/macos` and never made it into
+this shared file at all, so the gap wasn't even visible without
+checking `platform/macos`'s own `PROGRESS.md` directly. Reconciled by
+merging macOS's real key set into `source/en.json`, then migrating
+every remaining Windows file against it — see `PROGRESS.md`'s Phase 3
+entry for the full remediation, and the note now added to `CLAUDE.md`
+about where completion is actually tracked.
 
-Two known simplifications, not yet addressed:
-- Interpolated/dynamic strings (e.g. `ImportPacketView`'s "N key(s)
-  collided..." pluralization, and every raw `"\(error)"` message shown
-  after a failed operation) were left as English literals even in
-  migrated files — ICU MessageFormat plural support is real work beyond
-  what "scaffolding" needs to prove out, and doing it for one string
-  without a real plan for all of them would be premature.
-- Timestamps: spec §9 says store ISO-8601 internally, format for display
-  only, using locale-aware formatting. `KeyDetailView` currently displays
-  `KeyInfo.createdAt` (already an RFC3339 string from `vaultcore`)
-  verbatim rather than through a locale-aware formatter — not fixed yet.
+Not always byte-identical English wording between platforms — where a
+screen's copy already differed (e.g. Windows's own inline
+vault-creation section, or `CreateCompartmentPage`, which macOS doesn't
+have at all), each platform kept its own wording under its own keys
+rather than being forced to match; where the concept and wording
+already lined up, one adopted the other's exact shared string. See
+`source/en.json`'s own top comment for which keys are platform-only.
+
+`source/ar.json` (Arabic, RTL) deliberately stays scoped to the
+original four-screen RTL-verification set on both platforms — spec
+§9's actual requirement ("verify right-to-left layout specifically on
+the import/export decision screens"), not a whole-app localization
+decision. A key outside that set falls back to English on both
+platforms' resource-lookup mechanisms, by design.
+
+**Two known simplifications, on both platforms, not yet addressed:**
+- Interpolated/dynamic strings shown after a failed operation (raw
+  `ex.Message`/`"\(error)"` passthroughs) were left as-is — real
+  per-error-code resource keys are a separate, larger effort than this
+  pass's scope.
+- Timestamps: spec §9 says store ISO-8601 internally, format for
+  display only, using locale-aware formatting. Both `KeyDetailView` and
+  `KeyDetailPage` currently display the raw RFC3339 `createdAt` string
+  verbatim rather than through a locale-aware formatter — not fixed on
+  either platform yet.
 
 ## Verifying without a screen
 
@@ -112,12 +127,15 @@ byte-for-byte against `Resources/Strings.ar.resx`'s own UTF-8 bytes,
 since a Windows console's default codepage mangles Arabic text on
 display even when the underlying lookup is correct — `Console.OutputEncoding
 = Encoding.UTF8` in the hook fixes the *display* half of that), a
-missing key falls back to the raw key, and the one `{0}`-interpolated
-key (`duality.option3.confirmation_field_format`) formats correctly via
-`Strings.Format`. All four migrated Windows pages were additionally
-verified rendering their real, correct text in a live running app (not
-just the hook) via `System.Windows.Automation` — including
+missing key falls back to the raw key, and every `{0}`-interpolated key
+(`duality.option3.confirmation_field_format`,
+`settings.auto_unlock_explanation_format`,
+`discardkey.confirm_prompt_format`) formats correctly via
+`Strings.Format`. Every migrated Windows page was additionally verified
+rendering its real, correct text in a live running app (not just the
+hook) via `System.Windows.Automation` — including
 `MasterKeyDualityPage`, reached for real by creating two disposable
 vaults and exporting/importing a packet with an embedded master key
-between them, exactly the flow spec §9 calls out for RTL/safety
-verification.
+between them (once seeded via raw agent calls, once through the real
+UI end to end — see `PROGRESS.md`'s item 3.8 entry), exactly the flow
+spec §9 calls out for RTL/safety verification.

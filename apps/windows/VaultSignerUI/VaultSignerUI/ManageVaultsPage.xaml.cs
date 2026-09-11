@@ -6,10 +6,8 @@ namespace VaultSignerUI;
 
 /// Spec §5.6's dedicated management screen: "reachable both from the
 /// entry screen and from the app's settings, so it doesn't require
-/// closing whatever vault is currently open." Reachable from
-/// WelcomePage today; there's no Settings screen yet to reach it from a
-/// second way (auto-unlock toggles, which would live there, aren't
-/// built on Windows yet either — see PROGRESS.md). Operates purely on
+/// closing whatever vault is currently open." Reachable from both
+/// WelcomePage and SettingsPage. Operates purely on
 /// `KnownVaultsStore` — never touches whatever vault the agent
 /// currently has open, which is what makes it safe to add a second
 /// entry point later without new plumbing. Mirrors
@@ -19,6 +17,11 @@ public sealed partial class ManageVaultsPage : Page
     public ManageVaultsPage()
     {
         InitializeComponent();
+        BackButtonElement.Content = Strings.Get("nav.back_button");
+        TitleText.Text = Strings.Get("manage_vaults.title");
+        SubtitleText.Text = Strings.Get("manage_vaults.subtitle");
+        NoVaultsText.Text = Strings.Get("manage_vaults.no_vaults");
+        AddButton.Content = Strings.Get("manage_vaults.add_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)

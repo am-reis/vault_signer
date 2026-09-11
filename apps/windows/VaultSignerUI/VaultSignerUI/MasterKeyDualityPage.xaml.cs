@@ -29,6 +29,29 @@ public sealed partial class MasterKeyDualityPage : Page, ISensitiveScreen
     public MasterKeyDualityPage()
     {
         InitializeComponent();
+        HeaderText.Text = Strings.Get("duality.header");
+        SubtitleText.Text = Strings.Get("duality.subtitle");
+        Option1TitleText.Text = Strings.Get("duality.option1.title");
+        RecommendedBadgeText.Text = Strings.Get("duality.recommended_badge");
+        Option1DescriptionText.Text = Strings.Get("duality.option1.description");
+        Option1NoCompartmentText.Text = Strings.Get("duality.option1.no_unlocked_compartment");
+        Option1CompartmentCombo.Header = Strings.Get("duality.option1.merge_into_picker");
+        Option1Button.Content = Strings.Get("duality.use_this_option_button");
+        Option2TitleText.Text = Strings.Get("duality.option2.title");
+        Option2DescriptionText.Text = Strings.Get("duality.option2.description");
+        Option2LabelBox.PlaceholderText = Strings.Get("duality.option2.label_field");
+        Option2PassphraseBox.PlaceholderText = Strings.Get("duality.option2.passphrase_field");
+        Option2Button.Content = Strings.Get("duality.use_this_option_button");
+        Option3TitleText.Text = Strings.Get("duality.option3.title");
+        Option3DescriptionText.Text = Strings.Get("duality.option3.description");
+        Option3NoCompartmentText.Text = Strings.Get("duality.option3.no_unlocked_compartment");
+        Option3CompartmentCombo.Header = Strings.Get("duality.option3.replace_picker");
+        Option3PassphraseBox.PlaceholderText = Strings.Get("duality.option3.passphrase_field");
+        Option3ConfirmBox.PlaceholderText = Strings.Format("duality.option3.confirmation_field_format", ReplaceConfirmationPhrase);
+        Option3Button.Content = Strings.Get("duality.use_this_option_button");
+        CancelButtonElement.Content = Strings.Get("duality.cancel_button");
+        CompleteTitleText.Text = Strings.Get("import.complete_title");
+        DoneButtonElement.Content = Strings.Get("import.done_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)

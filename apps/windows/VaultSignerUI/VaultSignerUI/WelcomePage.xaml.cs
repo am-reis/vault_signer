@@ -17,6 +17,9 @@ internal sealed class KnownVaultRow(KnownVaultEntry entry)
     public Visibility UnavailableVisibility => Available ? Visibility.Collapsed : Visibility.Visible;
     public Brush ForegroundBrush => (Brush)Application.Current.Resources[
         Available ? "TextFillColorPrimaryBrush" : "TextFillColorDisabledBrush"];
+    public string UnavailableTooltip => Strings.Get("welcome.vault_unavailable_tooltip");
+    public string ForgetTooltip => Strings.Get("welcome.forget_tooltip");
+    public string ForgetButtonLabel => Strings.Get("welcome.forget_button");
 }
 
 /// First screen of the real, navigated flow (see MainWindow.xaml's
@@ -34,6 +37,20 @@ public sealed partial class WelcomePage : Page, ISensitiveScreen
     public WelcomePage()
     {
         InitializeComponent();
+        SubtitleText.Text = Strings.Get("welcome.subtitle");
+        RecentVaultsHeaderText.Text = Strings.Get("welcome.recent_vaults_header");
+        ManageVaultsLinkButton.Content = Strings.Get("welcome.manage_vaults_button");
+        NoRecentVaultsText.Text = Strings.Get("welcome.no_recent_vaults");
+        CreateSectionHeaderText.Text = Strings.Get("welcome.create_section_header");
+        CreateFolderText.Text = Strings.Get("welcome.no_folder_chosen");
+        ChooseFolderButton.Content = Strings.Get("welcome.choose_folder_button");
+        NewVaultFileNameBox.PlaceholderText = Strings.Get("welcome.filename_placeholder");
+        CompartmentLabelBox.PlaceholderText = Strings.Get("welcome.compartment_name_placeholder");
+        MasterPassphraseBox.PlaceholderText = Strings.Get("welcome.master_passphrase_placeholder");
+        ConfirmPassphraseBox.PlaceholderText = Strings.Get("welcome.confirm_passphrase_placeholder");
+        CreateVaultButton.Content = Strings.Get("welcome.create_vault_button");
+        OpenSectionHeaderText.Text = Strings.Get("welcome.open_section_header");
+        OpenVaultButton.Content = Strings.Get("welcome.open_button");
         Loaded += WelcomePage_Loaded;
     }
 

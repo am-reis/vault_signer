@@ -14,7 +14,7 @@
 
                 <StackPanel Spacing="4">
                     <TextBlock Text="VaultSigner" FontSize="32" FontWeight="SemiBold" />
-                    <TextBlock Text="Open a vault you've used before, or create a new one." Opacity="0.7" TextWrapping="Wrap" />
+                    <TextBlock x:Name="SubtitleText" Opacity="0.7" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
@@ -25,11 +25,11 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Recent vaults" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <HyperlinkButton Grid.Column="1" Content="Manage known vaults" Padding="0" Click="ManageVaultsLink_Click" />
+                        <TextBlock x:Name="RecentVaultsHeaderText" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <HyperlinkButton x:Name="ManageVaultsLinkButton" Grid.Column="1" Padding="0" Click="ManageVaultsLink_Click" />
                     </Grid>
 
-                    <TextBlock x:Name="NoRecentVaultsText" Text="No recent vaults yet." Opacity="0.7" Visibility="Collapsed" />
+                    <TextBlock x:Name="NoRecentVaultsText" Opacity="0.7" Visibility="Collapsed" />
 
                     <ListView x:Name="RecentVaultsList" SelectionMode="None" IsItemClickEnabled="True" ItemClick="RecentVaultsList_ItemClick" MaxHeight="220">
                         <ListView.ItemTemplate>
@@ -46,9 +46,9 @@
                                         <TextBlock Text="{x:Bind Path}" Opacity="0.6" FontSize="12" TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <FontIcon Grid.Column="1" Glyph="&#xE7BA;" FontSize="14" Foreground="#F2A93B" Margin="8,0"
-                                              Visibility="{x:Bind UnavailableVisibility}" ToolTipService.ToolTip="This file couldn't be found" />
+                                              Visibility="{x:Bind UnavailableVisibility}" ToolTipService.ToolTip="{x:Bind UnavailableTooltip}" />
                                     <Button Grid.Column="2" Background="Transparent" BorderThickness="0" Padding="6"
-                                            Click="ForgetButton_Click" Tag="{x:Bind Path}" ToolTipService.ToolTip="Forget this vault">
+                                            Click="ForgetButton_Click" Tag="{x:Bind Path}" ToolTipService.ToolTip="{x:Bind ForgetTooltip}">
                                         <FontIcon Glyph="&#xE711;" FontSize="12" />
                                     </Button>
                                 </Grid>
@@ -58,27 +58,27 @@
                 </StackPanel>
 
                 <StackPanel x:Name="CreateSection" Spacing="8">
-                    <TextBlock Text="Create a new vault" FontWeight="SemiBold" />
+                    <TextBlock x:Name="CreateSectionHeaderText" FontWeight="SemiBold" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="CreateFolderText" Text="No folder chosen" Opacity="0.7" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <Button Grid.Column="1" Content="Choose Folder…" Margin="8,0,0,0" Click="ChooseFolderButton_Click" />
+                        <TextBlock x:Name="CreateFolderText" Opacity="0.7" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <Button x:Name="ChooseFolderButton" Grid.Column="1" Margin="8,0,0,0" Click="ChooseFolderButton_Click" />
                     </Grid>
-                    <TextBox x:Name="NewVaultFileNameBox" PlaceholderText="File name, e.g. MyVault.vlt" Text="MyVault.vlt" />
-                    <TextBox x:Name="CompartmentLabelBox" PlaceholderText="First compartment name, e.g. Personal" Text="Personal" />
-                    <PasswordBox x:Name="MasterPassphraseBox" PlaceholderText="Master passphrase" />
-                    <PasswordBox x:Name="ConfirmPassphraseBox" PlaceholderText="Confirm master passphrase" />
+                    <TextBox x:Name="NewVaultFileNameBox" Text="MyVault.vlt" />
+                    <TextBox x:Name="CompartmentLabelBox" Text="Personal" />
+                    <PasswordBox x:Name="MasterPassphraseBox" />
+                    <PasswordBox x:Name="ConfirmPassphraseBox" />
                     <local:DeviceProfilePicker x:Name="ProfilePicker" />
-                    <Button x:Name="CreateVaultButton" Content="Create Vault" Style="{StaticResource AccentButtonStyle}"
+                    <Button x:Name="CreateVaultButton" Style="{StaticResource AccentButtonStyle}"
                             HorizontalAlignment="Right" Click="CreateVaultButton_Click" />
                 </StackPanel>
 
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Or open an existing vault file" FontWeight="SemiBold" />
-                    <Button x:Name="OpenVaultButton" Content="Browse for a Vault File…" Click="OpenVaultButton_Click" />
+                    <TextBlock x:Name="OpenSectionHeaderText" FontWeight="SemiBold" />
+                    <Button x:Name="OpenVaultButton" Click="OpenVaultButton_Click" />
                 </StackPanel>
 
             </StackPanel>

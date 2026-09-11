@@ -23,6 +23,15 @@ public sealed partial class ImportPacketPage : Page, ISensitiveScreen
     public ImportPacketPage()
     {
         InitializeComponent();
+        BackButtonElement.Content = Strings.Get("nav.back_button");
+        TitleText.Text = Strings.Get("import.title");
+        SubtitleText.Text = Strings.Get("import.subtitle_detailed");
+        ChooseFileButton.Content = Strings.Get("import.choose_file_button");
+        TransferPasswordPromptText.Text = Strings.Get("import.transfer_password_prompt");
+        TransferPasswordBox.PlaceholderText = Strings.Get("import.transfer_password_field");
+        ContinueButton.Content = Strings.Get("import.continue_button");
+        CompleteTitleText.Text = Strings.Get("import.complete_title");
+        DoneButtonElement.Content = Strings.Get("import.done_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)

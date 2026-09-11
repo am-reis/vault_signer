@@ -2058,6 +2058,148 @@ documents macOS; the Windows paragraph there is `shared`-branch scope
 and deliberately left for whenever a real Windows release actually
 ships.
 
+### Session checkpoint (this entry): item 3.7, i18n parity with macOS
+
+User asked directly to complete items 3.7, 3.8, and 3.11. This entry
+covers 3.7.
+
+- [x] 3.7 i18n parity with macOS build. Mirrors macOS's own scope
+      exactly (spec §12 items 2.9/2.11, see `i18n/README.md`): the same
+      four screens — `WelcomePage`, `ImportPacketPage`,
+      `MasterKeyDualityPage`, `ManageVaultsPage` — migrated to
+      `i18n/source/en.json`/`ar.json` resource keys, not full-app
+      coverage (66 hardcoded literals remain across the rest of the
+      Windows app, tracked the same way macOS's 88 are — see
+      `i18n/lint-hardcoded-strings.ps1 -Report`).
+      **New shared-source keys**: 15 new keys added to `en.json`/
+      `ar.json` for Windows-only UI concepts macOS's migrated screens
+      don't have (WelcomePage's inline vault-creation section — a
+      separate sheet on macOS, not part of that platform's migrated
+      set — plus a shared `nav.back_button` and a couple of
+      Windows-specific tooltip/empty-state strings). Everywhere a
+      Windows string already matched a shared key's meaning, Windows
+      adopted that exact English text rather than keeping independent
+      wording — e.g. "Browse for a Vault File…" became "Open Existing
+      Vault…", matching macOS's button — so this is genuine text
+      parity, not just architectural parity, wherever the two
+      platforms' screens actually correspond.
+      **Windows-side tooling, written in PowerShell, not Python** —
+      unlike every other `i18n/` script: this Windows dev box has no
+      working Python install (confirmed directly, not assumed —
+      `python`/`python3` only resolve to the Microsoft Store
+      app-execution-alias stub), and PowerShell is already this
+      project's own native Windows tooling choice. Shipping a `.py`
+      generator nobody on this box could actually run or verify would
+      contradict this project's practice of proving tooling live.
+      `i18n/generate-resx-strings.ps1` converts `source/*.json` into
+      .NET satellite `.resx` files under
+      `apps/windows/VaultSignerUI/VaultSignerUI/Resources/` (plain SDK
+      default embedded resources — confirmed via a real build that no
+      `.csproj` wiring is needed). `i18n/lint-hardcoded-strings.ps1` is
+      the Windows counterpart to spec §9's CI-lint requirement.
+      **`Strings.cs`** is a thin `ResourceManager` wrapper
+      (`Strings.Get("welcome.subtitle")`) mirroring how SwiftUI's
+      `Text(LocalizedStringKey)` resolves a flat key on macOS — the
+      same flat, dot-separated key namespace works unchanged on both
+      platforms, deliberately *not* WinRT's `x:Uid`/MRT resource
+      system (`ResourceLoader`), since that's built around package
+      identity this app doesn't have (it's unpackaged — see
+      `VaultSignerUI.csproj`'s `WindowsAppSDKSelfContained` comment for
+      why). `Strings.Format` handles the one `{0}`-interpolated key
+      (Apple's `%@` placeholder, converted by the generator).
+      **`App.xaml.cs`** gained a `--test-i18n <locale> <key>` headless
+      hook mirroring macOS's own (`VaultSignerApp.swift`) — allocates a
+      console (none exists by default for a `WinExe`), resolves the key
+      against an explicit culture, prints it, exits without ever
+      creating the UI window.
+
+      **Two real bugs found only by actually running things, not by
+      reading the code:**
+      1. The resx generator's own XML header comment used `--` as a
+         separator — invalid inside an XML comment (`MSB3103`/
+         `XmlException`, confirmed via a real build failure). Fixed by
+         removing the double-hyphen.
+      2. That same fix, first attempted with a literal em dash instead
+         of `--`, corrupted the `.ps1` script's own parsing — Windows
+         PowerShell 5.1 mis-decoded the non-ASCII character without a
+         BOM, breaking every line after it (confirmed by a real parser
+         error, not assumed). Fixed by keeping the generator's own
+         *source* to plain ASCII; non-ASCII content (the actual Arabic
+         strings) is fine as *data* written through `UTF8Encoding`,
+         just not as literal characters in the script file itself.
+
+      **Verified for real, in this exact order:**
+      1. `Strings.Get`/`Format` resolution, via the `--test-i18n` hook:
+         `en` and `ar` both resolve correctly (Arabic checked
+         byte-for-byte against `Strings.ar.resx`'s own UTF-8 bytes,
+         since a Windows console's default codepage visibly mangles
+         Arabic on *display* even when the underlying lookup is
+         correct — a real, initially-alarming false alarm, resolved by
+         comparing raw bytes instead of trusting the terminal
+         rendering); a missing key falls back to the raw key; the
+         `{0}`-interpolated key formats correctly.
+      2. `WelcomePage`, live, via `System.Windows.Automation`: every
+         migrated string confirmed rendering as its real, correct
+         text — but only after finding and working around a genuine,
+         pre-existing, unrelated bug this exposed (see below).
+      3. `ImportPacketPage` and `MasterKeyDualityPage`, live, via a
+         real two-vault scenario: created disposable vault A (raw pipe
+         calls, `internal.create_vault`/`create_key`), exported a
+         packet from it with `include_master_key: true`, created
+         disposable vault B (switches the one running agent's active
+         vault), launched the UI against B, clicked through to
+         `ImportPacketPage` (confirmed its text), used the real native
+         file picker (`System.Windows.Automation` + `SendKeys` to type
+         the path, since the picker's filename field doesn't support
+         `ValuePattern`) to import the packet, landed on
+         `MasterKeyDualityPage` for real (not simulated) — every
+         string confirmed correct, including the interpolated
+         confirmation phrase and both "no unlocked compartment"
+         messages correctly hidden (a real unlocked compartment was
+         available to merge into/replace). Then cleaned up: both
+         disposable vault files and the packet deleted, and
+         `config.json` — which `internal.create_vault` had pointed at
+         the disposable vaults — deleted too, restoring the exact
+         "no config file" state this box was in before this checkpoint
+         started (confirmed, not assumed, by checking before touching
+         anything).
+      4. `ManageVaultsPage`, live, reached from `SettingsPage`'s own
+         "Manage Known Vaults…" link (added in an earlier checkpoint):
+         every string confirmed correct.
+      5. `i18n/lint-hardcoded-strings.ps1 -Strict`: clean (exit 0) —
+         but only after fixing two real false positives the first run
+         caught in its own regex (flagging a plain `TextBox`'s own
+         `Text=` default value, e.g. `WelcomePage`'s `"MyVault.vlt"`,
+         as if it were label text; and flagging the literal
+         `"VaultSigner"` brand name, which spec §9 explicitly excludes
+         from localization) — both fixed by narrowing which
+         attribute/control-type pairs the lint actually checks, plus a
+         small brand-name exemption list.
+
+      **A real, pre-existing bug found and worked around (not fixed —
+      out of scope for this item), worth recording clearly**:
+      `ManagementHandlers.cs`'s `ListCompartments` handler does
+      `Vault?.ListCompartments() ?? []` — this **never throws**, even
+      with no vault open at all; it just returns an empty array.
+      `WelcomePage_Loaded`'s "does a vault happen to already be open"
+      check calls exactly this method and only treats a *thrown*
+      `FacadeException` as "no vault" — so with no vault open, the call
+      still succeeds (with an empty compartment list), and
+      `WelcomePage` unconditionally navigates itself straight to
+      `VaultHomePage` every single time, regardless of whether a vault
+      is actually open. In practice this means `WelcomePage` can never
+      currently be seen through normal navigation — confirmed by
+      relaunching a completely fresh agent with no config file and no
+      vault ever created, and observing the UI land on `VaultHomePage`
+      anyway. Worked around here only for verification purposes: a
+      temporary, reverted-before-committing opt-in command-line flag
+      (`--no-vault-skip`) forced the real "no vault" path so
+      `WelcomePage` could actually be observed rendering. **This is a
+      real product bug independent of i18n and should be fixed
+      separately** — likely by having the agent expose a real
+      "is a vault currently open" check rather than inferring it from
+      whether the compartment list happens to be non-throwing.
+
 ## Phase 4 — Android
 
 Not started.

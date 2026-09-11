@@ -15,6 +15,24 @@ public sealed partial class CreateKeyPage : Page, ISensitiveScreen
     public CreateKeyPage()
     {
         InitializeComponent();
+        BackButtonElement.Content = Strings.Get("nav.back_button");
+        TitleText.Text = Strings.Get("createkey.title");
+        LabelFieldText.Text = Strings.Get("createkey.label_field");
+        LabelBox.PlaceholderText = Strings.Get("createkey.label_placeholder");
+        DescriptionFieldText.Text = Strings.Get("createkey.description_label");
+        DescriptionBox.PlaceholderText = Strings.Get("createkey.description_placeholder");
+        ResourceFieldText.Text = Strings.Get("createkey.resource_label");
+        ResourceBox.PlaceholderText = Strings.Get("createkey.resource_placeholder");
+        TagsFieldText.Text = Strings.Get("createkey.tags_label");
+        TagsBox.PlaceholderText = Strings.Get("createkey.tags_placeholder");
+        KeyTypeFieldText.Text = Strings.Get("createkey.key_type_label");
+        Ed25519Item.Content = Strings.Get("common.key_type_ed25519");
+        EcdsaP256Item.Content = Strings.Get("common.key_type_ecdsa_p256");
+        Fido2ExplanationText.Text = Strings.Get("createkey.fido2_explanation");
+        PassphraseFieldText.Text = Strings.Get("createkey.passphrase_field");
+        PassphraseBox.PlaceholderText = Strings.Get("createkey.passphrase_placeholder");
+        ConfirmPassphraseBox.PlaceholderText = Strings.Get("createkey.confirm_passphrase_field");
+        CreateButton.Content = Strings.Get("createkey.create_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)

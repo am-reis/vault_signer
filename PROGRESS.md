@@ -2082,9 +2082,24 @@ ships.
 User asked directly to complete items 3.7, 3.8, and 3.11. This entry
 covers 3.7.
 
-- [x] 3.7 i18n parity with macOS build. Mirrors macOS's own scope
-      exactly (spec §12 items 2.9/2.11, see `i18n/README.md`): the same
-      four screens — `WelcomePage`, `ImportPacketPage`,
+- [ ] 3.7 i18n parity with macOS build. **Correction, added after this
+      checkpoint originally shipped**: this entry's own "mirrors
+      macOS's own scope exactly" framing below was wrong, caught by a
+      reviewer, not by this session — it mirrored an *earlier* macOS
+      milestone (the original 4-screen RTL set), not macOS's actual
+      current state (all 13 views, zero hardcoded strings, reached in a
+      later macOS-side session whose `i18n/source/en.json` additions
+      were committed directly on `platform/macos` and never reached
+      `shared`, so the real gap wasn't visible without checking that
+      branch's own `PROGRESS.md` directly). This item is genuinely
+      complete now — see the "item 3.7, corrected" checkpoint further
+      down for the real completion, verification, and the process fix
+      recorded in `CLAUDE.md` so this class of mistake — checking
+      "done" against a stale copy of another platform's state — doesn't
+      recur. Left as `[ ]` here rather than editing history further up;
+      the corrected checkpoint below carries the real `[x]`.
+      Below (unedited): what this checkpoint originally covered — the
+      same four screens — `WelcomePage`, `ImportPacketPage`,
       `MasterKeyDualityPage`, `ManageVaultsPage` — migrated to
       `i18n/source/en.json`/`ar.json` resource keys, not full-app
       coverage (66 hardcoded literals remain across the rest of the
@@ -2325,6 +2340,114 @@ respects, or an agent-side `internal.close_vault` method — worth
 raising with the user rather than deciding unilaterally, since it's a
 product-shape question (does "switching vaults" mean the agent forgets
 the vault too, or only the UI's view of it?).
+
+### Session checkpoint (this entry): item 3.7, corrected — genuine full-app i18n parity
+
+A reviewer caught a real gap in the "item 3.7, i18n parity with macOS"
+checkpoint above: it said Windows "mirrors macOS's own scope exactly,"
+but that was macOS's *original* 4-screen RTL-set scope (spec §12 item
+2.9's first pass), not macOS's actual current state. macOS had already
+reached full-app migration — all 13 views, zero hardcoded strings — in
+a session whose `i18n/source/en.json` additions (~100 keys) were
+committed directly on `platform/macos` rather than on `shared`, so they
+never reached this branch, `staging`, or anywhere the earlier checkpoint
+could have seen them without deliberately reading `platform/macos`'s
+own `PROGRESS.md`. The 66-hardcoded-literals figure that checkpoint
+quoted was real and honestly disclosed — but "not full parity" is what
+it actually meant, not "done."
+
+- [x] 3.7 i18n parity with macOS build — now genuine. Both platforms
+      fully migrated: macOS's 13 views (already done, per its own
+      `PROGRESS.md`) and, this checkpoint, all 12 Windows pages —
+      the original four plus `BackupMasterKeyOnlyPage`,
+      `CreateCompartmentPage`, `CreateKeyPage`, `DeviceProfilePicker`,
+      `ExportKeysPage`, `KeyDetailPage`, `SettingsPage`,
+      `VaultHomePage`. `i18n/lint-hardcoded-strings.ps1 -Strict` is
+      clean (exit 0) with **zero** hardcoded literals across the entire
+      Windows app, matching macOS's own bar exactly (`i18n/README.md`
+      records both).
+
+      **Step 1 — reconciled `i18n/source/en.json`** (on `shared`,
+      correct branch per `CLAUDE.md`'s path ownership): pulled
+      macOS's real 162-key file from `platform/macos` directly (`git
+      show origin/platform/macos:i18n/source/en.json`), merged it with
+      Windows's existing 15 Windows-only keys (no name collisions,
+      confirmed by checking each one), keeping macOS's exact key
+      structure and grouping rather than just appending. `ar.json`
+      needed no changes — confirmed its existing 60 keys are already
+      exactly macOS's 45 RTL-scoped keys plus Windows's 15, byte-for-
+      byte identical values for every key in common (diffed, not
+      assumed) — Arabic coverage is deliberately narrower than English
+      on both platforms (spec §9's actual requirement is RTL
+      verification on the import/export screens, not whole-app
+      localization), so this was already correct once the scope
+      question was understood correctly.
+      **Step 2 — migrated all 8 remaining Windows files**, adding ~40
+      more keys along the way for concepts with no macOS equivalent
+      (`createcompartment.*` — Windows's standalone compartment-
+      creation feature, which macOS doesn't have at all — plus various
+      `*_placeholder`/`*_label` keys where Windows's UI splits a single
+      macOS field-label string into a separate bold label + placeholder
+      hint) or where a value is genuinely interpolated
+      (`settings.auto_unlock_explanation_format`,
+      `discardkey.confirm_prompt_format`, both new `Strings.Format`
+      call sites, mirroring `duality.option3.confirmation_field_format`
+      from the original pass). Also fixed, while migrating
+      `VaultHomePage`/`KeyDetailPage`: `KeyRow.TypeAndPurpose` and
+      `KeyDetailPage`'s own type/purpose line were interpolating the
+      *raw enum ToString()* (`"CustomSigning"`, `"EcdsaP256"`) instead
+      of a real display string — now routed through `common.*` keys the
+      same way `CreateKeyPage`'s type picker already was, so a real key
+      now shows "Custom signing" (with the space) instead of the enum
+      name leaking into the UI. A stale doc comment on `SettingsPage`
+      claiming "this app has no i18n scaffolding yet (spec item 3.7,
+      still open)" was also fixed while touching that file.
+      **A real, non-obvious rendering difference found and handled**:
+      `exportpacket.option_asis_detail`'s shared value uses Markdown
+      (`**bold**`) — SwiftUI's `Text(LocalizedStringKey)` renders that
+      automatically, but WinUI3's plain `TextBlock.Text` does not, so
+      using the value as-is would have shown literal `**` asterisks.
+      Fixed with a targeted `.Replace("**", "")` at the one call site
+      that needs it, keeping one shared value serving both platforms
+      correctly in each one's own native rendering behavior, rather
+      than forking the string.
+      **Also improved the lint tool itself while using it for this**:
+      the first `-Report` run under-counted — `RadioButton`/`CheckBox`/
+      `ToggleSwitch`/`ComboBoxItem` weren't in its control-type list at
+      all, and it matched line-by-line, so any attribute wrapped onto
+      its own line (a real, common style already used throughout this
+      codebase's own XAML) was invisible to it. Both fixed: the pattern
+      list now covers those control types, and matching runs against
+      each file's full text with line numbers computed from newline
+      counts, not per-line. This mirrors macOS's own item 2.9 note
+      about going beyond what its lint script's regex alone could catch
+      for genuine completeness rather than gaming the tool.
+
+      **Verified live**, same rigor as the original pass: rebuilt
+      `Resources/Strings.resx` (219 keys) and `Strings.ar.resx` (59,
+      unchanged), clean build, then created a real vault and key
+      (`internal.create_vault`/`create_key` over the raw pipe, fastest
+      reliable setup — already proven equivalent to driving the UI
+      form, per item 3.8's entry above) and walked through
+      `VaultHomePage`, `KeyDetailPage`, `ExportKeysPage`,
+      `CreateKeyPage`, `SettingsPage`, and `CreateCompartmentPage` live
+      via `System.Windows.Automation`, confirming every migrated string
+      — including the three interpolated ones and the Markdown-stripped
+      one — rendered correctly, not a raw key or a blank label. All
+      test state (vault files, `config.json`) deleted afterward,
+      restoring the pre-checkpoint state.
+
+      **Process fix**: added a note to `CLAUDE.md` (`shared`, merged
+      down) making explicit that `PROGRESS.md` is the only place
+      completion is tracked — this exact mistake (trusting a stale,
+      not-actually-current picture of another platform's state) is
+      distinct from, but related to, the near-mistake recorded there
+      about `spec/VaultSigner-Spec.md`'s checklist never being the
+      completion record either. The actual missing habit this surfaced:
+      when a cross-platform shared resource (`i18n/source/*.json`) is
+      involved, check the *other* platform's own branch state directly
+      before claiming parity with it, rather than trusting whatever
+      copy happens to already be on `shared`.
 
 ## Phase 4 — Android
 

@@ -13,14 +13,14 @@
             <StackPanel Padding="32,24,32,32" Spacing="20" MaxWidth="520" HorizontalAlignment="Center">
 
                 <StackPanel Spacing="4">
-                    <HyperlinkButton Content="&#x2190; Back" Padding="0" Click="BackButton_Click" />
+                    <HyperlinkButton x:Name="BackButtonElement" Padding="0" Click="BackButton_Click" />
                     <TextBlock x:Name="TitleText" FontSize="28" FontWeight="SemiBold" />
                 </StackPanel>
 
                 <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
 
                 <StackPanel x:Name="KeySelectionSection" Spacing="8">
-                    <TextBlock Text="Keys to include" FontWeight="SemiBold" />
+                    <TextBlock x:Name="KeysToIncludeText" FontWeight="SemiBold" />
                     <ListView x:Name="KeysList" SelectionMode="Multiple" MaxHeight="180">
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="local:KeyRow">
@@ -34,43 +34,39 @@
                 </StackPanel>
 
                 <StackPanel x:Name="IncludeMasterKeySection" Spacing="4">
-                    <CheckBox x:Name="IncludeMasterKeyCheck" Content="Include master key in export" />
-                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
-                               Text="Lets the recipient treat this as carrying its own master key instead of just independently-passphrased keys." />
+                    <CheckBox x:Name="IncludeMasterKeyCheck" />
+                    <TextBlock x:Name="IncludeMasterExplanationText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
                 </StackPanel>
 
-                <TextBlock Text="Protect this export with" FontWeight="SemiBold" />
+                <TextBlock x:Name="ProtectWithText" FontWeight="SemiBold" />
 
                 <StackPanel Spacing="10">
                     <RadioButton x:Name="AsIsRadio" GroupName="Encryption" Checked="EncryptionOption_Checked" HorizontalContentAlignment="Stretch">
                         <StackPanel Spacing="4" Padding="4">
-                            <TextBlock Text="Just package the keys as-is" FontWeight="SemiBold" TextWrapping="Wrap" />
-                            <TextBlock TextWrapping="Wrap" Opacity="0.75" FontSize="12"
-                                       Text="Keys stay encrypted with their own passphrases; no extra layer is added. The label, description, and resource for each key travel in the clear inside this file. Only use this if the recipient already knows each key's passphrase and the transport channel itself is trusted." />
+                            <TextBlock x:Name="AsIsTitleText" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock x:Name="AsIsDetailText" TextWrapping="Wrap" Opacity="0.75" FontSize="12" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="DestinationPasswordRadio" GroupName="Encryption" Checked="EncryptionOption_Checked" HorizontalContentAlignment="Stretch">
                         <StackPanel Spacing="4" Padding="4">
-                            <TextBlock Text="Re-encrypt for the destination vault's master password" FontWeight="SemiBold" TextWrapping="Wrap" />
-                            <TextBlock TextWrapping="Wrap" Opacity="0.75" FontSize="12"
-                                       Text="Choose this only if you know the master password of the vault you're importing into." />
-                            <PasswordBox x:Name="DestinationPasswordBox" PlaceholderText="Destination vault's master passphrase" Visibility="Collapsed" />
+                            <TextBlock x:Name="DestinationTitleText" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock x:Name="DestinationDetailText" TextWrapping="Wrap" Opacity="0.75" FontSize="12" />
+                            <PasswordBox x:Name="DestinationPasswordBox" Visibility="Collapsed" />
                         </StackPanel>
                     </RadioButton>
                     <RadioButton x:Name="TransferPasswordRadio" GroupName="Encryption" Checked="EncryptionOption_Checked" HorizontalContentAlignment="Stretch">
                         <StackPanel Spacing="4" Padding="4">
-                            <TextBlock Text="Protect with a one-time transfer password" FontWeight="SemiBold" TextWrapping="Wrap" />
-                            <TextBlock TextWrapping="Wrap" Opacity="0.75" FontSize="12"
-                                       Text="Set a new passphrase for this export only. Deliver it to the recipient through a separate channel from the file itself." />
+                            <TextBlock x:Name="TransferTitleText" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock x:Name="TransferDetailText" TextWrapping="Wrap" Opacity="0.75" FontSize="12" />
                             <StackPanel x:Name="TransferPasswordFields" Visibility="Collapsed" Spacing="6">
-                                <PasswordBox x:Name="TransferPasswordBox" PlaceholderText="Transfer passphrase" />
-                                <PasswordBox x:Name="ConfirmTransferPasswordBox" PlaceholderText="Confirm transfer passphrase" />
+                                <PasswordBox x:Name="TransferPasswordBox" />
+                                <PasswordBox x:Name="ConfirmTransferPasswordBox" />
                             </StackPanel>
                         </StackPanel>
                     </RadioButton>
                 </StackPanel>
 
-                <Button x:Name="ExportButton" Content="Export…" Style="{StaticResource AccentButtonStyle}"
+                <Button x:Name="ExportButton" Style="{StaticResource AccentButtonStyle}"
                         HorizontalAlignment="Right" Click="ExportButton_Click" />
 
             </StackPanel>

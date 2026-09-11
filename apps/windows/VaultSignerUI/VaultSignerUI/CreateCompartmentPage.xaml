@@ -13,20 +13,19 @@
             <StackPanel Padding="32,24,32,32" Spacing="16" MaxWidth="440" HorizontalAlignment="Center">
 
                 <StackPanel Spacing="4">
-                    <HyperlinkButton Content="&#x2190; Back" Padding="0" Click="BackButton_Click" />
-                    <TextBlock Text="New Compartment" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                               Text="A compartment is its own independent set of keys with its own master passphrase, inside this same vault file. Use this if you want, for example, a separate 'Work' set of keys from your 'Personal' ones." />
+                    <HyperlinkButton x:Name="BackButtonElement" Padding="0" Click="BackButton_Click" />
+                    <TextBlock x:Name="TitleText" FontSize="28" FontWeight="SemiBold" />
+                    <TextBlock x:Name="SubtitleText" TextWrapping="Wrap" Opacity="0.7" />
                 </StackPanel>
 
                 <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
 
-                <TextBox x:Name="LabelBox" PlaceholderText="Compartment name, e.g. Work" />
-                <PasswordBox x:Name="PassphraseBox" PlaceholderText="Master passphrase for this compartment" />
-                <PasswordBox x:Name="ConfirmPassphraseBox" PlaceholderText="Confirm master passphrase" />
+                <TextBox x:Name="LabelBox" />
+                <PasswordBox x:Name="PassphraseBox" />
+                <PasswordBox x:Name="ConfirmPassphraseBox" />
                 <local:DeviceProfilePicker x:Name="ProfilePicker" />
 
-                <Button x:Name="CreateButton" Content="Create Compartment" Style="{StaticResource AccentButtonStyle}"
+                <Button x:Name="CreateButton" Style="{StaticResource AccentButtonStyle}"
                         HorizontalAlignment="Right" Click="CreateButton_Click" />
 
             </StackPanel>

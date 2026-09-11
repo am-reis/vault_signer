@@ -13,7 +13,7 @@
             <StackPanel Padding="32,24,32,32" Spacing="20" MaxWidth="480" HorizontalAlignment="Center">
 
                 <StackPanel Spacing="4">
-                    <HyperlinkButton Content="&#x2190; Back" Padding="0" Click="BackButton_Click" />
+                    <HyperlinkButton x:Name="BackButtonElement" Padding="0" Click="BackButton_Click" />
                     <TextBlock x:Name="TitleText" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </StackPanel>
 
@@ -21,45 +21,44 @@
 
                 <StackPanel Spacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="16" CornerRadius="6">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Description" FontWeight="SemiBold" Width="110" />
+                        <TextBlock x:Name="DescriptionFieldText" FontWeight="SemiBold" Width="110" />
                         <TextBlock x:Name="DescriptionText" TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Resource" FontWeight="SemiBold" Width="110" />
+                        <TextBlock x:Name="ResourceFieldText" FontWeight="SemiBold" Width="110" />
                         <TextBlock x:Name="ResourceText" TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Type / Purpose" FontWeight="SemiBold" Width="110" />
+                        <TextBlock x:Name="TypePurposeFieldText" FontWeight="SemiBold" Width="110" />
                         <TextBlock x:Name="TypeText" TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Created" FontWeight="SemiBold" Width="110" />
+                        <TextBlock x:Name="CreatedFieldText" FontWeight="SemiBold" Width="110" />
                         <TextBlock x:Name="CreatedText" TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" x:Name="LastUsedRow">
-                        <TextBlock Text="Last used" FontWeight="SemiBold" Width="110" />
+                        <TextBlock x:Name="LastUsedFieldText" FontWeight="SemiBold" Width="110" />
                         <TextBlock x:Name="LastUsedText" TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="8" x:Name="TagsRow">
-                        <TextBlock Text="Tags" FontWeight="SemiBold" Width="110" />
+                        <TextBlock x:Name="TagsFieldText" FontWeight="SemiBold" Width="110" />
                         <TextBlock x:Name="TagsText" TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Spacing="4">
-                        <TextBlock Text="Public key" FontWeight="SemiBold" />
+                        <TextBlock x:Name="PublicKeyFieldText" FontWeight="SemiBold" />
                         <TextBlock x:Name="PublicKeyText" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Opacity="0.85" />
                     </StackPanel>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button x:Name="ChangePassphraseButton" Content="Change Passphrase…" Click="ChangePassphraseButton_Click" />
-                    <Button x:Name="ExportKeyButton" Content="Export This Key…" Click="ExportKeyButton_Click" />
-                    <Button x:Name="RevealRawKeyButton" Content="Reveal Raw Key…" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Click="RevealRawKeyButton_Click" />
+                    <Button x:Name="ChangePassphraseButton" Click="ChangePassphraseButton_Click" />
+                    <Button x:Name="ExportKeyButton" Click="ExportKeyButton_Click" />
+                    <Button x:Name="RevealRawKeyButton" Foreground="{ThemeResource SystemFillColorCriticalBrush}" Click="RevealRawKeyButton_Click" />
                 </StackPanel>
 
                 <StackPanel Spacing="8" Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}" Padding="16" CornerRadius="6">
-                    <TextBlock Text="Danger zone" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
-                    <TextBlock TextWrapping="Wrap" Opacity="0.85"
-                               Text="Discarding a key permanently deletes its private material. This cannot be undone." />
+                    <TextBlock x:Name="DangerZoneText" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                    <TextBlock x:Name="DiscardWarningText" TextWrapping="Wrap" Opacity="0.85" />
                     <TextBlock x:Name="ConfirmPrompt" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,4,0,0" />
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -67,7 +66,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBox Grid.Column="0" x:Name="DiscardConfirmBox" />
-                        <Button Grid.Column="1" x:Name="DiscardKeyButton" Content="Discard Key" Margin="8,0,0,0" Click="DiscardKeyButton_Click" />
+                        <Button Grid.Column="1" x:Name="DiscardKeyButton" Margin="8,0,0,0" Click="DiscardKeyButton_Click" />
                     </Grid>
                 </StackPanel>
 

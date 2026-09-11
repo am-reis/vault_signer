@@ -19,7 +19,22 @@ internal sealed class KeyRow(KeyInfo info)
     /// subtitle exactly, including its "no resource" fallback text
     /// (this was previously missing resource entirely).
     public string TypeAndPurpose =>
-        $"{(Info.resource.Length > 0 ? Info.resource : "(no resource)")} · {Info.keyType} · {Info.purpose}";
+        $"{(Info.resource.Length > 0 ? Info.resource : Strings.Get("keylist.no_resource"))} · {KeyTypeLabel} · {PurposeLabel}";
+
+    private string KeyTypeLabel => Info.keyType switch
+    {
+        FacadeKeyType.Ed25519 => Strings.Get("common.key_type_ed25519"),
+        FacadeKeyType.EcdsaP256 => Strings.Get("common.key_type_ecdsa_p256"),
+        _ => Info.keyType.ToString(),
+    };
+
+    private string PurposeLabel => Info.purpose switch
+    {
+        FacadePurpose.Fido2 => Strings.Get("common.purpose_fido2"),
+        FacadePurpose.CustomSigning => Strings.Get("common.purpose_custom_signing"),
+        FacadePurpose.Both => Strings.Get("common.purpose_both"),
+        _ => Info.purpose.ToString(),
+    };
 }
 
 /// Compartment picker + key list — the hub screen a user lands on and
@@ -39,6 +54,22 @@ public sealed partial class VaultHomePage : Page, ISensitiveScreen
     public VaultHomePage()
     {
         InitializeComponent();
+        SwitchVaultLink.Content = Strings.Get("keylist.switch_vault_link");
+        ToolTipService.SetToolTip(SettingsButton, Strings.Get("keylist.settings_button"));
+        ToolTipService.SetToolTip(LockAllButton, Strings.Get("keylist.lock_all_tooltip"));
+        LockAllText.Text = Strings.Get("keylist.lock_all_button");
+        CompartmentLabelText.Text = Strings.Get("unlock.compartment_picker");
+        NewCompartmentLinkButton.Content = Strings.Get("keylist.new_compartment_link");
+        UnlockPassphraseBox.PlaceholderText = Strings.Get("unlock.master_passphrase_placeholder");
+        UnlockButton.Content = Strings.Get("unlock.unlock_button");
+        KeysHeaderText.Text = Strings.Get("keylist.default_title");
+        NewKeyText.Text = Strings.Get("keylist.new_key_button");
+        EmptyKeysText.Text = Strings.Get("keylist.no_keys_combined");
+        ImportBackupHeaderText.Text = Strings.Get("keylist.import_backup_header");
+        ImportButtonElement.Content = Strings.Get("keylist.import_button");
+        ExportKeysButtonElement.Content = Strings.Get("keylist.export_keys_button");
+        BackUpEverythingButtonElement.Content = Strings.Get("keylist.backup_everything_button");
+        BackUpMasterKeyOnlyButtonElement.Content = Strings.Get("keylist.backup_master_only_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)

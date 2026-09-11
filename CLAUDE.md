@@ -16,6 +16,8 @@ Path ownership is a convention, not a physical split — `shared`'s tree is not 
 
 `PROGRESS.md` is a single cross-cutting project journal, edited from whichever branch the work happened on. **It is the only place completion is tracked.** `spec/VaultSigner-Spec.md`'s own `## 12. Execution plan` checklist is a static plan — its `- [ ]` items are never checked off, even for items that are fully done and shipped (compare macOS's Phase 2 items there against `PROGRESS.md`'s own Phase 2 section, which marks the same items `- [x]` with the verification details). When an item is done, add or update its `- [x] N.M ...` entry in `PROGRESS.md` — don't edit the checkbox in the spec file itself.
 
+**Before claiming parity with another platform on a shared resource, check that platform's own branch directly — not just what's already on `shared`.** A real gap shipped this way once: Windows's i18n work claimed it "mirrors macOS's scope exactly," but macOS had already moved past that scope in a later session whose `i18n/source/*.json` additions were committed directly on `platform/macos` (itself a mistake — see the path-ownership rule above) and so never reached `shared`. The Windows-side claim was checked against whatever was on `shared` at the time, not against `platform/macos`'s actual tip, and the gap went unnoticed until a reviewer caught it. When a change touches a `shared`-owned resource (`i18n/`, `vaultcore/`, `spec/`, `docs/`) on behalf of "matching platform X," fetch and read platform X's own branch state for that resource first.
+
 ## Flow
 
 ```

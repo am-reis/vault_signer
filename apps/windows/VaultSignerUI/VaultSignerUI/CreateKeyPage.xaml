@@ -13,39 +13,38 @@
             <StackPanel Padding="32,24,32,32" Spacing="20" MaxWidth="480" HorizontalAlignment="Center">
 
                 <StackPanel Spacing="4">
-                    <HyperlinkButton Content="&#x2190; Back" Padding="0" Click="BackButton_Click" />
-                    <TextBlock Text="New Key" FontSize="28" FontWeight="SemiBold" />
+                    <HyperlinkButton x:Name="BackButtonElement" Padding="0" Click="BackButton_Click" />
+                    <TextBlock x:Name="TitleText" FontSize="28" FontWeight="SemiBold" />
                 </StackPanel>
 
                 <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
 
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Label" FontWeight="SemiBold" />
-                    <TextBox x:Name="LabelBox" PlaceholderText="e.g. Deploy signing key" />
+                    <TextBlock x:Name="LabelFieldText" FontWeight="SemiBold" />
+                    <TextBox x:Name="LabelBox" />
 
-                    <TextBlock Text="Description" FontWeight="SemiBold" Margin="0,8,0,0" />
-                    <TextBox x:Name="DescriptionBox" PlaceholderText="Optional" AcceptsReturn="True" TextWrapping="Wrap" Height="72" />
+                    <TextBlock x:Name="DescriptionFieldText" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <TextBox x:Name="DescriptionBox" AcceptsReturn="True" TextWrapping="Wrap" Height="72" />
 
-                    <TextBlock Text="Resource" FontWeight="SemiBold" Margin="0,8,0,0" />
-                    <TextBox x:Name="ResourceBox" PlaceholderText="e.g. a hostname or service name" />
+                    <TextBlock x:Name="ResourceFieldText" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <TextBox x:Name="ResourceBox" />
 
-                    <TextBlock Text="Tags" FontWeight="SemiBold" Margin="0,8,0,0" />
-                    <TextBox x:Name="TagsBox" PlaceholderText="Comma-separated, optional" />
+                    <TextBlock x:Name="TagsFieldText" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <TextBox x:Name="TagsBox" />
 
-                    <TextBlock Text="Key type" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <TextBlock x:Name="KeyTypeFieldText" FontWeight="SemiBold" Margin="0,8,0,0" />
                     <ComboBox x:Name="KeyTypeCombo" HorizontalAlignment="Stretch" SelectedIndex="0">
-                        <ComboBoxItem Content="Ed25519" />
-                        <ComboBoxItem Content="ECDSA P-256" />
+                        <ComboBoxItem x:Name="Ed25519Item" />
+                        <ComboBoxItem x:Name="EcdsaP256Item" />
                     </ComboBox>
-                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
-                               Text="Keys created here are for custom signing only. A FIDO2/passkey credential needs a real relying-party registration ceremony to supply its rp_id and user handle — it's created automatically the first time you register this vault as a passkey with a site, not through this form." />
+                    <TextBlock x:Name="Fido2ExplanationText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
 
-                    <TextBlock Text="Key passphrase" FontWeight="SemiBold" Margin="0,8,0,0" />
-                    <PasswordBox x:Name="PassphraseBox" PlaceholderText="Required each time this key is used to sign" />
-                    <PasswordBox x:Name="ConfirmPassphraseBox" PlaceholderText="Confirm key passphrase" />
+                    <TextBlock x:Name="PassphraseFieldText" FontWeight="SemiBold" Margin="0,8,0,0" />
+                    <PasswordBox x:Name="PassphraseBox" />
+                    <PasswordBox x:Name="ConfirmPassphraseBox" />
                 </StackPanel>
 
-                <Button x:Name="CreateButton" Content="Create Key" Style="{StaticResource AccentButtonStyle}"
+                <Button x:Name="CreateButton" Style="{StaticResource AccentButtonStyle}"
                         HorizontalAlignment="Right" Click="CreateButton_Click" />
 
             </StackPanel>

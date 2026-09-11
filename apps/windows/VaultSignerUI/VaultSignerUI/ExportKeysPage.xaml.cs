@@ -26,6 +26,24 @@ public sealed partial class ExportKeysPage : Page, ISensitiveScreen
     public ExportKeysPage()
     {
         InitializeComponent();
+        BackButtonElement.Content = Strings.Get("nav.back_button");
+        KeysToIncludeText.Text = Strings.Get("exportpacket.keys_to_include_header");
+        IncludeMasterKeyCheck.Content = Strings.Get("exportpacket.include_master_toggle");
+        IncludeMasterExplanationText.Text = Strings.Get("exportpacket.include_master_explanation");
+        ProtectWithText.Text = Strings.Get("exportpacket.protect_with_label");
+        AsIsTitleText.Text = Strings.Get("exportpacket.option_asis_title");
+        // WinUI3's plain TextBlock doesn't interpret Markdown the way
+        // SwiftUI's Text(LocalizedStringKey) does -- the shared key's
+        // "**...**" would otherwise show literal asterisks.
+        AsIsDetailText.Text = Strings.Get("exportpacket.option_asis_detail").Replace("**", "");
+        DestinationTitleText.Text = Strings.Get("exportpacket.option_destination_title");
+        DestinationDetailText.Text = Strings.Get("exportpacket.option_destination_detail");
+        DestinationPasswordBox.PlaceholderText = Strings.Get("exportpacket.option_destination_field");
+        TransferTitleText.Text = Strings.Get("exportpacket.option_transfer_title");
+        TransferDetailText.Text = Strings.Get("exportpacket.option_transfer_detail");
+        TransferPasswordBox.PlaceholderText = Strings.Get("exportpacket.transfer_passphrase_field");
+        ConfirmTransferPasswordBox.PlaceholderText = Strings.Get("exportpacket.confirm_transfer_field");
+        ExportButton.Content = Strings.Get("exportpacket.export_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -35,7 +53,7 @@ public sealed partial class ExportKeysPage : Page, ISensitiveScreen
         _compartmentId = args.CompartmentId;
         _backupMode = args.BackupMode;
 
-        TitleText.Text = _backupMode ? "Back Up Everything" : "Export Keys";
+        TitleText.Text = _backupMode ? Strings.Get("exportpacket.title_backup_everything") : Strings.Get("exportpacket.title_export");
         KeySelectionSection.Visibility = _backupMode ? Visibility.Collapsed : Visibility.Visible;
         IncludeMasterKeySection.Visibility = _backupMode ? Visibility.Collapsed : Visibility.Visible;
 

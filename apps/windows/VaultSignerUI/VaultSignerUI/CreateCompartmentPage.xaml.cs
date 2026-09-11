@@ -20,6 +20,13 @@ public sealed partial class CreateCompartmentPage : Page, ISensitiveScreen
     public CreateCompartmentPage()
     {
         InitializeComponent();
+        BackButtonElement.Content = Strings.Get("nav.back_button");
+        TitleText.Text = Strings.Get("createcompartment.title");
+        SubtitleText.Text = Strings.Get("createcompartment.subtitle");
+        LabelBox.PlaceholderText = Strings.Get("createcompartment.label_placeholder");
+        PassphraseBox.PlaceholderText = Strings.Get("createcompartment.master_passphrase_placeholder");
+        ConfirmPassphraseBox.PlaceholderText = Strings.Get("createcompartment.confirm_passphrase_placeholder");
+        CreateButton.Content = Strings.Get("createcompartment.create_button");
     }
 
     private void CreateButton_Click(object sender, RoutedEventArgs e)

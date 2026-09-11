@@ -101,6 +101,9 @@
   <data name="import.subtitle" xml:space="preserve">
     <value>Choose a .vltkey or .vltpack file.</value>
   </data>
+  <data name="import.subtitle_detailed" xml:space="preserve">
+    <value>Choose a .vltpack file exported from another VaultSigner vault (or a backup) to import its keys into this compartment.</value>
+  </data>
   <data name="import.cancel_button" xml:space="preserve">
     <value>Cancel</value>
   </data>
@@ -121,9 +124,6 @@
   </data>
   <data name="import.continue_button" xml:space="preserve">
     <value>Continue</value>
-  </data>
-  <data name="import.subtitle_detailed" xml:space="preserve">
-    <value>Choose a .vltpack file exported from another VaultSigner vault (or a backup) to import its keys into this compartment.</value>
   </data>
   <data name="duality.header" xml:space="preserve">
     <value>This import includes another vault&apos;s master key</value>
@@ -181,5 +181,487 @@
   </data>
   <data name="duality.option3.confirmation_field_format" xml:space="preserve">
     <value>Type &quot;{0}&quot; to confirm</value>
+  </data>
+  <data name="common.cancel_button" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="common.ok_button" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="common.error_title" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="common.done_button" xml:space="preserve">
+    <value>Done</value>
+  </data>
+  <data name="common.passphrases_dont_match" xml:space="preserve">
+    <value>Passphrases don&apos;t match</value>
+  </data>
+  <data name="common.key_type_ed25519" xml:space="preserve">
+    <value>Ed25519</value>
+  </data>
+  <data name="common.key_type_ecdsa_p256" xml:space="preserve">
+    <value>ECDSA P-256</value>
+  </data>
+  <data name="common.purpose_fido2" xml:space="preserve">
+    <value>FIDO2</value>
+  </data>
+  <data name="common.purpose_custom_signing" xml:space="preserve">
+    <value>Custom signing</value>
+  </data>
+  <data name="common.purpose_both" xml:space="preserve">
+    <value>FIDO2 + custom signing</value>
+  </data>
+  <data name="common.on_state" xml:space="preserve">
+    <value>On</value>
+  </data>
+  <data name="common.off_state" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="createvault.title" xml:space="preserve">
+    <value>Create New Vault</value>
+  </data>
+  <data name="createvault.compartment_label_field" xml:space="preserve">
+    <value>Compartment label</value>
+  </data>
+  <data name="createvault.compartment_label_placeholder" xml:space="preserve">
+    <value>Personal</value>
+  </data>
+  <data name="createvault.no_location_chosen" xml:space="preserve">
+    <value>No location chosen</value>
+  </data>
+  <data name="createvault.choose_location_button" xml:space="preserve">
+    <value>Choose Location…</value>
+  </data>
+  <data name="createvault.master_passphrase_field" xml:space="preserve">
+    <value>Master passphrase</value>
+  </data>
+  <data name="createvault.confirm_passphrase_field" xml:space="preserve">
+    <value>Confirm passphrase</value>
+  </data>
+  <data name="createvault.device_profile_label" xml:space="preserve">
+    <value>Device profile</value>
+  </data>
+  <data name="createvault.profile_desktop" xml:space="preserve">
+    <value>Desktop</value>
+  </data>
+  <data name="createvault.profile_mobile" xml:space="preserve">
+    <value>Mobile</value>
+  </data>
+  <data name="createvault.master_passphrase_explanation" xml:space="preserve">
+    <value>The master passphrase protects your key list and labels, but not the keys themselves — each key gets its own independent passphrase when you create it.</value>
+  </data>
+  <data name="createvault.device_profile_explanation" xml:space="preserve">
+    <value>Controls how expensive the passphrase-derivation step is (spec §4.2) — Desktop targets a stronger, slower derivation; Mobile trades some of that strength for speed and battery. This affects the master passphrase&apos;s protection, not the keys themselves.</value>
+  </data>
+  <data name="createvault.create_button" xml:space="preserve">
+    <value>Create Vault</value>
+  </data>
+  <data name="createvault.panel_title" xml:space="preserve">
+    <value>Create Vault</value>
+  </data>
+  <data name="createcompartment.title" xml:space="preserve">
+    <value>New Compartment</value>
+  </data>
+  <data name="createcompartment.subtitle" xml:space="preserve">
+    <value>A compartment is its own independent set of keys with its own master passphrase, inside this same vault file. Use this if you want, for example, a separate &apos;Work&apos; set of keys from your &apos;Personal&apos; ones.</value>
+  </data>
+  <data name="createcompartment.label_placeholder" xml:space="preserve">
+    <value>Compartment name, e.g. Work</value>
+  </data>
+  <data name="createcompartment.master_passphrase_placeholder" xml:space="preserve">
+    <value>Master passphrase for this compartment</value>
+  </data>
+  <data name="createcompartment.confirm_passphrase_placeholder" xml:space="preserve">
+    <value>Confirm master passphrase</value>
+  </data>
+  <data name="createcompartment.create_button" xml:space="preserve">
+    <value>Create Compartment</value>
+  </data>
+  <data name="createkey.title" xml:space="preserve">
+    <value>Create Key</value>
+  </data>
+  <data name="createkey.label_field" xml:space="preserve">
+    <value>Label</value>
+  </data>
+  <data name="createkey.label_placeholder" xml:space="preserve">
+    <value>e.g. Deploy signing key</value>
+  </data>
+  <data name="createkey.description_field" xml:space="preserve">
+    <value>Description (optional)</value>
+  </data>
+  <data name="createkey.description_label" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="createkey.description_placeholder" xml:space="preserve">
+    <value>Optional</value>
+  </data>
+  <data name="createkey.resource_field" xml:space="preserve">
+    <value>Resource, e.g. https://example.com</value>
+  </data>
+  <data name="createkey.resource_label" xml:space="preserve">
+    <value>Resource</value>
+  </data>
+  <data name="createkey.resource_placeholder" xml:space="preserve">
+    <value>e.g. a hostname or service name</value>
+  </data>
+  <data name="createkey.tags_field" xml:space="preserve">
+    <value>Tags, comma-separated</value>
+  </data>
+  <data name="createkey.tags_label" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="createkey.tags_placeholder" xml:space="preserve">
+    <value>Comma-separated, optional</value>
+  </data>
+  <data name="createkey.key_type_label" xml:space="preserve">
+    <value>Key type</value>
+  </data>
+  <data name="createkey.key_type_ed25519_option" xml:space="preserve">
+    <value>Ed25519 (default)</value>
+  </data>
+  <data name="createkey.fido2_explanation" xml:space="preserve">
+    <value>Keys created here are for custom signing only. A FIDO2/passkey credential needs a real relying-party registration ceremony to supply its rp_id and user handle — it&apos;s created automatically the first time you register this vault as a passkey with a site, not through this form.</value>
+  </data>
+  <data name="createkey.passphrase_field" xml:space="preserve">
+    <value>Key passphrase</value>
+  </data>
+  <data name="createkey.passphrase_placeholder" xml:space="preserve">
+    <value>Required each time this key is used to sign</value>
+  </data>
+  <data name="createkey.confirm_passphrase_field" xml:space="preserve">
+    <value>Confirm key passphrase</value>
+  </data>
+  <data name="createkey.passphrase_explanation" xml:space="preserve">
+    <value>This passphrase is independent of your vault&apos;s master passphrase — you&apos;ll need it again to sign or reveal this key.</value>
+  </data>
+  <data name="createkey.create_button" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="unlock.title" xml:space="preserve">
+    <value>Unlock Vault</value>
+  </data>
+  <data name="unlock.compartment_picker" xml:space="preserve">
+    <value>Compartment</value>
+  </data>
+  <data name="unlock.master_passphrase_field" xml:space="preserve">
+    <value>Master passphrase</value>
+  </data>
+  <data name="unlock.master_passphrase_placeholder" xml:space="preserve">
+    <value>Passphrase to unlock this compartment</value>
+  </data>
+  <data name="unlock.unlock_button" xml:space="preserve">
+    <value>Unlock</value>
+  </data>
+  <data name="keylist.no_keys_title" xml:space="preserve">
+    <value>No Keys Yet</value>
+  </data>
+  <data name="keylist.no_keys_subtitle" xml:space="preserve">
+    <value>Create your first key to start signing.</value>
+  </data>
+  <data name="keylist.no_resource" xml:space="preserve">
+    <value>(no resource)</value>
+  </data>
+  <data name="keylist.new_key_button" xml:space="preserve">
+    <value>New Key</value>
+  </data>
+  <data name="keylist.export_packet_button" xml:space="preserve">
+    <value>Export Packet…</value>
+  </data>
+  <data name="keylist.import_packet_button" xml:space="preserve">
+    <value>Import Packet…</value>
+  </data>
+  <data name="keylist.import_export_menu" xml:space="preserve">
+    <value>Import/Export</value>
+  </data>
+  <data name="keylist.settings_button" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="keylist.lock_button" xml:space="preserve">
+    <value>Lock</value>
+  </data>
+  <data name="keylist.default_title" xml:space="preserve">
+    <value>Keys</value>
+  </data>
+  <data name="keylist.switch_vault_link" xml:space="preserve">
+    <value>Open a different vault</value>
+  </data>
+  <data name="keylist.lock_all_button" xml:space="preserve">
+    <value>Lock All</value>
+  </data>
+  <data name="keylist.new_compartment_link" xml:space="preserve">
+    <value>New Compartment…</value>
+  </data>
+  <data name="keylist.import_backup_header" xml:space="preserve">
+    <value>Import &amp; backup</value>
+  </data>
+  <data name="keylist.import_button" xml:space="preserve">
+    <value>Import…</value>
+  </data>
+  <data name="keylist.export_keys_button" xml:space="preserve">
+    <value>Export Keys…</value>
+  </data>
+  <data name="keylist.backup_everything_button" xml:space="preserve">
+    <value>Back Up Everything…</value>
+  </data>
+  <data name="keylist.backup_master_only_button" xml:space="preserve">
+    <value>Back Up Master Key Only…</value>
+  </data>
+  <data name="keylist.lock_all_tooltip" xml:space="preserve">
+    <value>Lock every compartment and wipe cached key material</value>
+  </data>
+  <data name="keylist.no_keys_combined" xml:space="preserve">
+    <value>No keys in this compartment yet — click New Key to create one.</value>
+  </data>
+  <data name="keydetail.details_section" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="keydetail.actions_section" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="keydetail.label_field" xml:space="preserve">
+    <value>Label</value>
+  </data>
+  <data name="keydetail.description_field" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="keydetail.resource_field" xml:space="preserve">
+    <value>Resource</value>
+  </data>
+  <data name="keydetail.public_key_field" xml:space="preserve">
+    <value>Public key</value>
+  </data>
+  <data name="keydetail.created_field" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="keydetail.last_used_field" xml:space="preserve">
+    <value>Last used</value>
+  </data>
+  <data name="keydetail.type_purpose_field" xml:space="preserve">
+    <value>Type / Purpose</value>
+  </data>
+  <data name="keydetail.tags_field" xml:space="preserve">
+    <value>Tags</value>
+  </data>
+  <data name="keydetail.change_passphrase_button" xml:space="preserve">
+    <value>Change Passphrase…</value>
+  </data>
+  <data name="keydetail.reveal_raw_key_button" xml:space="preserve">
+    <value>Reveal Raw Key…</value>
+  </data>
+  <data name="keydetail.export_button" xml:space="preserve">
+    <value>Export This Key…</value>
+  </data>
+  <data name="keydetail.discard_button" xml:space="preserve">
+    <value>Discard Key…</value>
+  </data>
+  <data name="keydetail.export_failed_format" xml:space="preserve">
+    <value>Export failed: {0}</value>
+  </data>
+  <data name="keydetail.panel_title" xml:space="preserve">
+    <value>Export Key</value>
+  </data>
+  <data name="keydetail.danger_zone_label" xml:space="preserve">
+    <value>Danger zone</value>
+  </data>
+  <data name="keydetail.no_description" xml:space="preserve">
+    <value>(none)</value>
+  </data>
+  <data name="changepassphrase.title" xml:space="preserve">
+    <value>Change Key Passphrase</value>
+  </data>
+  <data name="changepassphrase.current_field" xml:space="preserve">
+    <value>Current passphrase</value>
+  </data>
+  <data name="changepassphrase.new_field" xml:space="preserve">
+    <value>New passphrase</value>
+  </data>
+  <data name="changepassphrase.confirm_field" xml:space="preserve">
+    <value>Confirm new passphrase</value>
+  </data>
+  <data name="changepassphrase.incorrect_current" xml:space="preserve">
+    <value>Incorrect current passphrase</value>
+  </data>
+  <data name="changepassphrase.change_button" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="revealkey.danger_zone_label" xml:space="preserve">
+    <value>Danger Zone</value>
+  </data>
+  <data name="revealkey.warning_text" xml:space="preserve">
+    <value>This reveals the raw private key. Anyone who sees it can act as this key. It will not be copied to the clipboard automatically.</value>
+  </data>
+  <data name="revealkey.passphrase_field" xml:space="preserve">
+    <value>Key passphrase</value>
+  </data>
+  <data name="revealkey.incorrect_passphrase" xml:space="preserve">
+    <value>Incorrect passphrase</value>
+  </data>
+  <data name="revealkey.reveal_button" xml:space="preserve">
+    <value>Reveal</value>
+  </data>
+  <data name="discardkey.title" xml:space="preserve">
+    <value>Discard Key</value>
+  </data>
+  <data name="discardkey.warning_text" xml:space="preserve">
+    <value>Discarding a key permanently deletes its private material. This cannot be undone.</value>
+  </data>
+  <data name="discardkey.confirm_format" xml:space="preserve">
+    <value>This permanently deletes &quot;{0}&quot;. Type &quot;{0}&quot; to confirm.</value>
+  </data>
+  <data name="discardkey.confirm_prompt_format" xml:space="preserve">
+    <value>Type &quot;{0}&quot; to confirm:</value>
+  </data>
+  <data name="discardkey.discard_button" xml:space="preserve">
+    <value>Discard</value>
+  </data>
+  <data name="exportpacket.title_export" xml:space="preserve">
+    <value>Export Keys</value>
+  </data>
+  <data name="exportpacket.title_backup" xml:space="preserve">
+    <value>Back Up</value>
+  </data>
+  <data name="exportpacket.title_backup_everything" xml:space="preserve">
+    <value>Back Up Everything</value>
+  </data>
+  <data name="exportpacket.keys_to_include_header" xml:space="preserve">
+    <value>Keys to include</value>
+  </data>
+  <data name="exportpacket.include_master_toggle" xml:space="preserve">
+    <value>Include master key in export</value>
+  </data>
+  <data name="exportpacket.include_master_explanation" xml:space="preserve">
+    <value>Lets the recipient treat this as carrying its own master key (spec §5.2.1) instead of just independently-passphrased keys.</value>
+  </data>
+  <data name="exportpacket.protect_with_label" xml:space="preserve">
+    <value>Protect this export with:</value>
+  </data>
+  <data name="exportpacket.option_asis_title" xml:space="preserve">
+    <value>Just package the keys as-is</value>
+  </data>
+  <data name="exportpacket.option_asis_detail" xml:space="preserve">
+    <value>Keys stay encrypted with their own passphrases; no extra layer is added. **The label, description, and resource for each key travel in the clear inside this file.** Only use this if the recipient already knows each key&apos;s passphrase and the transport channel itself is trusted.</value>
+  </data>
+  <data name="exportpacket.option_destination_title" xml:space="preserve">
+    <value>Re-encrypt for the destination vault&apos;s master password</value>
+  </data>
+  <data name="exportpacket.option_destination_detail" xml:space="preserve">
+    <value>Choose this only if you know the master password of the vault you&apos;re importing into.</value>
+  </data>
+  <data name="exportpacket.option_destination_field" xml:space="preserve">
+    <value>Destination vault&apos;s master passphrase</value>
+  </data>
+  <data name="exportpacket.option_transfer_title" xml:space="preserve">
+    <value>Protect with a one-time transfer password</value>
+  </data>
+  <data name="exportpacket.option_transfer_detail" xml:space="preserve">
+    <value>Set a new passphrase for this export only. Deliver it to the recipient through a separate channel from the file itself.</value>
+  </data>
+  <data name="exportpacket.transfer_passphrase_field" xml:space="preserve">
+    <value>Transfer passphrase</value>
+  </data>
+  <data name="exportpacket.confirm_transfer_field" xml:space="preserve">
+    <value>Confirm transfer passphrase</value>
+  </data>
+  <data name="exportpacket.export_button" xml:space="preserve">
+    <value>Export…</value>
+  </data>
+  <data name="exportpacket.export_failed_format" xml:space="preserve">
+    <value>Export failed: {0}</value>
+  </data>
+  <data name="exportpacket.panel_title" xml:space="preserve">
+    <value>Export Packet</value>
+  </data>
+  <data name="backupmasterkey.title" xml:space="preserve">
+    <value>Back Up Master Key Only</value>
+  </data>
+  <data name="backupmasterkey.warning_text" xml:space="preserve">
+    <value>This alone does NOT protect anything — your per-key blobs are also required to actually use any key. Store this only alongside a plan for recovering those separately (e.g. this vault file itself, backed up elsewhere).</value>
+  </data>
+  <data name="backupmasterkey.transfer_passphrase_field" xml:space="preserve">
+    <value>One-time transfer passphrase</value>
+  </data>
+  <data name="backupmasterkey.confirm_field" xml:space="preserve">
+    <value>Confirm transfer passphrase</value>
+  </data>
+  <data name="backupmasterkey.backup_button" xml:space="preserve">
+    <value>Back Up…</value>
+  </data>
+  <data name="backupmasterkey.backup_failed_format" xml:space="preserve">
+    <value>Backup failed: {0}</value>
+  </data>
+  <data name="backupmasterkey.panel_title" xml:space="preserve">
+    <value>Back Up Master Key</value>
+  </data>
+  <data name="settings.title" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="settings.start_at_login_toggle" xml:space="preserve">
+    <value>Start VaultSigner at login</value>
+  </data>
+  <data name="settings.start_at_login_footer" xml:space="preserve">
+    <value>Runs the background service that answers signing requests and FIDO2 prompts even when the VaultSigner window isn&apos;t open.</value>
+  </data>
+  <data name="settings.auto_unlock_toggle" xml:space="preserve">
+    <value>Auto-unlock on startup</value>
+  </data>
+  <data name="settings.auto_unlock_footer" xml:space="preserve">
+    <value>Off by default. When on, this compartment&apos;s master passphrase is stored in the Keychain so it unlocks automatically at login, without you typing anything. This is weaker than the vault&apos;s normal design — see the confirmation dialog for what that means before turning it on.</value>
+  </data>
+  <data name="settings.backup_everything_button" xml:space="preserve">
+    <value>Back Up Everything…</value>
+  </data>
+  <data name="settings.backup_master_only_button" xml:space="preserve">
+    <value>Back Up Master Key Only…</value>
+  </data>
+  <data name="settings.backup_header" xml:space="preserve">
+    <value>Backup</value>
+  </data>
+  <data name="settings.backup_footer" xml:space="preserve">
+    <value>&quot;Back up everything&quot; protects all keys + the master key together (spec §5.4 recommends the one-time transfer password option for backups stored anywhere other than an already-encrypted local disk). &quot;Master key only&quot; is a shortcut for people who store key recovery material separately — on its own it does NOT protect anything, since the per-key blobs are also required.</value>
+  </data>
+  <data name="settings.vaults_header" xml:space="preserve">
+    <value>Vaults</value>
+  </data>
+  <data name="settings.manage_vaults_button" xml:space="preserve">
+    <value>Manage Known Vaults…</value>
+  </data>
+  <data name="settings.approve_login_item_message" xml:space="preserve">
+    <value>Approve VaultSigner in System Settings → General → Login Items &amp; Extensions</value>
+  </data>
+  <data name="settings.login_item_not_found_message" xml:space="preserve">
+    <value>Login item not found in this build (development build outside /Applications?)</value>
+  </data>
+  <data name="settings.login_item_change_failed_format" xml:space="preserve">
+    <value>Couldn&apos;t change login item: {0}</value>
+  </data>
+  <data name="settings.auto_unlock_incorrect_passphrase" xml:space="preserve">
+    <value>Incorrect master passphrase; auto-unlock was not enabled.</value>
+  </data>
+  <data name="settings.auto_unlock_explanation_format" xml:space="preserve">
+    <value>Unlocks &quot;{0}&quot; automatically when VaultSignerAgent starts, without you typing its passphrase. This does not expose individual keys — those still need their own passphrases regardless of this setting. Windows note: the passphrase is protected with DPAPI tied to your Windows account, not to this app specifically — any other process running as you (not just VaultSignerAgent) could in principle decrypt it too. This is weaker than macOS&apos;s Keychain, which can scope access to VaultSigner alone.</value>
+  </data>
+  <data name="settings.auto_unlock_confirm_title" xml:space="preserve">
+    <value>Turn on auto-unlock?</value>
+  </data>
+  <data name="settings.auto_unlock_confirm_passphrase_placeholder" xml:space="preserve">
+    <value>This compartment&apos;s master passphrase</value>
+  </data>
+  <data name="settings.auto_unlock_confirm_turn_on_button" xml:space="preserve">
+    <value>Turn On</value>
+  </data>
+  <data name="autounlockconfirm.title" xml:space="preserve">
+    <value>Enable Auto-Unlock?</value>
+  </data>
+  <data name="autounlockconfirm.body_text" xml:space="preserve">
+    <value>Your master passphrase will be stored in the macOS Keychain so this compartment unlocks automatically every time you log in or restart — no one needs to type anything.
+
+This means a decryption path to your key list and labels now persists across a reboot without your input. It does not expose your keys themselves — each key still needs its own separate passphrase to sign or reveal. But anyone who can run code as you on this Mac may be able to read this stored passphrase too, similar to other Keychain-backed secrets.</value>
+  </data>
+  <data name="autounlockconfirm.confirm_passphrase_field" xml:space="preserve">
+    <value>Confirm master passphrase</value>
+  </data>
+  <data name="autounlockconfirm.enable_button" xml:space="preserve">
+    <value>Enable Auto-Unlock</value>
   </data>
 </root>

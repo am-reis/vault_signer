@@ -13,25 +13,24 @@
             <StackPanel Padding="32,24,32,32" Spacing="20" MaxWidth="480" HorizontalAlignment="Center">
 
                 <StackPanel Spacing="4">
-                    <HyperlinkButton Content="&#x2190; Back" Padding="0" Click="BackButton_Click" />
-                    <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" />
+                    <HyperlinkButton x:Name="BackButtonElement" Padding="0" Click="BackButton_Click" />
+                    <TextBlock x:Name="TitleText" FontSize="28" FontWeight="SemiBold" />
                 </StackPanel>
 
                 <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
 
                 <StackPanel Spacing="4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Padding="16" CornerRadius="6">
-                    <ToggleSwitch x:Name="AutostartToggle" Header="Start VaultSigner automatically" OnContent="On" OffContent="Off" Toggled="AutostartToggle_Toggled" />
-                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
-                               Text="So it's ready to answer signing requests even when you haven't opened the app yourself. Recommended — signing availability depends on this being on." />
+                    <ToggleSwitch x:Name="AutostartToggle" Toggled="AutostartToggle_Toggled" />
+                    <TextBlock x:Name="AutostartFooterText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
                 </StackPanel>
 
                 <StackPanel Spacing="4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Padding="16" CornerRadius="6">
-                    <ToggleSwitch x:Name="AutoUnlockToggle" Header="Auto-unlock this compartment on startup" OnContent="On" OffContent="Off" Toggled="AutoUnlockToggle_Toggled" />
+                    <ToggleSwitch x:Name="AutoUnlockToggle" Toggled="AutoUnlockToggle_Toggled" />
                     <TextBlock x:Name="AutoUnlockCompartmentText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
                 </StackPanel>
 
                 <StackPanel Spacing="8">
-                    <HyperlinkButton Content="Manage Known Vaults…" Padding="0" Click="ManageVaultsLink_Click" />
+                    <HyperlinkButton x:Name="ManageVaultsLinkButton" Padding="0" Click="ManageVaultsLink_Click" />
                 </StackPanel>
 
             </StackPanel>

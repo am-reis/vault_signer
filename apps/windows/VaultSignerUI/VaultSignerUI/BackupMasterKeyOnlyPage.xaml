@@ -12,22 +12,21 @@
         <ScrollViewer>
             <StackPanel Padding="32,24,32,32" Spacing="16" MaxWidth="440" HorizontalAlignment="Center">
 
-                <HyperlinkButton Content="&#x2190; Back" Padding="0" Click="BackButton_Click" />
+                <HyperlinkButton x:Name="BackButtonElement" Padding="0" Click="BackButton_Click" />
 
                 <StackPanel Orientation="Horizontal" Spacing="10">
                     <FontIcon Glyph="&#xE7BA;" Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontSize="22" />
-                    <TextBlock Text="Back Up Master Key Only" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    <TextBlock x:Name="TitleText" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
                 </StackPanel>
 
-                <TextBlock TextWrapping="Wrap" Opacity="0.85"
-                           Text="This alone does NOT protect anything — your per-key blobs are also required to actually use any key. Store this only alongside a plan for recovering those separately (e.g. this vault file itself, backed up elsewhere)." />
+                <TextBlock x:Name="WarningText" TextWrapping="Wrap" Opacity="0.85" />
 
                 <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Error" IsClosable="True" />
 
-                <PasswordBox x:Name="TransferPasswordBox" PlaceholderText="One-time transfer passphrase" />
-                <PasswordBox x:Name="ConfirmTransferPasswordBox" PlaceholderText="Confirm transfer passphrase" />
+                <PasswordBox x:Name="TransferPasswordBox" />
+                <PasswordBox x:Name="ConfirmTransferPasswordBox" />
 
-                <Button x:Name="BackUpButton" Content="Back Up…" Style="{StaticResource AccentButtonStyle}"
+                <Button x:Name="BackUpButton" Style="{StaticResource AccentButtonStyle}"
                         HorizontalAlignment="Right" Click="BackUpButton_Click" />
 
             </StackPanel>

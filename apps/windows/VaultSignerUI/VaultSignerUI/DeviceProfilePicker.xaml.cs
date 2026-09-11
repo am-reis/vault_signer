@@ -13,6 +13,10 @@ public sealed partial class DeviceProfilePicker : UserControl
     public DeviceProfilePicker()
     {
         InitializeComponent();
+        DeviceProfileLabelText.Text = Strings.Get("createvault.device_profile_label");
+        DesktopRadio.Content = Strings.Get("createvault.profile_desktop");
+        MobileRadio.Content = Strings.Get("createvault.profile_mobile");
+        ExplanationText.Text = Strings.Get("createvault.device_profile_explanation");
     }
 
     internal FacadeDeviceProfile SelectedProfile =>

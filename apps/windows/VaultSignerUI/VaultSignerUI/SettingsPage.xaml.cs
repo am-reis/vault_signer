@@ -8,9 +8,7 @@ namespace VaultSignerUI;
 /// Spec §8's two independent toggles, plus the second entry point to
 /// known-vaults management spec §5.6 requires ("reachable both from the
 /// entry screen and from the app's settings"). Mirrors
-/// apps/macos/VaultSigner/Sources/Views/SettingsView.swift's role — this
-/// app has no i18n scaffolding yet (spec item 3.7, still open), so the
-/// copy here is plain literal text rather than resource keys, but the
+/// apps/macos/VaultSigner/Sources/Views/SettingsView.swift's role. The
 /// two toggles' behavior and defaults, and the DPAPI risk disclosure
 /// text, match spec §8 and `DpapiAutoUnlockStore.cs`'s own doc comment
 /// on what this screen is required to state.
@@ -23,6 +21,16 @@ public sealed partial class SettingsPage : Page, ISensitiveScreen
     public SettingsPage()
     {
         InitializeComponent();
+        BackButtonElement.Content = Strings.Get("nav.back_button");
+        TitleText.Text = Strings.Get("settings.title");
+        AutostartToggle.Header = Strings.Get("settings.start_at_login_toggle");
+        AutostartToggle.OnContent = Strings.Get("common.on_state");
+        AutostartToggle.OffContent = Strings.Get("common.off_state");
+        AutostartFooterText.Text = Strings.Get("settings.start_at_login_footer");
+        AutoUnlockToggle.Header = Strings.Get("settings.auto_unlock_toggle");
+        AutoUnlockToggle.OnContent = Strings.Get("common.on_state");
+        AutoUnlockToggle.OffContent = Strings.Get("common.off_state");
+        ManageVaultsLinkButton.Content = Strings.Get("settings.manage_vaults_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -31,12 +39,7 @@ public sealed partial class SettingsPage : Page, ISensitiveScreen
         var args = (SettingsPageArgs)e.Parameter;
         _compartmentId = args.CompartmentId;
         _compartmentLabel = args.CompartmentLabel;
-        AutoUnlockCompartmentText.Text =
-            $"Unlocks \"{_compartmentLabel}\" automatically when VaultSignerAgent starts, without you typing its passphrase. " +
-            "This does not expose individual keys — those still need their own passphrases regardless of this setting. " +
-            "Windows note: the passphrase is protected with DPAPI tied to your Windows account, not to this app specifically — " +
-            "any other process running as you (not just VaultSignerAgent) could in principle decrypt it too. This is weaker " +
-            "than macOS's Keychain, which can scope access to VaultSigner alone.";
+        AutoUnlockCompartmentText.Text = Strings.Format("settings.auto_unlock_explanation_format", _compartmentLabel);
 
         _loading = true;
         BusyRing.IsActive = true;
@@ -86,10 +89,10 @@ public sealed partial class SettingsPage : Page, ISensitiveScreen
         // doing anything (spec §8: "requires explicit opt-in with an
         // in-app risk explanation") — never enable from the toggle flip
         // alone.
-        var passphraseBox = new PasswordBox { PlaceholderText = "This compartment's master passphrase" };
+        var passphraseBox = new PasswordBox { PlaceholderText = Strings.Get("settings.auto_unlock_confirm_passphrase_placeholder") };
         var dialog = new ContentDialog
         {
-            Title = "Turn on auto-unlock?",
+            Title = Strings.Get("settings.auto_unlock_confirm_title"),
             Content = new StackPanel
             {
                 Spacing = 10,
@@ -103,8 +106,8 @@ public sealed partial class SettingsPage : Page, ISensitiveScreen
                     passphraseBox,
                 },
             },
-            PrimaryButtonText = "Turn On",
-            CloseButtonText = "Cancel",
+            PrimaryButtonText = Strings.Get("settings.auto_unlock_confirm_turn_on_button"),
+            CloseButtonText = Strings.Get("common.cancel_button"),
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = XamlRoot,
         };

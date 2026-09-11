@@ -21,6 +21,12 @@ public sealed partial class BackupMasterKeyOnlyPage : Page, ISensitiveScreen
     public BackupMasterKeyOnlyPage()
     {
         InitializeComponent();
+        BackButtonElement.Content = Strings.Get("nav.back_button");
+        TitleText.Text = Strings.Get("backupmasterkey.title");
+        WarningText.Text = Strings.Get("backupmasterkey.warning_text");
+        TransferPasswordBox.PlaceholderText = Strings.Get("backupmasterkey.transfer_passphrase_field");
+        ConfirmTransferPasswordBox.PlaceholderText = Strings.Get("backupmasterkey.confirm_field");
+        BackUpButton.Content = Strings.Get("backupmasterkey.backup_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)

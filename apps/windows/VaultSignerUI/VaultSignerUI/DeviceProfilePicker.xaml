@@ -9,12 +9,11 @@
     mc:Ignorable="d">
 
     <StackPanel Spacing="4">
-        <TextBlock Text="Device profile" FontWeight="SemiBold" />
+        <TextBlock x:Name="DeviceProfileLabelText" FontWeight="SemiBold" />
         <RadioButtons x:Name="ProfileRadios" SelectedIndex="0">
-            <RadioButton Content="Desktop" />
-            <RadioButton Content="Mobile" />
+            <RadioButton x:Name="DesktopRadio" />
+            <RadioButton x:Name="MobileRadio" />
         </RadioButtons>
-        <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="12"
-                   Text="Controls how expensive the passphrase-derivation step is (spec §4.2) — Desktop targets a stronger, slower derivation; Mobile trades some of that strength for speed and battery. This affects the master passphrase's protection, not the keys themselves." />
+        <TextBlock x:Name="ExplanationText" TextWrapping="Wrap" Opacity="0.7" FontSize="12" />
     </StackPanel>
 </UserControl>

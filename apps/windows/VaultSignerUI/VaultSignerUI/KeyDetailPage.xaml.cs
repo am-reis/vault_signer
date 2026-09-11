@@ -23,6 +23,20 @@ public sealed partial class KeyDetailPage : Page, ISensitiveScreen
     public KeyDetailPage()
     {
         InitializeComponent();
+        BackButtonElement.Content = Strings.Get("nav.back_button");
+        DescriptionFieldText.Text = Strings.Get("keydetail.description_field");
+        ResourceFieldText.Text = Strings.Get("keydetail.resource_field");
+        TypePurposeFieldText.Text = Strings.Get("keydetail.type_purpose_field");
+        CreatedFieldText.Text = Strings.Get("keydetail.created_field");
+        LastUsedFieldText.Text = Strings.Get("keydetail.last_used_field");
+        TagsFieldText.Text = Strings.Get("keydetail.tags_field");
+        PublicKeyFieldText.Text = Strings.Get("keydetail.public_key_field");
+        ChangePassphraseButton.Content = Strings.Get("keydetail.change_passphrase_button");
+        ExportKeyButton.Content = Strings.Get("keydetail.export_button");
+        RevealRawKeyButton.Content = Strings.Get("keydetail.reveal_raw_key_button");
+        DangerZoneText.Text = Strings.Get("keydetail.danger_zone_label");
+        DiscardWarningText.Text = Strings.Get("discardkey.warning_text");
+        DiscardKeyButton.Content = Strings.Get("discardkey.discard_button");
     }
 
     protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -32,9 +46,9 @@ public sealed partial class KeyDetailPage : Page, ISensitiveScreen
         var info = _args.Key;
 
         TitleText.Text = info.label;
-        DescriptionText.Text = info.description.Length > 0 ? info.description : "(none)";
+        DescriptionText.Text = info.description.Length > 0 ? info.description : Strings.Get("keydetail.no_description");
         ResourceText.Text = info.resource;
-        TypeText.Text = $"{info.keyType} / {info.purpose}";
+        TypeText.Text = $"{KeyTypeLabel(info.keyType)} / {PurposeLabel(info.purpose)}";
         CreatedText.Text = info.createdAt;
         if (info.lastUsedAt is { } lastUsed)
         {
@@ -55,9 +69,24 @@ public sealed partial class KeyDetailPage : Page, ISensitiveScreen
             TagsRow.Visibility = Visibility.Collapsed;
         }
         PublicKeyText.Text = info.publicKeyHex;
-        ConfirmPrompt.Text = $"Type \"{info.label}\" to confirm:";
+        ConfirmPrompt.Text = Strings.Format("discardkey.confirm_prompt_format", info.label);
         DiscardConfirmBox.Text = "";
     }
+
+    private static string KeyTypeLabel(FacadeKeyType keyType) => keyType switch
+    {
+        FacadeKeyType.Ed25519 => Strings.Get("common.key_type_ed25519"),
+        FacadeKeyType.EcdsaP256 => Strings.Get("common.key_type_ecdsa_p256"),
+        _ => keyType.ToString(),
+    };
+
+    private static string PurposeLabel(FacadePurpose purpose) => purpose switch
+    {
+        FacadePurpose.Fido2 => Strings.Get("common.purpose_fido2"),
+        FacadePurpose.CustomSigning => Strings.Get("common.purpose_custom_signing"),
+        FacadePurpose.Both => Strings.Get("common.purpose_both"),
+        _ => purpose.ToString(),
+    };
 
     /// Spec §5.1: "standalone action reachable from the key detail
     /// screen, independent of import/export. Required for every

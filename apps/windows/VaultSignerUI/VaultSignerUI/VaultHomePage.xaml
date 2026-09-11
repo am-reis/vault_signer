@@ -20,17 +20,15 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel Spacing="4">
                         <TextBlock Text="VaultSigner" FontSize="32" FontWeight="SemiBold" />
-                        <HyperlinkButton x:Name="SwitchVaultLink" Content="Open a different vault" Padding="0" Click="SwitchVaultLink_Click" />
+                        <HyperlinkButton x:Name="SwitchVaultLink" Padding="0" Click="SwitchVaultLink_Click" />
                     </StackPanel>
-                    <Button Grid.Column="1" x:Name="SettingsButton" Click="SettingsButton_Click" VerticalAlignment="Top" Margin="0,0,8,0"
-                            ToolTipService.ToolTip="Settings">
+                    <Button Grid.Column="1" x:Name="SettingsButton" Click="SettingsButton_Click" VerticalAlignment="Top" Margin="0,0,8,0">
                         <FontIcon Glyph="&#xE713;" FontSize="14" />
                     </Button>
-                    <Button Grid.Column="2" x:Name="LockAllButton" Click="LockAllButton_Click" VerticalAlignment="Top"
-                            ToolTipService.ToolTip="Lock every compartment and wipe cached key material">
+                    <Button Grid.Column="2" x:Name="LockAllButton" Click="LockAllButton_Click" VerticalAlignment="Top">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE72E;" FontSize="14" />
-                            <TextBlock Text="Lock All" />
+                            <TextBlock x:Name="LockAllText" />
                         </StackPanel>
                     </Button>
                 </Grid>
@@ -43,8 +41,8 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Compartment" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <HyperlinkButton Grid.Column="1" Content="New Compartment…" Padding="0" Click="NewCompartmentLink_Click" />
+                        <TextBlock x:Name="CompartmentLabelText" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <HyperlinkButton Grid.Column="1" x:Name="NewCompartmentLinkButton" Padding="0" Click="NewCompartmentLink_Click" />
                     </Grid>
                     <ComboBox x:Name="CompartmentCombo" HorizontalAlignment="Stretch"
                               DisplayMemberPath="label" SelectionChanged="CompartmentCombo_SelectionChanged" />
@@ -54,8 +52,8 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <PasswordBox Grid.Column="0" x:Name="UnlockPassphraseBox" PlaceholderText="Passphrase to unlock this compartment" />
-                        <Button Grid.Column="1" x:Name="UnlockButton" Content="Unlock" Style="{StaticResource AccentButtonStyle}" Margin="8,0,0,0" Click="UnlockButton_Click" />
+                        <PasswordBox Grid.Column="0" x:Name="UnlockPassphraseBox" />
+                        <Button Grid.Column="1" x:Name="UnlockButton" Style="{StaticResource AccentButtonStyle}" Margin="8,0,0,0" Click="UnlockButton_Click" />
                     </Grid>
                 </StackPanel>
 
@@ -65,17 +63,16 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Keys" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <TextBlock x:Name="KeysHeaderText" FontWeight="SemiBold" VerticalAlignment="Center" />
                         <Button Grid.Column="1" x:Name="NewKeyButton" Style="{StaticResource AccentButtonStyle}" Click="NewKeyButton_Click">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon Glyph="&#xE710;" FontSize="14" />
-                                <TextBlock Text="New Key" />
+                                <TextBlock x:Name="NewKeyText" />
                             </StackPanel>
                         </Button>
                     </Grid>
 
-                    <TextBlock x:Name="EmptyKeysText" Opacity="0.7" TextWrapping="Wrap"
-                               Text="No keys in this compartment yet — click New Key to create one." Visibility="Collapsed" />
+                    <TextBlock x:Name="EmptyKeysText" Opacity="0.7" TextWrapping="Wrap" Visibility="Collapsed" />
 
                     <ListView x:Name="KeysList" SelectionMode="None" ItemClick="KeysList_ItemClick" IsItemClickEnabled="True">
                         <ListView.ItemTemplate>
@@ -97,12 +94,12 @@
                 </StackPanel>
 
                 <StackPanel x:Name="VaultActionsSection" Spacing="8" Visibility="Collapsed">
-                    <TextBlock Text="Import &amp; backup" FontWeight="SemiBold" />
+                    <TextBlock x:Name="ImportBackupHeaderText" FontWeight="SemiBold" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Import…" Click="ImportButton_Click" />
-                        <Button Content="Export Keys…" Click="ExportKeysButton_Click" />
-                        <Button Content="Back Up Everything…" Click="BackUpEverythingButton_Click" />
-                        <Button Content="Back Up Master Key Only…" Click="BackUpMasterKeyOnlyButton_Click" />
+                        <Button x:Name="ImportButtonElement" Click="ImportButton_Click" />
+                        <Button x:Name="ExportKeysButtonElement" Click="ExportKeysButton_Click" />
+                        <Button x:Name="BackUpEverythingButtonElement" Click="BackUpEverythingButton_Click" />
+                        <Button x:Name="BackUpMasterKeyOnlyButtonElement" Click="BackUpMasterKeyOnlyButton_Click" />
                     </StackPanel>
                 </StackPanel>
 

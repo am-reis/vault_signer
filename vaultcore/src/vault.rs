@@ -1444,6 +1444,24 @@ impl Vault {
             if let Some(unlocked) = state.unlocked.get_mut(&updated.id) {
                 unlocked.manifest = updated.manifest.clone();
             }
+            // Bug found via real device testing (Android, spec §5.3
+            // option 1): updating `state.unlocked[id].manifest` above
+            // only refreshes the plaintext working copy this process
+            // reads from — `write_atomic` below serializes
+            // `state.container`, so without also re-encrypting the new
+            // manifest back into `state.container.master_blobs[id]`, the
+            // file on disk keeps the *pre-merge* master blob. Every
+            // in-memory read (list_keys, sign, even this same
+            // `Vault` instance's own re-reads) looks correct because
+            // they all go through `state.unlocked`; only a fresh
+            // `Vault::open` — a real app restart — decrypts from the
+            // stale blob and silently loses the merge. Mirrors
+            // `persist_locked`'s re-encrypt step, which every *other*
+            // manifest-mutating method already goes through.
+            if let Some(unlocked) = state.unlocked.get(&updated.id) {
+                let blob = master_blob::encrypt_with_key(updated.id, unlocked.manifest.clone(), &unlocked.master_key)?;
+                state.container.master_blobs.insert(updated.id, blob);
+            }
         }
         let outcome = self.apply_merge_result_metadata(&result);
         self.copy_incoming_blobs(state, &result.id_remap, incoming_key_blobs);
@@ -1884,6 +1902,72 @@ mod tests {
 
         let keys = vault.list_keys(compartment_id).unwrap();
         assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].label, "Imported key");
+    }
+
+    /// Regression test for a real bug found by driving the Android app on
+    /// a device and force-stopping it mid-session (see PROGRESS.md's
+    /// Phase 4 entry): `merge_reencrypt_discard_incoming`'s in-memory
+    /// result (checked by the test above) looked correct, but the merged
+    /// key silently vanished after the vault was closed and reopened —
+    /// `apply_merge_result` updated `state.unlocked[id].manifest` (the
+    /// plaintext working copy) and `state.container.key_blobs` (the raw
+    /// sealed key bytes) but never re-encrypted the updated manifest back
+    /// into `state.container.master_blobs[id]`, so `write_atomic`
+    /// persisted a container whose master blob still decrypts to the
+    /// *pre-merge* manifest — orphaning the newly-copied `.kblob` (it's
+    /// on disk, but no manifest entry ever points to it again). This test
+    /// drops the `Vault` and re-opens the same path from disk, which the
+    /// existing `merge_option1_reencrypts_into_target_compartment` test
+    /// above never did — checking only the same in-memory instance is
+    /// exactly how this got past that test, past `vault.rs`'s other
+    /// merge-option-1 coverage, and past macOS's own interactive
+    /// verification (see PROGRESS.md's Phase 2 item 2.4 entry, which
+    /// explicitly notes only the no-embedded-master-key path — the *same*
+    /// facade method, just reached without the duality screen — was
+    /// exercised live, and not through a close-then-reopen).
+    #[test]
+    fn merge_option1_key_survives_close_and_reopen() {
+        let dir = tempdir().unwrap();
+        let path = vault_path(&dir);
+        let (vault, compartment_id) = create_test_vault(&dir);
+
+        let mut incoming = Manifest::new(Uuid::new_v4());
+        let incoming_key_id = Uuid::new_v4();
+        incoming.keys.push(KeyEntry {
+            key_id: incoming_key_id,
+            label: "Imported key".into(),
+            description: String::new(),
+            resource: "other.example".into(),
+            key_type: KeyType::Ed25519,
+            purpose: Purpose::CustomSigning,
+            fido2: None,
+            created_at: time::OffsetDateTime::now_utc(),
+            last_used_at: None,
+            tags: vec![],
+            blob_file: format!("key_blobs/{incoming_key_id}.kblob"),
+            blob_sha256: "a".repeat(64),
+            public_key_hex: "bb".repeat(32),
+        });
+        let incoming_json = String::from_utf8(incoming.to_json().unwrap()).unwrap();
+
+        vault
+            .merge_reencrypt_discard_incoming(
+                compartment_id.clone(),
+                incoming_json,
+                vec![IncomingKeyBlob { key_id: incoming_key_id.to_string(), blob_bytes: b"fake-blob-bytes".to_vec() }],
+            )
+            .unwrap();
+
+        // The bug: everything above looks fine (same assertions as the
+        // test above would pass here too). Drop this instance entirely
+        // and re-open the same file fresh, exactly like an app restart.
+        drop(vault);
+        let reopened = Vault::open(path).unwrap();
+        reopened.unlock_compartment(compartment_id.clone(), "master pw".into()).unwrap();
+
+        let keys = reopened.list_keys(compartment_id).unwrap();
+        assert_eq!(keys.len(), 1, "the imported key must still be listed after a close+reopen, not just in the same in-memory session");
         assert_eq!(keys[0].label, "Imported key");
     }
 

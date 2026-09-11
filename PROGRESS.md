@@ -951,6 +951,13 @@ independent knobs.
       own FIDO2 items (2.7's paid-account block, 3.4's OS-build block) —
       Android's blocker here is simply "not yet attempted, needs its own
       follow-up session with real interop testing," not an external gate.
+      This session tried two real demo relying parties
+      (fido.demo.gemalto.com, token2.com's FIDO2 demo) to move this item
+      forward: the first had an invalid TLS certificate and couldn't be
+      used; the second loaded correctly and reached Android's real system
+      passkey-creation dialog, confirming the registration path triggers
+      correctly this far — but a live ceremony still wasn't completed
+      end to end in this session, so the gap above stands unchanged.
 - [x] 4.5 Settings deep link via `createSettingsPendingIntent()`.
       Verified against Android's real current API surface first (it's an
       instance method on `CredentialManager`, not a static/companion
@@ -1009,17 +1016,18 @@ independent knobs.
 - [ ] 4.8 Phase 10 test/fuzz suite. The shared `vaultcore` suite (unit/
       crash-safety/fuzz/throttling, spec §10) is already green — no
       platform redoes that, per spec §10's own "every platform links the
-      same vaultcore binary" reasoning, same as Phase 2/3. What's
-      Android-specific and **not done**: no `androidTest`/instrumented
-      test files exist yet (the dependency is wired in
-      `app/build.gradle.kts`, nothing written against it); self-import/
-      export exercising the shared merge logic through *this* app's UI
-      (item 4.1's `Export`/`Import`/`MasterKeyDuality` screens) wasn't
-      click-tested this session; interop tests (2–3 real relying parties)
-      are blocked on item 4.4 the same way. Real, non-instrumented
-      coverage that *does* exist for Android specifically: the manual
-      device-driven verification under 4.1/4.3/4.6 above, which is real
-      but not a repeatable automated suite.
+      same vaultcore binary" reasoning, same as Phase 2/3. **Now done**:
+      a first real `androidTest` instrumented test
+      (`CoreVaultFlowTest`) exists, driving the actual `MainActivity`
+      through Compose's semantics tree (stable test tags, not raw pixel
+      coordinates) to create a vault and a key end to end against the
+      real native library and `:agent` IPC — passing repeatably on both
+      the `full` and `lite` flavors, on both the emulator and the paired
+      real Android 13 device. **Still not done**: self-import/export
+      exercising the shared merge logic through this app's UI (item 4.1's
+      `Export`/`Import`/`MasterKeyDuality` screens) hasn't been
+      click-tested; interop tests (2–3 real relying parties) are blocked
+      on item 4.4 the same way.
 - [x] 4.9 `docs/user-guide.md` reconciled against the real, shipped
       Android UI. One precise edit: extended the existing Windows
       compartments note to also cover Android (which genuinely has the

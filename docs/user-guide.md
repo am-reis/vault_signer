@@ -32,7 +32,7 @@ That's it — your vault is created empty, ready for you to add keys to it.
 
 If a listed vault shows a warning triangle, its file couldn't be found where VaultSigner last saw it — it may have moved or been deleted. Use **Manage Known Vaults…** (reachable from the opening screen everywhere, and also from Settings on platforms that have it) to add a vault you keep somewhere without opening it right away, or to **Forget** an entry you no longer want listed. Forgetting only removes it from this list — it never touches or deletes the actual file.
 
-*Windows note: keys are also organized into "compartments" — independent sets of keys, each with its own master passphrase, inside the same vault file. Most people only ever need one ("Personal"), created automatically with your vault; add another from **New Compartment…** next to the compartment picker if you want a separate set (say, "Work") with its own password.*
+*Windows and Android note: keys are also organized into "compartments" — independent sets of keys, each with its own master passphrase, inside the same vault file. Most people only ever need one ("Personal"), created automatically with your vault; add another from **New Compartment…** next to the compartment picker if you want a separate set (say, "Work") with its own password.*
 
 ---
 

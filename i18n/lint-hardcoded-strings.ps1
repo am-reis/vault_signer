@@ -7,15 +7,18 @@
 # build step -- point a CI job at it once one exists.
 #
 # Scans WinUI3 .xaml files for a hardcoded Text=/Content=/
-# PlaceholderText=/Header= literal on the specific control types that
-# carry real user-facing text in this app (TextBlock, Button,
-# HyperlinkButton, PasswordBox, TextBox, ComboBox) -- deliberately not
-# every attribute on every element: a plain TextBox's own Text= is
+# PlaceholderText=/Header=/ToolTip= literal on the specific control
+# types that carry real user-facing text in this app -- deliberately
+# not every attribute on every element: a plain TextBox's own Text= is
 # normally an editable default VALUE (e.g. a suggested file name), not
 # label text, so it's excluded to avoid flagging things that were never
 # meant to be localized. A regex, not a real XAML parser -- false
 # positives/negatives are expected, same caveat the Python version
-# documents for its own Swift-literal regex.
+# documents for its own Swift-literal regex. Matches against each
+# file's full text (not line-by-line) so an attribute wrapped onto its
+# own line -- a common style in this codebase's own XAML -- is still
+# caught; confirmed this was a real gap by finding several such misses
+# on a first pass that only checked single lines.
 #
 # Two modes:
 #   -Report  (default) lists every hardcoded literal found, per file.
@@ -39,7 +42,15 @@ $MigratedFiles = @(
     "WelcomePage.xaml",
     "ImportPacketPage.xaml",
     "MasterKeyDualityPage.xaml",
-    "ManageVaultsPage.xaml"
+    "ManageVaultsPage.xaml",
+    "BackupMasterKeyOnlyPage.xaml",
+    "CreateCompartmentPage.xaml",
+    "CreateKeyPage.xaml",
+    "DeviceProfilePicker.xaml",
+    "ExportKeysPage.xaml",
+    "KeyDetailPage.xaml",
+    "SettingsPage.xaml",
+    "VaultHomePage.xaml"
 )
 
 # Each pattern pairs an attribute with only the control types where
@@ -53,9 +64,10 @@ $MigratedFiles = @(
 # never a literal).
 $LiteralPatterns = @(
     '<TextBlock\b[^>]*\bText="((?!\{)[^"]*)"',
-    '<(?:Button|HyperlinkButton)\b[^>]*\bContent="((?!\{)[^"]*)"',
+    '<(?:Button|HyperlinkButton|RadioButton|CheckBox|ComboBoxItem)\b[^>]*\bContent="((?!\{)[^"]*)"',
     '<(?:PasswordBox|TextBox)\b[^>]*\bPlaceholderText="((?!\{)[^"]*)"',
-    '<ComboBox\b[^>]*\bHeader="((?!\{)[^"]*)"'
+    '<(?:ComboBox|ToggleSwitch)\b[^>]*\bHeader="((?!\{)[^"]*)"',
+    '\bToolTipService\.ToolTip="((?!\{)[^"]*)"'
 )
 
 # Product/brand names deliberately excluded from localization, per
@@ -69,18 +81,19 @@ Get-ChildItem -Path $PagesDir -Filter "*.xaml" | Sort-Object Name | ForEach-Obje
     $isMigrated = $MigratedFiles -contains $_.Name
     if ($Strict -and -not $isMigrated) { return }
 
-    $lineNum = 0
+    $content = Get-Content -Raw $_.FullName
     $findings = @()
-    foreach ($line in Get-Content $_.FullName) {
-        $lineNum++
-        foreach ($pattern in $LiteralPatterns) {
-            foreach ($m in [regex]::Matches($line, $pattern)) {
-                $value = $m.Groups[1].Value
-                if ($ExemptLiterals -contains $value) { continue }
-                $findings += [PSCustomObject]@{ Line = $lineNum; Text = $value }
-            }
+    foreach ($pattern in $LiteralPatterns) {
+        foreach ($m in [regex]::Matches($content, $pattern)) {
+            $value = $m.Groups[1].Value
+            if ($ExemptLiterals -contains $value) { continue }
+            # Line number = 1 + newline count before the match start --
+            # matches are found against the whole file, not per-line.
+            $lineNum = 1 + ([regex]::Matches($content.Substring(0, $m.Index), "`n")).Count
+            $findings += [PSCustomObject]@{ Line = $lineNum; Text = $value }
         }
     }
+    $findings = $findings | Sort-Object Line
     if ($findings.Count -eq 0) { return }
 
     foreach ($f in $findings) {

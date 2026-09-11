@@ -749,7 +749,290 @@ Not started.
 
 ## Phase 4 — Android
 
-Not started.
+In progress, first real checkpoint. See spec §12 for the full item list
+(4.1–4.11). Everything below was built on `platform/android` (branched
+from `shared`, per `CLAUDE.md`'s branch model) and, where marked
+"verified," actually run — installed and driven — on a real cold-booted
+`vaultsigner_avd` emulator (Android 14, x86_64), not just compiled.
+
+**Environment note, since the task brief's own provisioning list turned
+out incomplete:** JDK 17, the Android SDK (API 34, build-tools 34.0.0),
+the emulator/AVD, all 4 Rust Android targets, and cargo-ndk were real and
+already working — but the Android **NDK itself** was not installed
+(`$ANDROID_HOME/ndk/` didn't exist), which cargo-ndk needs to actually
+compile anything. Installed `ndk;28.2.13676358` (r28c) via `sdkmanager`
+before any cross-compilation could be attempted. Also had to install
+`platforms;android-36` — not because this project's floor moved off API
+34 (it hasn't, see below), but because several current-stable androidx
+libraries (`core-ktx` 1.19, `lifecycle` 2.11, `activity-compose` 1.13)
+require compiling against API 37 / AGP 9.1+, and AGP 9.x needs a newer
+JDK than this VM's deliberately-provisioned JDK 17 — pinned to the
+newest androidx versions that still work with AGP 8.13.2 / compileSdk 36
+instead (`core-ktx` 1.15.0, `lifecycle` 2.8.7, `activity-compose` 1.9.3,
+`compose-bom` 2024.12.01, `credentials` 1.5.0), all verified by a real
+green `:app:assembleDebug`. `compileSdk` is 36; `minSdk`/`targetSdk`
+stay 34 per spec §12 item 0.2's Android-14+ floor — those are
+independent knobs.
+
+- [x] 4.1 Compose management UI mirroring 2.1–2.5. Real `Vault`-backed
+      screens in `apps/android/app/src/main/kotlin/com/vaultsigner/ui/`:
+      `WelcomeScreen` (known-vaults list per spec §5.6, create/open),
+      `CreateVaultScreen`, `UnlockScreen` (compartment picker when >1),
+      `KeyListScreen`, `CreateKeyScreen`, `CreateCompartmentScreen`
+      (mirrors Windows's `CreateCompartmentPage` — macOS never built one,
+      per the architecture survey done at the start of this phase),
+      `KeyDetailScreen` (change-passphrase/reveal-raw-key/discard as
+      dialogs), `ExportPacketScreen` (all three §5.2.2 encryption
+      choices, uncollapsed, no default), `ImportPacketScreen` +
+      `MasterKeyDualityScreen` (all three §5.3 options, exact
+      `REPLACE_CONFIRMATION_PHRASE` enforced client- and server-side),
+      `SettingsScreen`, `ManageVaultsScreen`.
+
+      **Interactively verified for the core flow, on-device, this
+      session** (mirrors how Phase 2 verified macOS without trusting
+      screenshots — see item 4.2 for why screenshots don't work here
+      either, though for a different reason): drove the real installed
+      app via `adb shell input`/`uiautomator dump` (not a screenshot —
+      see 4.2) through create-vault (real ~1s Argon2id derivation) →
+      force-stop the app entirely → relaunch → agent auto-reopens the
+      last vault → routes to Unlock (not straight to keys — a real bug
+      this caught, see below) → unlock with the real passphrase → key
+      list → create-key (real Ed25519 keypair) → the new key visible via
+      `vaultsigner.list_public_keys` over the real socket. **Not yet
+      driven this way**: `ExportPacketScreen`/`ImportPacketScreen`/
+      `MasterKeyDualityScreen`/`CreateCompartmentScreen` — built and
+      compile-verified, and their underlying `Vault` facade calls are
+      already proven by the Kotlin/Swift `uniffi-verify` harnesses (item
+      1.11) and macOS's own interactive verification (items 2.3/2.4), but
+      not click-tested through *this* app's UI yet.
+
+      **Three real bugs found and fixed by actually driving the app**
+      (not found by reading the code — device testing genuinely earned
+      its keep here):
+      1. Every form screen (`CreateKey`/`CreateVault`/`CreateCompartment`/
+         `Export`/`Import`/`MasterKeyDuality`/`Settings`/`KeyDetail`/
+         `Unlock`) used a plain, non-scrollable `Column` — on the
+         emulator's 640px-tall viewport, `CreateKeyScreen`'s lower fields
+         and its own Create button were completely unreachable. Fixed
+         with `Modifier.verticalScroll`.
+      2. `VaultSignerService.onCreate()` started the socket server
+         *before* reopening the last-known vault — a client's very first
+         `internal.status` right after a cold agent start could race
+         ahead of `AgentState.vault` being set and see `vault_open: false`
+         for a vault that was, milliseconds later, actually open.
+         Reordered so the reopen finishes first.
+      3. `WelcomeScreen` routed straight to the key list whenever a
+         reopened vault had exactly one compartment, without checking
+         whether that compartment was actually *unlocked* — opening a
+         vault never auto-unlocks it on its own (only §8's opt-in
+         auto-unlock does), so this would have hit "compartment is not
+         unlocked" trying to list keys on the very first relaunch after
+         a force-stop. Now checks `compartments[0].unlocked` too.
+- [x] 4.2 `FLAG_SECURE` (spec §5.0). Applied once, globally, on
+      `MainActivity`'s window in `onCreate` — this app is single-Activity
+      (Compose Navigation swaps screens within one window), so one call
+      covers every screen by construction, unlike macOS's per-`NSWindow`-
+      sheet or Windows's per-`Page`-navigation-event approach (both
+      workarounds for those platforms' multi-window reality, not
+      applicable here — see `apps/android/docs/protocol-integration.md`'s
+      sibling note for the same comparison from the transport side).
+      `PassphrasePromptActivity` and `PasskeyCompletionActivity` set it
+      independently since they're genuinely separate Activities/windows.
+
+      **Verified for real, isolated, A/B** (not incidental the way
+      macOS's own first observation was flagged as needing a deliberate
+      test — done properly here from the start): `adb shell screencap`
+      on the home screen produced a real 204 KB PNG; the identical
+      command with `MainActivity` in the foreground produced a genuine
+      0-byte file; backing out to home and back reproduced both results
+      consistently. Repeated the same test against `PassphrasePromptActivity`
+      mid-prompt (see 4.6) — also a clean 0-byte capture.
+- [x] 4.3 Foreground service hosting the custom-protocol listener and
+      retention cache, with autostart/auto-unlock toggles.
+      `VaultSignerService` (`android:process=":agent"`,
+      `foregroundServiceType="specialUse"` — API 34's category for a use
+      case with no better-fitting standard type, with the required
+      `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` justification string) owns the
+      single `Vault` instance and a `LocalServerSocket` serving both
+      `vaultsigner.*` and `internal.*` over the same abstract-namespace
+      socket (spec §8: "both communicate over the same local-IPC
+      mechanism as Section 7"). `internal.*` is authenticated via
+      `LocalSocket.getPeerCredentials().uid == Process.myUid()` —
+      Android's per-app UID sandboxing makes this a complete answer,
+      strictly simpler than the code-signing checks macOS/Windows need
+      (spec §8's own caveat: a Unix socket's owner-only permissions alone
+      only prove same-*user*, not same-*app*, on desktop; on Android
+      there is no same-user-different-app case to guard against in the
+      first place). `AutoUnlockStore` (Android Keystore, hardware-backed
+      AES-GCM key, mirrors macOS Keychain/Windows DPAPI) and
+      `AutostartPrefs` + `BootCompletedReceiver` implement the two §8
+      toggles; `VaultConfig` persists the last-open vault path so a
+      restarted agent picks back up where it left off (mirrors macOS's
+      `main.swift`).
+
+      **Verified for real**: survives `am force-stop` (kills both the
+      default and `:agent` processes) and correctly reopens its vault on
+      the next launch (see 4.1's bug #2/#3); the real notification shows
+      with `IMPORTANCE_MIN`; `ps -A` confirms `com.vaultsigner.app:agent`
+      as a genuinely separate OS process from `com.vaultsigner.app`.
+- [ ] 4.4 `CredentialProviderService` registered and verified against at
+      least two real relying parties. **Registered and OS-recognized,
+      verified live — the relying-party interop half is not done.**
+      `VaultSignerCredentialProviderService` + `PasskeyCompletionActivity`
+      run in the same `:agent` process as `VaultSignerService` and share
+      `AgentState.vault` directly — a deliberate architectural choice to
+      avoid the exact split-brain gap macOS's extension has (a genuinely
+      separate OS process there, forced to open its own separate `Vault`,
+      flagged as a known deferred issue in that platform's own item 2.7
+      entry; Android's single-APK, multi-component-one-process model
+      avoids it by construction, not by discipline). `onBeginGetCredentialRequest`
+      queries `vault.credentialCandidates(rp_id)` (already existed in the
+      facade, unused until now) and builds real `PublicKeyCredentialEntry`
+      objects; `onBeginCreateCredentialRequest` offers a `CreateEntry` for
+      the currently-unlocked compartment. `PasskeyCompletionActivity`
+      does the real CTAP2-native round trip via `handleFido2GetAssertionNative`/
+      `handleFido2MakeCredentialNative` (reusing the exact facade methods
+      macOS's extension uses) and constructs the WebAuthn response JSON
+      itself (Android's Credential Manager doesn't build `clientDataJSON`
+      for a provider — verified against Android's own current developer
+      docs, not assumed, after this session's own reminder that the
+      Windows FIDO2 work got bitten by exactly this kind of drift).
+
+      **Real, live verification**: tapping the app's own Settings →
+      "Enable in system settings" opens Android's actual system Settings
+      (`Settings$AccountDashboardActivity`), where "VaultSigner" appears
+      under Additional providers with the correct
+      `android:settingsSubtitle` from `provider.xml` — the registration
+      is genuinely OS-recognized, not just compiling.
+
+      **What is not done, honestly**: no live WebAuthn ceremony has been
+      run against a real relying party in a real browser. The
+      `clientDataJSON`/origin-derivation logic in
+      `PasskeyCompletionActivity` is a best-effort construction against
+      documented WebAuthn/Credential-Manager shapes, not something this
+      session could verify byte-for-byte correct without that live test.
+      This is the same category of honest gap Phase 2/3 carry for their
+      own FIDO2 items (2.7's paid-account block, 3.4's OS-build block) —
+      Android's blocker here is simply "not yet attempted, needs its own
+      follow-up session with real interop testing," not an external gate.
+- [x] 4.5 Settings deep link via `createSettingsPendingIntent()`.
+      Verified against Android's real current API surface first (it's an
+      instance method on `CredentialManager`, not a static/companion
+      method the way the spec's generic wording could be read) — see
+      `SettingsScreen.kt`. **Verified live**, end-to-end, per item 4.4's
+      note above.
+- [x] 4.6 Custom protocol verified against a minimal test client.
+      `apps/android/uniffi-verify/agent_test_client.py` (mirrors
+      `apps/macos/uniffi-verify/agent_test_client.py`'s shape), run for
+      real over `adb forward tcp:9999 localabstract:com.vaultsigner.app.agent`
+      against the real running app: `vaultsigner.list_public_keys`
+      answers with no prior registration; `internal.*` from a non-owner
+      peer UID is correctly rejected with `unauthorized_caller`; unknown
+      methods get `method_not_found`. **Also manually verified
+      interactively**, the macOS-equivalent "real third-party GUI app"
+      case (there: a Tkinter demo; here: the same Python client used
+      live rather than automated): a `vaultsigner.sign` call for a cold
+      key produced the real prompt "Shell wants to sign with key
+      76365e38" (caller identity resolved via `PackageManager`, from the
+      adb-mediated peer's real UID — never a self-reported name),
+      entering the real key passphrase and tapping Allow returned a
+      signature independently verified with Python's `cryptography`
+      library against the key's real Ed25519 public key. See
+      `apps/android/docs/protocol-integration.md` for the one thing this
+      *doesn't* prove: genuine third-party-app-to-app socket reachability
+      independent of `adb`'s own mediation, flagged there as believed-but-
+      not-conclusively-tested.
+- [x] 4.7 i18n parity with prior builds. Built i18n-first rather than
+      migrated after the fact (a different starting point than macOS/
+      Windows had at their own 2.9/3.7 checkpoints): every screen/view
+      file uses `i18n/source/en.json` keys via generated `R.string.*`
+      resources from day one. `i18n/generate-android-strings.py` (new,
+      mirrors `generate-apple-strings.py`) emits `res/values/strings.xml`
+      + `res/values-ar/strings.xml`, converting Apple's `%@` placeholder
+      convention to Android's positional `%1$s` form and XML-entity-
+      escaping values (`&`/`</>` — caught a real generator bug this way:
+      `duality.option1.title`'s "Re-encrypt & discard..." broke the XML
+      parser until fixed). `i18n/lint-hardcoded-strings-android.py` (new,
+      mirrors the Swift/PowerShell lints) `--strict` is clean across
+      every screen/view file, not a partial set. 11 new `android.*` keys
+      added to `i18n/source/en.json` for surfaces with no desktop
+      equivalent (the foreground-service notification, the Credential
+      Manager provider subtitle, the passphrase-prompt dialog) —
+      committed directly on `shared` per `CLAUDE.md`'s path ownership
+      (git's ref model won't let a `shared/<topic>` branch coexist
+      locally with the `shared` branch itself, so this used the other
+      branch-model-sanctioned path: committing shared-scope work directly
+      on `shared`). **Not done**: `ar.json`'s RTL layout was not verified
+      on-device this session (inherited automatically for
+      `WelcomeScreen`/`ImportPacketScreen`/`MasterKeyDualityScreen`/
+      `ManageVaultsScreen` since Android's `values-ar` qualifier carries
+      automatic RTL mirroring, same source keys as macOS/Windows already
+      translate — but "the resource exists" isn't "verified rendered
+      correctly RTL," and this session didn't switch the emulator to a
+      RTL locale to check).
+- [ ] 4.8 Phase 10 test/fuzz suite. The shared `vaultcore` suite (unit/
+      crash-safety/fuzz/throttling, spec §10) is already green — no
+      platform redoes that, per spec §10's own "every platform links the
+      same vaultcore binary" reasoning, same as Phase 2/3. What's
+      Android-specific and **not done**: no `androidTest`/instrumented
+      test files exist yet (the dependency is wired in
+      `app/build.gradle.kts`, nothing written against it); self-import/
+      export exercising the shared merge logic through *this* app's UI
+      (item 4.1's `Export`/`Import`/`MasterKeyDuality` screens) wasn't
+      click-tested this session; interop tests (2–3 real relying parties)
+      are blocked on item 4.4 the same way. Real, non-instrumented
+      coverage that *does* exist for Android specifically: the manual
+      device-driven verification under 4.1/4.3/4.6 above, which is real
+      but not a repeatable automated suite.
+- [x] 4.9 `docs/user-guide.md` reconciled against the real, shipped
+      Android UI. One precise edit: extended the existing Windows
+      compartments note to also cover Android (which genuinely has the
+      identical feature — verified via the same `Vault::add_compartment`
+      facade already proven in the Kotlin/Swift `uniffi-verify`
+      harnesses). Everything else in the guide already described
+      Android's real behavior accurately with no edit needed: the
+      auto-unlock section's default (non-Windows-caveated) text already
+      matches Android Keystore's real protection strength (spec §8
+      groups it with macOS Keychain, not Windows DPAPI); the custom-
+      protocol paragraph already matches Android's real desktop-like
+      transport (no iOS-style App-Intents narrowing); retention timing,
+      known-vaults, and reveal-raw-key behavior all match what the real
+      built app does.
+- [x] 4.10 `apps/android/docs/protocol-integration.md` written and
+      linked from `docs/protocol-integration/README.md`'s platform-guides
+      list. Covers the real transport (an abstract-namespace Unix domain
+      socket, not a filesystem path — explains precisely why desktop's
+      model doesn't translate to Android's per-app-UID storage
+      sandboxing), discovery, `internal.*` authentication, caller-identity
+      resolution, and a working example — plus the honest, explicit
+      caveat on what genuine third-party-app reachability this session
+      did and didn't prove (see item 4.6).
+- [ ] 4.11 Documentation site rebuild. **Not attempted, correctly**:
+      `CLAUDE.md`'s Versioning/docs section requires this be done "from a
+      branch with every completed platform's docs actually merged in
+      (staging, release, or main — never `shared` alone)". `staging`
+      already has macOS's and Windows's `apps/` content (confirmed:
+      `git ls-tree -r origin/staging -- apps/windows` shows 65 files,
+      `apps/macos` shows 38), but **not** Android's — `platform/android`
+      itself hasn't been merged into `staging` yet. Deciding *that* isn't
+      this session's call to make unilaterally: several of this phase's
+      own items are still open (4.4's interop, 4.8's suite), and whether
+      "first real checkpoint" already counts as ready to integrate into a
+      shared branch other in-flight platform work depends on is a
+      judgment call for whoever's coordinating the release, not something
+      to do quietly as a side effect of wanting to run a docs-site script.
+      Left for that person — same posture Windows's own item 3.11 entry
+      already took ("prepared but deliberately not published this
+      session").
+
+**Not part of spec §12's checklist but worth recording**: the real,
+concrete architectural payoff of testing on-device rather than stopping
+at "it compiles" — items 4.1–4.3/4.6's bugs (§4.1) were only found by
+actually installing and clicking through the app, and would not have
+surfaced from a code review alone. `apps/android/` also required
+provisioning work the task brief's own environment notes didn't
+anticipate (the missing NDK, the AGP/JDK version ceiling) — see this
+section's own opening note.
 
 ## Phase 5 — iOS/iPadOS
 

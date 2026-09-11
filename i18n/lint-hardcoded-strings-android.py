@@ -24,13 +24,27 @@ SOURCE_DIR = REPO_ROOT / "apps" / "android" / "app" / "src" / "main" / "kotlin"
 
 # Files already migrated to i18n/source/en.json keys (via generated
 # R.string.* resources) — a hardcoded string literal found in one of
-# these is a real regression. Deliberately starts with the same
-# RTL-priority screens spec §9 calls out for the desktop platforms.
+# these is a real regression. As of Phase 4 (spec §12 item 4.7), every
+# screen/view file is migrated — a materially different starting point
+# than macOS/Windows had at their own item 2.9/3.7 checkpoints, since
+# Android's screens were built i18n-first rather than migrated
+# after the fact.
 MIGRATED_FILES = {
-    "WelcomeScreen.kt",
+    "PasskeyCompletionActivity.kt",
+    "PassphrasePromptActivity.kt",
+    "VaultSignerCredentialProviderService.kt",
+    "CreateCompartmentScreen.kt",
+    "CreateKeyScreen.kt",
+    "CreateVaultScreen.kt",
+    "ExportPacketScreen.kt",
     "ImportPacketScreen.kt",
-    "MasterKeyDualityScreen.kt",
+    "KeyDetailScreen.kt",
+    "KeyListScreen.kt",
     "ManageVaultsScreen.kt",
+    "MasterKeyDualityScreen.kt",
+    "SettingsScreen.kt",
+    "UnlockScreen.kt",
+    "WelcomeScreen.kt",
 }
 
 LITERAL_CALL = re.compile(r'\bText\(\s*(?:text\s*=\s*)?"((?:[^"\\]|\\.)*)"')

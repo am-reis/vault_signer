@@ -13,6 +13,7 @@
   "android.prompt_deny": "Deny",
   "android.settings_enable_credential_provider_button": "Enable in system settings",
   "android.settings_enable_credential_provider_footer": "Opens the system's Passwords & accounts settings so you can turn on VaultSigner as a passkey provider.",
+  "android.new_passkey_title_format": "New passkey for %@",
 
   "welcome.subtitle": "Create a new vault, or open one you already have.",
   "welcome.create_button": "Create New Vault…",

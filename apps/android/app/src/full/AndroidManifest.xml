@@ -1,0 +1,42 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- "full"-flavor-only manifest fragment (spec §6.3), merged into
+         src/main/AndroidManifest.xml by AGP's flavor manifest merge —
+         everything FIDO2/Credential-Manager-specific that "lite" (minSdk
+         23, no CredentialProviderService) doesn't ship at all. -->
+    <application>
+
+        <!-- Completes one FIDO2 ceremony (spec §6.3/§6.6): the target of
+             the PendingIntent behind every PublicKeyCredentialEntry/
+             CreateEntry VaultSignerCredentialProviderService offers. Runs
+             in the same ":agent" process so it shares AgentState.vault
+             directly. -->
+        <activity
+            android:name=".credentialprovider.PasskeyCompletionActivity"
+            android:process=":agent"
+            android:exported="false"
+            android:theme="@style/Theme.VaultSigner.Dialog"
+            android:excludeFromRecents="true" />
+
+        <!-- FIDO2/WebAuthn OS integration (spec §6.3). Runs in the same
+             ":agent" process as VaultSignerService so both hold the exact
+             same in-process Vault reference — never a second, independent
+             Vault instance (the architectural gap macOS's credential
+             provider extension couldn't avoid, since it's a genuinely
+             separate OS process there; Android's single-APK, same-process
+             model lets this be done correctly from the start). -->
+        <service
+            android:name=".credentialprovider.VaultSignerCredentialProviderService"
+            android:process=":agent"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.credentials.CredentialProviderService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.credentials.provider"
+                android:resource="@xml/provider" />
+        </service>
+
+    </application>
+</manifest>

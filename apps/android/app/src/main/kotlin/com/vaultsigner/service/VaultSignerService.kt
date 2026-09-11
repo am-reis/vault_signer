@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.vaultsigner.R
 import com.vaultsigner.ipc.InternalErrorCodes
 import com.vaultsigner.ipc.InternalMethods
@@ -35,6 +36,17 @@ import java.util.concurrent.Executors
  * `internal.*` is just a same-app-UID-authenticated slice of the same
  * transport (see [PeerAuthentication]), matching spec §8's "both
  * communicate over the same local-IPC mechanism as Section 7."
+ *
+ * Fully shared between the "full" (minSdk 34) and "lite" (minSdk 23)
+ * flavors (see `docs/release-process.md`) — this class has nothing to do
+ * with FIDO2, so it isn't flavor-specific code, but it does need to start
+ * correctly across that whole SDK range. [foregroundServiceTypeForThisDevice]
+ * is the one place that shows: "specialUse" (spec's own choice for this
+ * service) didn't exist before API 34, so a "lite" build actually running
+ * on an API 23-33 device needs a different, older type instead of just
+ * omitting one — omitting a foreground service type entirely is itself
+ * disallowed by the platform once a device is new enough to require one
+ * at all (API 29+).
  */
 class VaultSignerService : Service() {
     private lateinit var managementHandlers: ManagementHandlers
@@ -45,7 +57,7 @@ class VaultSignerService : Service() {
     override fun onCreate() {
         super.onCreate()
         managementHandlers = ManagementHandlers(applicationContext)
-        startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), foregroundServiceTypeForThisDevice())
         // Must finish before the socket starts accepting connections below
         // — otherwise a client's very first `internal.status` could race
         // ahead of AgentState.vault being set and see `vault_open: false`
@@ -181,6 +193,30 @@ class VaultSignerService : Service() {
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
+    }
+
+    /**
+     * Foreground service types don't exist at all before API 29 (Q) —
+     * [ServiceCompat.startForeground] safely falls back to the plain
+     * 2-arg `startForeground` there regardless of what's passed. From 29
+     * on, a type is required and *is* checked against what the OS itself
+     * knows about: "specialUse" (`AndroidManifest.xml`'s declared type
+     * this service actually wants) doesn't exist as a concept before API
+     * 34, so passing its raw int value on an API 29-33 device is not a
+     * safe bet to assume works — "dataSync" is used instead there, one of
+     * the original set of types introduced alongside the whole mechanism
+     * in API 29, well-established, and declared in the manifest
+     * side-by-side with "specialUse" for exactly this. Real per-type
+     * runtime permission enforcement (spec-relevant: `FOREGROUND_SERVICE_
+     * DATA_SYNC`/`_SPECIAL_USE`) only started in API 34 regardless of
+     * which type is requested, so declaring both permissions unconditionally
+     * (`AndroidManifest.xml`) is correct for every OS version this method
+     * can run on.
+     */
+    private fun foregroundServiceTypeForThisDevice(): Int = when {
+        Build.VERSION.SDK_INT >= 34 -> ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        Build.VERSION.SDK_INT >= 29 -> ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        else -> 0
     }
 
     companion object {

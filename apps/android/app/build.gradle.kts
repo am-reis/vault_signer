@@ -24,12 +24,50 @@ android {
 
     defaultConfig {
         applicationId = "com.vaultsigner.app"
-        // Spec §12/§6.3: Android 14+/API 34+ only, matching the credential-
-        // provider role this app must play — no fallback path for older APIs.
-        minSdk = 34
+        // minSdk is per-flavor (below) — Credential Manager's provider
+        // role (spec §6.3) genuinely needs API 34, but that floor doesn't
+        // apply to the rest of the app (vault/key management, the custom
+        // protocol, i18n), so it isn't a project-wide constant anymore.
+        // targetSdk stays a single, un-flavored value: it's what the app
+        // *behaves as* at runtime on a device that has it, independent of
+        // the oldest device either flavor can install on.
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
+    }
+
+    // Two flavors of the *same app*, from the same commit, same version
+    // number (see docs/release-process.md and CLAUDE.md's Release
+    // artifacts section) — not two products, not two versioning lines.
+    // "full" keeps spec §12's original API-34+ scope (FIDO2/
+    // CredentialProviderService included); "lite" drops just that one
+    // capability to reach the other ~44 points of device-share API 34
+    // alone doesn't cover (54.5% cumulative at API 34 vs. 98.0% at API 23,
+    // per apilevels.com's April 2026 Statcounter-sourced figures — see
+    // docs/release-process.md for the full reasoning behind landing on
+    // API 23 specifically, not just "lower").
+    flavorDimensions += "tier"
+    productFlavors {
+        create("full") {
+            dimension = "tier"
+            minSdk = 34
+        }
+        create("lite") {
+            dimension = "tier"
+            // 23, not lower: AndroidX itself has required minSdk 23+
+            // since mid-2025, so this is the actual practical floor for
+            // an app built on Compose/AndroidX regardless of product
+            // choice — going lower isn't an option this dependency stack
+            // has, and 23 already covers ~98% of active devices (vs.
+            // ~96.6% at 24), so there is no real coverage left on the
+            // table between them.
+            minSdk = 23
+            // Deliberately no versionNameSuffix/applicationIdSuffix here:
+            // both flavors carry the identical version number from the
+            // identical commit (see docs/release-process.md) — "full" vs.
+            // "lite" is an artifact-filename distinction, not a version
+            // or app-identity one.
+        }
     }
 
     buildTypes {
@@ -97,7 +135,11 @@ dependencies {
     // classes (CredentialProviderService, BeginGetCredentialRequest, ...)
     // live in this same artifact, not a separate `credentials-provider`
     // one (verified against Google's real group index, not assumed).
-    implementation("androidx.credentials:credentials:1.5.0")
+    // "full"-only: this is the one dependency the FIDO2 code path needs
+    // that the rest of the app doesn't — declaring it as fullImplementation
+    // rather than implementation means "lite" never even links it, not
+    // just "doesn't call it."
+    "fullImplementation"("androidx.credentials:credentials:1.5.0")
 
     // The UniFFI-generated Kotlin bindings for vaultcore call into JNA
     // directly (see vaultcore/uniffi-verify/kotlin/Main.kt) — the `@aar`

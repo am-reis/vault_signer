@@ -1,7 +1,9 @@
 # VaultSigner — Android
 
 Phase 4 target (spec §12 item 4). Kotlin/Jetpack Compose app, binding to
-`vaultcore` via generated UniFFI Kotlin bindings over JNA.
+`vaultcore` via generated UniFFI Kotlin bindings over JNA. Ships as two
+Gradle product flavors — `full` (API 34+, FIDO2/`CredentialProviderService`)
+and `lite` (API 23+, no FIDO2) — see `docs/release-process.md`.
 
 **For current status, read `PROGRESS.md` at the repo root** — that file,
 not this one, is the kept-current status log for this project (per its
@@ -12,9 +14,11 @@ is built, what is real-device-verified, and what is still open.
 ## Building
 
 ```
-Scripts/build-vaultcore.sh   # cross-compiles vaultcore per ABI into jniLibs (needs the Android NDK)
-./gradlew :app:assembleDebug # regenerates the UniFFI Kotlin bindings, then builds
+Scripts/build-vaultcore.sh              # cross-compiles vaultcore per ABI into jniLibs (needs the Android NDK)
+./gradlew :app:assembleFullDebug        # API 34+, FIDO2 included
+./gradlew :app:assembleLiteDebug        # API 23+, no FIDO2
 ```
 
-`docs/protocol-integration.md` in this directory documents the real
-custom-protocol transport this platform uses.
+`docs/protocol-integration.md` documents the real custom-protocol
+transport this platform uses; `docs/release-process.md` documents the
+`full`/`lite` flavor split, minSdk reasoning, and release/tagging model.

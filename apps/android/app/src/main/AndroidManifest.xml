@@ -1,9 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Foreground service (spec §8): hosts the single Vault instance,
-         the custom-protocol/internal listener, and the retention cache. -->
+         the custom-protocol/internal listener, and the retention cache.
+         Declares both foreground-service types VaultSignerService can
+         run as (see that class's own doc comment for why): "specialUse"
+         on API 34+, "dataSync" as the pre-34 stand-in (per-type runtime
+         permissions, this one included, are themselves only enforced
+         starting API 34 — declaring both here is harmless on every
+         earlier OS version and correct on 34+ regardless of which flavor
+         happens to be running there). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- "Start VaultSigner at login/startup" (spec §8) — the Android
          equivalent of launchd RunAtLoad / a Windows Service autostart. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -42,27 +50,19 @@
             android:excludeFromRecents="true"
             android:launchMode="singleInstance" />
 
-        <!-- Completes one FIDO2 ceremony (spec §6.3/§6.6): the target of
-             the PendingIntent behind every PublicKeyCredentialEntry/
-             CreateEntry VaultSignerCredentialProviderService offers. Runs
-             in the same ":agent" process so it shares AgentState.vault
-             directly. -->
-        <activity
-            android:name=".credentialprovider.PasskeyCompletionActivity"
-            android:process=":agent"
-            android:exported="false"
-            android:theme="@style/Theme.VaultSigner.Dialog"
-            android:excludeFromRecents="true" />
-
         <!-- Spec §8: owns the single Vault instance and every write to the
              container file. Runs in its own process so it survives the UI
              Activity's process being killed, mirroring launchd/Windows
-             Service being a separate process from the management UI. -->
+             Service being a separate process from the management UI.
+             Fully shared between flavors — see its own doc comment for
+             how it picks a foreground-service type safe for its actual
+             minSdk (23 for "lite", 34 for "full") at runtime rather than
+             assuming API 34's "specialUse" is always available. -->
         <service
             android:name=".service.VaultSignerService"
             android:process=":agent"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|dataSync">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Local FIDO2/passkey and signing-request server for a user-controlled key vault; holds decrypted key material in memory only while unlocked." />
@@ -79,27 +79,6 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-
-        <!-- FIDO2/WebAuthn OS integration (spec §6.3). Runs in the same
-             ":agent" process as VaultSignerService so both hold the exact
-             same in-process Vault reference — never a second, independent
-             Vault instance (the architectural gap macOS's credential
-             provider extension couldn't avoid, since it's a genuinely
-             separate OS process there; Android's single-APK, same-process
-             model lets this be done correctly from the start). -->
-        <service
-            android:name=".credentialprovider.VaultSignerCredentialProviderService"
-            android:process=":agent"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.credentials.CredentialProviderService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.credentials.provider"
-                android:resource="@xml/provider" />
-        </service>
 
     </application>
 </manifest>

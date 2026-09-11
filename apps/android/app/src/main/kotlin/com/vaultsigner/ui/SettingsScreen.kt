@@ -2,7 +2,6 @@ package com.vaultsigner.ui
 
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.credentials.CredentialManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.vaultsigner.R
@@ -34,26 +32,17 @@ import com.vaultsigner.R
 fun SettingsScreen(navController: NavHostController, viewModel: AppViewModel, state: UiState) {
     var showAutoUnlockConfirm by remember { mutableStateOf(false) }
     val compartmentId = state.selectedCompartmentId
-    val context = LocalContext.current
 
     Scaffold { padding ->
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.settings_title))
 
-            // Spec §6.3 item 4.5: deep link to the system's Credential
-            // Manager settings so the user can enable VaultSigner as a
-            // provider — `CredentialManager.createSettingsPendingIntent()`
-            // is the real, current API for this (androidx.credentials
-            // 1.5.0+), verified against Android's own developer docs
-            // rather than assumed from the spec text's more generic
-            // wording.
-            Button(onClick = {
-                val credentialManager = CredentialManager.create(context)
-                context.startIntentSender(credentialManager.createSettingsPendingIntent().intentSender, null, 0, 0, 0)
-            }) {
-                Text(stringResource(R.string.android_settings_enable_credential_provider_button))
-            }
-            Text(stringResource(R.string.android_settings_enable_credential_provider_footer))
+            // Spec §6.3 item 4.5's deep link, only meaningful where a
+            // CredentialProviderService actually exists to enable — real
+            // implementation lives in src/full/.../CredentialProviderSettingsSection.kt
+            // ("full" flavor only); src/lite/ provides a no-op so this
+            // shared screen never has to know which flavor it's in.
+            CredentialProviderSettingsSection()
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = SpaceBetween) {
                 Text(stringResource(R.string.settings_start_at_login_toggle))

@@ -285,6 +285,11 @@ change exists to design around, would likely guess wrong about what that
 change needs. The first breaking change to this document is also
 responsible for introducing whatever negotiation mechanism it needs.
 
+Candidate changes for a future version, not yet designed or decided, are
+tracked informally in [`NEXT-VERSION-NOTES.md`](NEXT-VERSION-NOTES.md)
+rather than here — this document only ever describes the protocol as it
+currently, actually behaves.
+
 ## 10. What this protocol does not cover
 
 - **`internal.*` methods** may exist on the same transport on some

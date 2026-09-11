@@ -33,6 +33,47 @@ Phase 1.
       starts, and none of them may vendor or fork `vaultcore` logic
       (spec §2, §11). Revisit only if a concrete cross-platform
       orchestration need appears. (`eaa66fd`)
+- [x] 0.4 Revisit release-tag scheme now that a second platform (Windows)
+      is genuinely close to shipping — the original single-global-tag
+      scheme (still described as the plan in `CLAUDE.md` up to this
+      point) said explicitly to revisit once that happened. **Decision:**
+      switched to per-platform tags (`macos-vX.Y.Z`, `windows-vX.Y.Z`, …),
+      each an independent SemVer line — a shared tag reads to an outside
+      developer as "every platform this project supports," and a
+      platform-only release under a shared tag silently re-published
+      every other platform's artifacts as if they'd changed too.
+      `vaultcore` gets independent **versioning** (its own `Cargo.toml`
+      number, reasoned about by its own changes) and a plain, lightweight
+      `vaultcore-vA.B.C` tag when that number moves — but not an
+      independent **release process**: it's never published on its own
+      (`publish = false`, no crates.io), only ever bundled inside a
+      platform's own release artifacts, so a third full release cadence
+      to coordinate would be pure overhead. Full rules in `CLAUDE.md`'s
+      Versioning section; this entry is the "why," not the rulebook.
+      **Flagging, not building here:** there's no
+      `apps/windows/Scripts/package-release.ps1` (or a `build-staging`
+      equivalent) yet at all — needed before a Windows release can
+      actually be cut. Left for whoever's already working directly on
+      `platform/windows` rather than built as part of this change.
+- [x] 0.5 Write a formal, standalone specification of the custom local
+      signing protocol (§7), distinct from the spec (deliberately
+      informal/process-oriented by original design) and from
+      `docs/protocol-integration/README.md` (a friendlier integration
+      guide with examples, kept as-is for that purpose). **Decision:**
+      third-party integration against this protocol (including the
+      author's own browser-extension integration) had outgrown an
+      informal description — `docs/protocol-integration/PROTOCOL-SPEC.md`
+      is now the normative wire-format reference, versioned on its own
+      (currently 1.0) independently of any platform's version. Per
+      `CLAUDE.md`'s Versioning section, changes to that document are what
+      drive `vaultcore`'s MAJOR/MINOR reasoning on protocol grounds going
+      forward. One substantive addition made while formalizing it:
+      `no_vault_open` was previously described identically but
+      separately in both the macOS and Windows integration guides as an
+      "agent-specific" error beyond the core catalog — promoted to the
+      core error table itself, since both existing implementations
+      already agreed on it and leaving it informal invited future
+      platforms to invent their own name for the same condition.
 
 ## Phase 1 — vaultcore (shared, built once, platform-agnostic)
 
@@ -59,11 +100,19 @@ Phase 1.
 - [x] 1.6 In-memory retention cache with `zeroize` and configurable
       timer (§4.5). `vaultcore/src/retention.rs`. Background sweep
       thread proactively wipes expired entries rather than relying on
-      next-access; zero-retention entries are single-use. **Known gap:**
-      `mlock`/`VirtualLock`/`mlockall`-equivalent calls are not
-      implemented — this needs real per-platform unsafe FFI against a
-      non-relocating allocation and is deliberately left as a TODO
-      rather than faked; see the module doc comment. (`eaa66fd`)
+      next-access; zero-retention entries are single-use. **Windows half
+      of the known gap closed this session** (done from a real Windows
+      machine — see Phase 3): `vaultcore/src/mem_lock.rs`'s
+      `LockedBuffer` backs cached key bytes with a page-aligned
+      `VirtualAlloc` region pinned via `VirtualLock`, zeroized via a
+      volatile write loop and released on drop, wired into
+      `CachedKey.bytes`. Verified for real: `cargo build --release
+      --target x86_64-pc-windows-msvc` and `cargo test --workspace`
+      (117 tests, up from 108) both clean on Windows. **macOS/Linux
+      still the original gap** — `LockedBuffer` falls back to a plain
+      `zeroize`-wrapped `Vec<u8>` there (zeroized on drop, not pinned
+      against paging) until a real `mlock`/`mlockall` path is built and
+      verified on an actual Unix machine; do not assume parity. (`eaa66fd`)
 - [x] 1.7 CTAP2 message handling (`authenticatorMakeCredential`,
       `authenticatorGetAssertion`) as a platform-agnostic library
       function. `vaultcore/src/ctap2.rs`, built directly on the

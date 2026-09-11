@@ -2,6 +2,8 @@
 
 This is the reference for third-party applications that want VaultSigner to sign data on their behalf, or to let a user pick a key for that purpose. It covers the protocol itself — message format, methods, authorization behavior, error codes — which is identical across every desktop platform. Platform-specific transport details (socket paths, discovery, launch behavior, and runnable code) live in a separate guide per platform, linked at the bottom.
 
+For the precise, normative wire format (exact field requirements, error-catalog guarantees, the rate-limiting formula) see [`PROTOCOL-SPEC.md`](PROTOCOL-SPEC.md) — this document stays the friendly, example-first introduction; that one is the formal reference.
+
 If you're building a login or account-registration flow using passkeys/WebAuthn, **this document is not what you need.** VaultSigner participates in those flows as a standard OS credential provider (Apple's `AuthenticationServices`, Android's Credential Manager, Windows Hello, etc.) — you integrate with the OS's own passkey APIs exactly as you would for any other passkey provider, and never talk to the socket described here directly.
 
 This document is for a different case: your app needs a raw cryptographic signature over some data it controls, using a key the user keeps in VaultSigner (deploy signing, artifact signing, commit signing, or similar), and it isn't going through a WebAuthn ceremony.
@@ -85,8 +87,9 @@ After 5 consecutive wrong passphrase attempts for a given key, further attempts 
 | `user_declined` | The person shown the prompt clicked Deny. | Only if the user initiates a new attempt themselves — never retry automatically. |
 | `passphrase_incorrect` | The passphrase entered at the prompt was wrong for this key. | Yes, subject to rate limiting above. |
 | `key_locked_retry_later` | Rate-limited — see above. | After the backoff period elapses. |
+| `no_vault_open` | The agent is running but has no vault open at all (e.g. a fresh install, before the user has created one). | Only after the user opens a vault in VaultSigner's own UI. |
 
-A real implementation may surface additional, implementation-specific error codes for conditions outside this core protocol's scope (for example, VaultSigner having no vault open at all) — see the platform-specific guide.
+A real implementation may surface further, implementation-specific error codes for conditions outside this core protocol's scope — see the platform-specific guide.
 
 ## What this protocol does not cover
 
@@ -97,5 +100,6 @@ A real implementation may surface additional, implementation-specific error code
 ## Platform guides
 
 - macOS: [`apps/macos/docs/protocol-integration.md`](../../apps/macos/docs/protocol-integration.md)
+- Windows: [`apps/windows/docs/protocol-integration.md`](../../apps/windows/docs/protocol-integration.md)
 
-Other platforms will be linked here as they ship (spec §7 covers the general transport shape per platform; §7.1 specifically calls out iOS as materially narrower than the socket/pipe model described above, since iOS has no persistent background listener).
+Other platforms will be linked here as they ship (spec §7 covers the general transport shape per platform; §7.1 specifically calls out iOS as materially narrower than the socket/pipe model described above, since iOS has no persistent background listener). Writing this addendum is a required part of finishing that platform's phase, not an optional follow-up — see spec §14.

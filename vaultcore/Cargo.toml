@@ -53,3 +53,6 @@ path = "src/bin/chaos_writer.rs"
 name = "uniffi-bindgen"
 path = "src/bin/uniffi_bindgen.rs"
 required-features = ["uniffi"]
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_System_Memory", "Win32_System_SystemInformation"] }

@@ -1,5 +1,7 @@
 package com.vaultsigner.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,7 +34,7 @@ fun CreateVaultScreen(navController: NavHostController, viewModel: AppViewModel,
     var mismatch by remember { mutableStateOf(false) }
 
     Scaffold { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.createvault_title))
             OutlinedTextField(value = fileName, onValueChange = { fileName = it }, label = { Text(stringResource(R.string.welcome_filename_placeholder)) })
             OutlinedTextField(value = compartmentLabel, onValueChange = { compartmentLabel = it }, label = { Text(stringResource(R.string.createvault_compartment_label_field)) })

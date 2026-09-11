@@ -1,5 +1,7 @@
 package com.vaultsigner.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,7 +42,7 @@ fun CreateKeyScreen(navController: NavHostController, viewModel: AppViewModel, s
     var mismatch by remember { mutableStateOf(false) }
 
     Scaffold { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.createkey_title))
             OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text(stringResource(R.string.createkey_label_field)) })
             OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(stringResource(R.string.createkey_description_field)) })

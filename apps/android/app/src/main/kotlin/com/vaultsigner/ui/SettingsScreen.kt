@@ -1,5 +1,7 @@
 package com.vaultsigner.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.credentials.CredentialManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,7 +37,7 @@ fun SettingsScreen(navController: NavHostController, viewModel: AppViewModel, st
     val context = LocalContext.current
 
     Scaffold { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.settings_title))
 
             // Spec §6.3 item 4.5: deep link to the system's Credential

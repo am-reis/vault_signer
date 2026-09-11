@@ -1,5 +1,7 @@
 package com.vaultsigner.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import android.net.Uri
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -56,7 +58,7 @@ fun ImportPacketScreen(navController: NavHostController, viewModel: AppViewModel
     LaunchedEffect(state.error) { if (state.error != null && packetB64 != null) needsTransferPassword = true }
 
     Scaffold { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.import_title))
             Text(stringResource(R.string.import_subtitle_detailed))
             Button(onClick = { pickLauncher.launch(arrayOf("*/*")) }) { Text(stringResource(R.string.import_choose_file_button)) }

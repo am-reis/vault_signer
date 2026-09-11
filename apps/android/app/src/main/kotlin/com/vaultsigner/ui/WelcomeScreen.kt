@@ -96,9 +96,15 @@ fun WelcomeScreen(navController: NavHostController, viewModel: AppViewModel, sta
 
 /** Reads the freshest state directly rather than a composable's captured
  * snapshot, since this runs inside an `onDone` callback fired after an
- * async RPC round trip updates the ViewModel's state. */
-private fun routeAfterOpen(viewModel: AppViewModel): String =
-    if (viewModel.state.value.compartments.size == 1) Routes.KEY_LIST else Routes.UNLOCK
+ * async RPC round trip updates the ViewModel's state. Opening a vault
+ * (spec §4.1) never auto-unlocks any compartment on its own — only spec
+ * §8's opt-in auto-unlock does that — so this only skips the unlock
+ * screen when the single compartment already reports `unlocked: true`
+ * (e.g. auto-unlock already ran agent-side). */
+private fun routeAfterOpen(viewModel: AppViewModel): String {
+    val compartments = viewModel.state.value.compartments
+    return if (compartments.size == 1 && compartments[0].unlocked) Routes.KEY_LIST else Routes.UNLOCK
+}
 
 private fun copyVaultLocally(context: android.content.Context, uri: Uri): String? {
     val resolver = context.contentResolver

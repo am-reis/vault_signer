@@ -1,5 +1,7 @@
 package com.vaultsigner.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import android.net.Uri
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -61,7 +63,7 @@ fun ExportPacketScreen(navController: NavHostController, viewModel: AppViewModel
     }
 
     Scaffold { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.exportpacket_keys_to_include_header))
             state.keys.forEach { key ->
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {

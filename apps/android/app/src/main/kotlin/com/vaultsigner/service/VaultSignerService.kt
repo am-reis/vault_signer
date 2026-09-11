@@ -46,8 +46,12 @@ class VaultSignerService : Service() {
         super.onCreate()
         managementHandlers = ManagementHandlers(applicationContext)
         startForeground(NOTIFICATION_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        // Must finish before the socket starts accepting connections below
+        // — otherwise a client's very first `internal.status` could race
+        // ahead of AgentState.vault being set and see `vault_open: false`
+        // for a vault that is, moments later, actually open.
+        reopenLastVaultIfAny()
         startSocketServer()
-        reopenLastVaultIfAutostartEnabled()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -68,7 +72,15 @@ class VaultSignerService : Service() {
         super.onDestroy()
     }
 
-    private fun reopenLastVaultIfAutostartEnabled() {
+    /** Reopens whichever vault [ManagementHandlers] last recorded via
+     * [VaultConfig], every time this process (re)starts — for whatever
+     * reason it started (a boot-triggered autostart, or the UI calling
+     * [ManagementClient.ensureAgentRunning] on demand). "Start VaultSigner
+     * at login" (spec §8) gates whether [BootCompletedReceiver] starts
+     * this process at all, not what this process does once running —
+     * once started, it always tries to pick back up where it left off,
+     * mirroring macOS's `main.swift`. */
+    private fun reopenLastVaultIfAny() {
         if (AgentState.vault != null) return
         val path = VaultConfig.loadVaultPath(applicationContext) ?: return
         try {

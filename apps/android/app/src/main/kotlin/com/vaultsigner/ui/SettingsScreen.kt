@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -63,7 +64,10 @@ fun SettingsScreen(navController: NavHostController, viewModel: AppViewModel, st
 
             Text(stringResource(R.string.settings_vaults_header))
             Button(onClick = { navController.navigate(Routes.MANAGE_VAULTS) }) { Text(stringResource(R.string.settings_manage_vaults_button)) }
-            Button(onClick = { viewModel.closeVault { navController.navigate(Routes.WELCOME) { popUpTo(0) } } }) { Text(stringResource(R.string.manage_vaults_close_vault_button)) }
+            Button(
+                onClick = { viewModel.closeVault { navController.navigate(Routes.WELCOME) { popUpTo(0) } } },
+                modifier = Modifier.testTag(TestTags.SETTINGS_CLOSE_VAULT_BUTTON),
+            ) { Text(stringResource(R.string.manage_vaults_close_vault_button)) }
 
             if (showAutoUnlockConfirm && compartmentId != null) {
                 AutoUnlockConfirmDialog(

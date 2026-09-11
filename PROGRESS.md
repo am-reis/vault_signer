@@ -798,13 +798,11 @@ independent knobs.
       last vault → routes to Unlock (not straight to keys — a real bug
       this caught, see below) → unlock with the real passphrase → key
       list → create-key (real Ed25519 keypair) → the new key visible via
-      `vaultsigner.list_public_keys` over the real socket. **Not yet
-      driven this way**: `ExportPacketScreen`/`ImportPacketScreen`/
-      `MasterKeyDualityScreen`/`CreateCompartmentScreen` — built and
-      compile-verified, and their underlying `Vault` facade calls are
-      already proven by the Kotlin/Swift `uniffi-verify` harnesses (item
-      1.11) and macOS's own interactive verification (items 2.3/2.4), but
-      not click-tested through *this* app's UI yet.
+      `vaultsigner.list_public_keys` over the real socket.
+      `ExportPacketScreen`/`ImportPacketScreen`/`MasterKeyDualityScreen`/
+      `CreateCompartmentScreen` are now also click-tested through this
+      app's own UI, via instrumented tests (see 4.8) rather than manual
+      driving.
 
       **Three real bugs found and fixed by actually driving the app**
       (not found by reading the code — device testing genuinely earned
@@ -1013,10 +1011,13 @@ independent knobs.
       RTL locale to check).
 - [ ] 4.8 Phase 10 test/fuzz suite. Shared `vaultcore` suite already
       green (spec §10, same as Phase 2/3). `androidTest` instrumented
-      coverage: [x] `CoreVaultFlowTest` (create vault → create key)
-      passing on both flavors, emulator + real device — see
-      `apps/android/docs/android-dev-journal.md`. Not done: self-import/
-      export UI click-testing; interop tests blocked on 4.4.
+      coverage: [x] `CoreVaultFlowTest` (create vault → create key),
+      [x] `CreateCompartmentFlowTest`, [x] `ExportImportDualityFlowTest`
+      (self-export/self-import round trip across two real vaults via
+      duality option 1) — all passing on both flavors, emulator + real
+      device, run via Android Test Orchestrator for process isolation
+      between tests. See `apps/android/docs/android-dev-journal.md`. Not
+      done: interop tests, blocked on 4.4.
 - [x] 4.9 `docs/user-guide.md` reconciled against the real, shipped
       Android UI. One precise edit: extended the existing Windows
       compartments note to also cover Android (which genuinely has the

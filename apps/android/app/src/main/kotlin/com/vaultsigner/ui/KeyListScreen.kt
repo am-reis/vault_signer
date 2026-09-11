@@ -53,19 +53,37 @@ fun KeyListScreen(navController: NavHostController, viewModel: AppViewModel, sta
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.keylist_new_key_button))
                     }
-                    IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
+                    IconButton(
+                        onClick = { navController.navigate(Routes.SETTINGS) },
+                        modifier = Modifier.testTag(TestTags.KEY_LIST_SETTINGS_BUTTON),
+                    ) {
                         Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.keylist_settings_button))
                     }
                     IconButton(onClick = { viewModel.lockAll { navController.navigate(Routes.WELCOME) { popUpTo(0) } } }) {
                         Icon(Icons.Filled.Lock, contentDescription = stringResource(R.string.keylist_lock_button))
                     }
-                    IconButton(onClick = { menuExpanded = true }) {
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.testTag(TestTags.KEY_LIST_MENU_BUTTON),
+                    ) {
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.keylist_import_export_menu))
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.keylist_export_packet_button)) }, onClick = { menuExpanded = false; navController.navigate(Routes.EXPORT_PACKET) })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.keylist_import_packet_button)) }, onClick = { menuExpanded = false; navController.navigate(Routes.IMPORT_PACKET) })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.keylist_new_compartment_link)) }, onClick = { menuExpanded = false; navController.navigate(Routes.CREATE_COMPARTMENT) })
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.keylist_export_packet_button)) },
+                            onClick = { menuExpanded = false; navController.navigate(Routes.EXPORT_PACKET) },
+                            modifier = Modifier.testTag(TestTags.KEY_LIST_EXPORT_MENU_ITEM),
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.keylist_import_packet_button)) },
+                            onClick = { menuExpanded = false; navController.navigate(Routes.IMPORT_PACKET) },
+                            modifier = Modifier.testTag(TestTags.KEY_LIST_IMPORT_MENU_ITEM),
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.keylist_new_compartment_link)) },
+                            onClick = { menuExpanded = false; navController.navigate(Routes.CREATE_COMPARTMENT) },
+                            modifier = Modifier.testTag(TestTags.KEY_LIST_NEW_COMPARTMENT_MENU_ITEM),
+                        )
                     }
                 },
             )

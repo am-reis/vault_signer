@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -61,7 +62,10 @@ fun ImportPacketScreen(navController: NavHostController, viewModel: AppViewModel
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.import_title))
             Text(stringResource(R.string.import_subtitle_detailed))
-            Button(onClick = { pickLauncher.launch(arrayOf("*/*")) }) { Text(stringResource(R.string.import_choose_file_button)) }
+            Button(
+                onClick = { pickLauncher.launch(arrayOf("*/*")) },
+                modifier = Modifier.testTag(TestTags.IMPORT_CHOOSE_FILE_BUTTON),
+            ) { Text(stringResource(R.string.import_choose_file_button)) }
 
             if (needsTransferPassword) {
                 Text(stringResource(R.string.import_transfer_password_prompt))

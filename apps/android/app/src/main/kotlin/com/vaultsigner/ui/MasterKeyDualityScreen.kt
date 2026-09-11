@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -58,11 +59,17 @@ private fun Option1Card(navController: NavHostController, viewModel: AppViewMode
         if (unlockedCompartments.isEmpty()) {
             Text(stringResource(R.string.duality_option1_no_unlocked_compartment))
         } else {
-            OutlinedButton(onClick = { expanded = true }) { Text(unlockedCompartments.firstOrNull { it.id == target }?.label ?: stringResource(R.string.duality_option1_merge_into_picker)) }
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier.testTag(TestTags.DUALITY_OPTION1_PICKER_BUTTON),
+            ) { Text(unlockedCompartments.firstOrNull { it.id == target }?.label ?: stringResource(R.string.duality_option1_merge_into_picker)) }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 unlockedCompartments.forEach { c -> DropdownMenuItem(text = { Text(c.label) }, onClick = { target = c.id; expanded = false }) }
             }
-            Button(onClick = { target?.let { viewModel.mergeReencryptDiscardIncoming(it); navController.popBackStack() } }) {
+            Button(
+                onClick = { target?.let { viewModel.mergeReencryptDiscardIncoming(it); navController.popBackStack() } },
+                modifier = Modifier.testTag(TestTags.DUALITY_OPTION1_USE_BUTTON),
+            ) {
                 Text(stringResource(R.string.duality_use_this_option_button))
             }
         }

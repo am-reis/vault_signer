@@ -35,6 +35,25 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Wipe app data between every test method, not just once per
+        // gradle invocation — see testOptions.execution below for why
+        // this matters together with that setting.
+        testInstrumentationRunnerArguments["clearPackageData"] = "true"
+    }
+
+    // Without Test Orchestrator, every test CLASS in one
+    // connectedAndroidTest invocation shares the same long-lived app
+    // process (and its :agent child process/open vault) — `am instrument`
+    // only restarts the process if it crashes. That let one test's
+    // leftover open vault bleed into the next test's initial state, and
+    // repeated Activity-recreation cycles against the same never-restarted
+    // :agent process eventually made the whole suite intermittently hang
+    // (see apps/android/docs/android-dev-journal.md). Orchestrator runs
+    // each test in its own fresh Instrumentation instance instead, and
+    // clearPackageData above wipes storage between them too — the real
+    // fix, not just working around it from the test side.
+    testOptions {
+        execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
 
     // Two flavors of the *same app*, from the same commit, same version
@@ -162,6 +181,18 @@ dependencies {
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // Export/Import both hand off to a real system document picker
+    // (ActivityResultContracts.CreateDocument/OpenDocument) — Espresso-
+    // Intents lets a test stub that picker's result with a real local
+    // file instead of needing a human to drive Android's actual file-
+    // picker UI, so the export→import round trip stays a real,
+    // automated test rather than something only ever driven manually.
+    androidTestImplementation("androidx.test.espresso:espresso-intents:3.7.0")
+
+    // Runs each test in its own fresh process/Instrumentation instance —
+    // see testOptions.execution above for why this suite needs it.
+    androidTestUtil("androidx.test:orchestrator:1.5.1")
 }
 
 // ---- vaultcore UniFFI Kotlin bindings: generated, never checked in ----

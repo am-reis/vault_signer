@@ -98,3 +98,51 @@ real, independent relying party (not just our own app's Settings
 screen, as item 4.4's earlier verification was limited to) — one level
 better than before, but the actual WebAuthn ceremony itself still isn't
 exercised. The interop gap in `PROGRESS.md`'s 4.4 entry stands.
+
+## 2026-09-11 — CreateCompartment/Export/Import/Duality click-through tests, and a suite-level flake
+
+Added two more instrumented tests (item 4.1/4.8's remaining screens):
+
+- `CreateCompartmentFlowTest`: create a vault, add a second compartment
+  from `KeyListScreen`'s overflow menu, confirm success (navigation back
+  to the key list — `addCompartment()` only calls `onDone` after the RPC
+  actually succeeds).
+- `ExportImportDualityFlowTest`: the automated form of the manual self-
+  export/self-import round trip mentioned in this phase's `PROGRESS.md`
+  4.1 entry (the one that caught the real `vaultcore` merge-persistence
+  bug) — create vault A with a key, export it "as-is" with the master
+  key included, close vault A, create vault B, import the packet, merge
+  via duality Option 1, and confirm the key lands in vault B.
+  `ExportPacketScreen`/`ImportPacketScreen` both hand off to a real
+  system document picker (`CreateDocument`/`OpenDocument`); Espresso-
+  Intents (`IntentsRule`) stubs that picker's result with a real local
+  file so the round trip stays genuinely automated.
+
+Both passed on their own immediately. Running all three test classes
+together in one `connectedFullDebugAndroidTest` invocation, though,
+intermittently failed a *different* test each time — always at a
+`waitUntil` that should have resolved almost instantly. Root cause,
+confirmed via full logcat correlation: `am instrument` keeps ONE app
+process (and its `:agent` child process, with whatever vault it has
+open) alive across every test *class* in one invocation — it only
+restarts on an actual crash. A `@Before fun ensureCleanStart()` was
+added first (`BaseVaultInstrumentedTest`, closes any vault left open by
+a prior test class via the real Settings → Close Vault UI) to make
+tests order-independent, and that fixed the *first* failure mode
+(a test starting mid-way through a previous test's still-open vault).
+But the flake persisted, now specifically as the third test in a row
+timing out completely — RPC calls that had been near-instant for tests
+1 and 2 stopped happening at all, with no error logged either.
+
+That's resource/process accumulation across repeated Activity-recreation
+cycles against the same never-restarted `:agent` process, not a real
+app bug — each test passes reliably in isolation, every time. The real
+fix is **Android Test Orchestrator**
+(`androidx.test:orchestrator`, `testOptions { execution =
+"ANDROIDX_TEST_ORCHESTRATOR" }`, `clearPackageData = "true"`), which
+runs every test method in its own fresh process rather than trying to
+reset state from the test side — this is exactly the problem it exists
+to solve. Confirmed stable across two repeated full-suite runs after
+enabling it. `ensureCleanStart()` was kept as a cheap defense-in-depth
+(a no-op once Orchestrator guarantees a clean process per test), not
+removed.

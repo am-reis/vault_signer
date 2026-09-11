@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -70,25 +71,31 @@ fun ExportPacketScreen(navController: NavHostController, viewModel: AppViewModel
                     Checkbox(
                         checked = selectedKeyIds.contains(key.id),
                         onCheckedChange = { checked -> selectedKeyIds = if (checked) selectedKeyIds + key.id else selectedKeyIds - key.id },
+                        modifier = Modifier.testTag(TestTags.EXPORT_KEY_CHECKBOX),
                     )
                     Text(key.label)
                 }
             }
 
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Checkbox(checked = includeMasterKey, onCheckedChange = { includeMasterKey = it })
+                Checkbox(
+                    checked = includeMasterKey, onCheckedChange = { includeMasterKey = it },
+                    modifier = Modifier.testTag(TestTags.EXPORT_INCLUDE_MASTER_CHECKBOX),
+                )
                 Text(stringResource(R.string.exportpacket_include_master_toggle))
             }
             Text(stringResource(R.string.exportpacket_include_master_explanation))
 
             Text(stringResource(R.string.exportpacket_protect_with_label))
             EncryptionOptionCard(
+                tag = TestTags.EXPORT_OPTION_ASIS,
                 selected = choice == EncryptionChoice.AS_IS,
                 onSelect = { choice = EncryptionChoice.AS_IS },
                 title = stringResource(R.string.exportpacket_option_asis_title),
                 detail = stringResource(R.string.exportpacket_option_asis_detail),
             )
             EncryptionOptionCard(
+                tag = TestTags.EXPORT_OPTION_DESTINATION,
                 selected = choice == EncryptionChoice.DESTINATION_PASSWORD,
                 onSelect = { choice = EncryptionChoice.DESTINATION_PASSWORD },
                 title = stringResource(R.string.exportpacket_option_destination_title),
@@ -101,6 +108,7 @@ fun ExportPacketScreen(navController: NavHostController, viewModel: AppViewModel
                 )
             }
             EncryptionOptionCard(
+                tag = TestTags.EXPORT_OPTION_TRANSFER,
                 selected = choice == EncryptionChoice.ONE_TIME_PASSWORD,
                 onSelect = { choice = EncryptionChoice.ONE_TIME_PASSWORD },
                 title = stringResource(R.string.exportpacket_option_transfer_title),
@@ -124,6 +132,7 @@ fun ExportPacketScreen(navController: NavHostController, viewModel: AppViewModel
                     }
                     viewModel.exportPacket(compartmentId, selectedKeyIds.toList(), includeMasterKey, encryption)
                 },
+                modifier = Modifier.testTag(TestTags.EXPORT_SUBMIT),
             ) {
                 Text(stringResource(R.string.exportpacket_export_button))
             }
@@ -132,8 +141,8 @@ fun ExportPacketScreen(navController: NavHostController, viewModel: AppViewModel
 }
 
 @Composable
-private fun EncryptionOptionCard(selected: Boolean, onSelect: () -> Unit, title: String, detail: String, extra: (@Composable () -> Unit)? = null) {
-    Column(modifier = Modifier.selectable(selected = selected, onClick = onSelect).padding(8.dp)) {
+private fun EncryptionOptionCard(tag: String, selected: Boolean, onSelect: () -> Unit, title: String, detail: String, extra: (@Composable () -> Unit)? = null) {
+    Column(modifier = Modifier.selectable(selected = selected, onClick = onSelect).testTag(tag).padding(8.dp)) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             RadioButton(selected = selected, onClick = onSelect)
             Text(title)

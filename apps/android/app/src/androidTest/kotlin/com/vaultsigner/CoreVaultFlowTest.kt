@@ -1,6 +1,5 @@
 package com.vaultsigner
 
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -8,9 +7,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.vaultsigner.ui.MainActivity
 import com.vaultsigner.ui.TestTags
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -35,10 +32,7 @@ import org.junit.runner.RunWith
  * code path that's the only thing actually flavor-specific.
  */
 @RunWith(AndroidJUnit4::class)
-class CoreVaultFlowTest {
-
-    @get:Rule
-    val composeTestRule = createAndroidComposeRule<MainActivity>()
+class CoreVaultFlowTest : BaseVaultInstrumentedTest() {
 
     @Test
     fun createVault_thenCreateKey_reachesRealKeyList() {

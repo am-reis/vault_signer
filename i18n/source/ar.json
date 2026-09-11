@@ -1,5 +1,5 @@
 {
-  "_comment": "Arabic (RTL) — spec §9 explicitly requires verifying right-to-left layout on the import/export decision screens, so this locale intentionally covers exactly the same key set as en.json's import/duality screens rather than the whole app.",
+  "_comment": "Arabic (RTL) — spec §9 explicitly requires verifying right-to-left layout on the import/export decision screens, so this locale intentionally covers exactly the same key set as en.json's Welcome/Import/Duality/Manage-Vaults screens (the same four migrated on both macOS and Windows — spec §12 item 3.7) rather than the whole app.",
 
   "welcome.subtitle": "أنشئ خزنة جديدة أو افتح خزنة موجودة لديك بالفعل.",
   "welcome.create_button": "إنشاء خزنة جديدة…",
@@ -11,9 +11,23 @@
   "welcome.manage_vaults_button": "إدارة الخزنات المعروفة…",
   "welcome.vault_unavailable_title": "الخزنة غير موجودة",
   "welcome.vault_unavailable_message": "تعذر العثور على ملف هذه الخزنة في موقعه المحفوظ. ربما تم نقله أو حذفه. يمكنك نسيان هذا العنصر أو تحديد موقع الملف من جديد.",
+  "welcome.vault_unavailable_tooltip": "تعذر العثور على هذا الملف",
+  "welcome.forget_tooltip": "نسيان هذه الخزنة",
+  "welcome.create_section_header": "إنشاء خزنة جديدة",
+  "welcome.choose_folder_button": "اختيار مجلد…",
+  "welcome.no_folder_chosen": "لم يتم اختيار مجلد",
+  "welcome.filename_placeholder": "اسم الملف، مثل MyVault.vlt",
+  "welcome.compartment_name_placeholder": "اسم القسم الأول، مثل Personal",
+  "welcome.master_passphrase_placeholder": "كلمة المرور الرئيسية",
+  "welcome.confirm_passphrase_placeholder": "تأكيد كلمة المرور الرئيسية",
+  "welcome.create_vault_button": "إنشاء خزنة",
+  "welcome.open_section_header": "أو فتح ملف خزنة موجود",
+
+  "nav.back_button": "→ رجوع",
 
   "manage_vaults.title": "إدارة الخزنات المعروفة",
   "manage_vaults.subtitle": "يتم تذكّر الخزنات التي أنشأتها أو فتحتها هنا حتى لا تضطر إلى البحث عنها مرة أخرى. نسيان عنصر لا يمس الملف نفسه أبدًا.",
+  "manage_vaults.no_vaults": "لا توجد خزنات معروفة بعد.",
   "manage_vaults.add_button": "إضافة خزنة موجودة…",
   "manage_vaults.add_panel_message": "اختر ملف خزنة بامتداد ‎.vlt لإضافته إلى القائمة",
   "manage_vaults.open_button": "إدارة الخزنات المعروفة…",
@@ -29,6 +43,7 @@
   "import.transfer_password_prompt": "هذه الحزمة محمية بكلمة مرور نقل.",
   "import.transfer_password_field": "كلمة مرور النقل",
   "import.continue_button": "متابعة",
+  "import.subtitle_detailed": "اختر ملف ‎.vltpack مُصدَّرًا من خزنة VaultSigner أخرى (أو نسخة احتياطية) لاستيراد مفاتيحه إلى هذا القسم.",
 
   "duality.header": "يتضمن هذا الاستيراد المفتاح الرئيسي لخزنة أخرى",
   "duality.subtitle": "قبل دمج أي مفاتيح، اختر ما يجب فعله بالمفتاح الرئيسي الوارد. لا يمكن تخطي هذا الاختيار.",
@@ -48,6 +63,7 @@
 
   "duality.option3.title": "استبدال المفتاح الرئيسي المحلي بالمفتاح الرئيسي الوارد",
   "duality.option3.description": "سيؤدي هذا إلى استبدال كلمة المرور التي تحمي جميع مفاتيحك الحالية، بما فيها المفاتيح التي لم تستوردها للتو، بكلمة مرور مختلفة. إذا لم تكن كلتا كلمتي المرور متوفرتين لديك الآن، فتوقف.",
+  "duality.option3.no_unlocked_compartment": "لا يوجد قسم مفتوح حاليًا لاستبداله.",
   "duality.option3.replace_picker": "استبدال",
   "duality.option3.passphrase_field": "كلمة المرور الرئيسية للخزنة الواردة",
   "duality.option3.confirmation_field_format": "اكتب \"%@\" للتأكيد"

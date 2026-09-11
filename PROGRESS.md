@@ -1001,14 +1001,12 @@ independent knobs.
       (git's ref model won't let a `shared/<topic>` branch coexist
       locally with the `shared` branch itself, so this used the other
       branch-model-sanctioned path: committing shared-scope work directly
-      on `shared`). **Not done**: `ar.json`'s RTL layout was not verified
-      on-device this session (inherited automatically for
-      `WelcomeScreen`/`ImportPacketScreen`/`MasterKeyDualityScreen`/
-      `ManageVaultsScreen` since Android's `values-ar` qualifier carries
-      automatic RTL mirroring, same source keys as macOS/Windows already
-      translate — but "the resource exists" isn't "verified rendered
-      correctly RTL," and this session didn't switch the emulator to a
-      RTL locale to check).
+      on `shared`). RTL layout now verified on-device (per-app Arabic
+      locale override, real Arabic text + mirrored element positions
+      confirmed via `uiautomator` bounds on `WelcomeScreen` and
+      `ManageVaultsScreen`) — see `apps/android/docs/android-dev-journal.md`.
+      `ImportPacketScreen`/`MasterKeyDualityScreen` inherit the same
+      automatic mirroring but weren't individually spot-checked.
 - [ ] 4.8 Phase 10 test/fuzz suite. Shared `vaultcore` suite already
       green (spec §10, same as Phase 2/3). `androidTest` instrumented
       coverage: [x] `CoreVaultFlowTest` (create vault → create key),

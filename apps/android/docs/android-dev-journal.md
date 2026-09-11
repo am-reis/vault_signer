@@ -146,3 +146,30 @@ to solve. Confirmed stable across two repeated full-suite runs after
 enabling it. `ensureCleanStart()` was kept as a cheap defense-in-depth
 (a no-op once Orchestrator guarantees a clean process per test), not
 removed.
+
+## 2026-09-11 — RTL verification, on-device
+
+`ar.json`'s translations already existed and Android's `values-ar`
+qualifier carries automatic RTL mirroring for free, but that had never
+actually been checked rendering on a real device. A system-wide locale
+change via `adb shell settings put system system_locales` didn't take
+effect (writing that setting directly doesn't trigger the actual
+locale-change path — that normally goes through a privileged
+`LocaleManagerService` call the Settings app makes internally). Android
+13's per-app language override did work directly from the shell:
+
+```
+adb shell cmd locale set-app-locales com.vaultsigner.app --user current --locales ar-SA
+```
+
+Verified via `uiautomator dump` (screenshots are blocked by
+`FLAG_SECURE`, same as always): real Arabic text renders correctly on
+`WelcomeScreen` and `ManageVaultsScreen`, and — more importantly —
+element bounds actually mirror, not just the text. E.g. "Create New
+Vault…" sits at `[40,114]-[164,134]` (hugging the left) in English;
+its Arabic equivalent sits at `[176,114]-[280,134]` (hugging the right)
+in the identical layout. Confirms `Alignment.Start`/`Column`'s default
+alignment genuinely resolves against `LocalLayoutDirection` here, not
+just that the strings are translated. Reverted the override back to
+`en-US` afterward so the emulator's default state doesn't surprise a
+later session.

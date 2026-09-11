@@ -1,5 +1,5 @@
 {
-  "_comment": "Single source-of-truth for VaultSigner's user-facing strings (spec §9). Keys are semantic (not raw English text) so ICU MessageFormat features like plurals/gender can be added per-key without renaming call sites. Generate platform-native formats from this file with i18n/generate-apple-strings.py (and future per-platform equivalents) rather than hand-editing .strings/.xml/.resx directly. This file currently covers only the screens migrated so far (Welcome, Import Packet, the master-key-duality screen) — see /PROGRESS.md item 2.9 for what's not yet migrated. Product/brand names (\"VaultSigner\") are deliberately excluded, per standard i18n practice.",
+  "_comment": "Single source-of-truth for VaultSigner's user-facing strings (spec §9). Keys are semantic (not raw English text) so ICU MessageFormat features like plurals/gender can be added per-key without renaming call sites. Generate platform-native formats from this file with i18n/generate-apple-strings.py (macOS) and i18n/generate-resx-strings.py (Windows) rather than hand-editing .strings/.xml/.resx directly. This file currently covers only the screens migrated so far on each platform (macOS: Welcome, Import Packet, the master-key-duality screen, Manage Vaults; Windows: the same four pages) — see /PROGRESS.md items 2.9 and 3.7 for what's not yet migrated. Both generators emit every key in this file into their platform's native format regardless of which platform actually uses it — not every key is referenced by every platform's code. Some (e.g. welcome.create_vault_button) exist only for a Windows-specific UI element macOS doesn't have (inline vault creation on the entry screen vs. a separate sheet). Product/brand names (\"VaultSigner\") are deliberately excluded, per standard i18n practice.",
 
   "welcome.subtitle": "Create a new vault, or open one you already have.",
   "welcome.create_button": "Create New Vault…",
@@ -11,8 +11,22 @@
   "welcome.manage_vaults_button": "Manage Known Vaults…",
   "welcome.vault_unavailable_title": "Vault Not Found",
   "welcome.vault_unavailable_message": "This vault's file couldn't be found at its remembered location. It may have been moved or deleted. You can forget this entry or re-locate the file.",
+  "welcome.vault_unavailable_tooltip": "This file couldn't be found",
+  "welcome.forget_tooltip": "Forget this vault",
+  "welcome.create_section_header": "Create a new vault",
+  "welcome.choose_folder_button": "Choose Folder…",
+  "welcome.no_folder_chosen": "No folder chosen",
+  "welcome.filename_placeholder": "File name, e.g. MyVault.vlt",
+  "welcome.compartment_name_placeholder": "First compartment name, e.g. Personal",
+  "welcome.master_passphrase_placeholder": "Master passphrase",
+  "welcome.confirm_passphrase_placeholder": "Confirm master passphrase",
+  "welcome.create_vault_button": "Create Vault",
+  "welcome.open_section_header": "Or open an existing vault file",
+
+  "nav.back_button": "← Back",
 
   "manage_vaults.title": "Manage Known Vaults",
+  "manage_vaults.no_vaults": "No known vaults yet.",
   "manage_vaults.subtitle": "Vaults you've created or opened are remembered here so you don't have to browse for them again. Forgetting an entry never touches the file itself.",
   "manage_vaults.add_button": "Add Existing Vault…",
   "manage_vaults.add_panel_message": "Choose a .vlt vault file to add to the list",
@@ -29,6 +43,7 @@
   "import.transfer_password_prompt": "This packet is protected by a transfer password.",
   "import.transfer_password_field": "Transfer passphrase",
   "import.continue_button": "Continue",
+  "import.subtitle_detailed": "Choose a .vltpack file exported from another VaultSigner vault (or a backup) to import its keys into this compartment.",
 
   "duality.header": "This import includes another vault's master key",
   "duality.subtitle": "Before any keys are merged, choose what to do with the incoming master key. This choice cannot be skipped.",
@@ -48,6 +63,7 @@
 
   "duality.option3.title": "Replace local master key with incoming master key",
   "duality.option3.description": "This will replace the password protecting ALL your existing keys, including ones you did not just import, with a different password. If you don't have both passwords available right now, stop.",
+  "duality.option3.no_unlocked_compartment": "No compartment is currently unlocked to replace.",
   "duality.option3.replace_picker": "Replace",
   "duality.option3.passphrase_field": "Incoming vault's master passphrase",
   "duality.option3.confirmation_field_format": "Type \"%@\" to confirm"

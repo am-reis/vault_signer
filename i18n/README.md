@@ -12,15 +12,29 @@ shaped resource files, plus per-platform generation scripts.
 - `generate-apple-strings.py` — converts each `source/<locale>.json` into
   `apps/macos/VaultSigner/Resources/<locale>.lproj/Localizable.strings`.
   Run it, then `xcodegen generate` in `apps/macos/`, whenever a
-  `source/*.json` file changes. Future platforms get their own generator
-  here (`strings.xml` for Android, `.resx` for Windows, `.po` for Linux)
-  reading the same `source/` files — none exist yet since no other
-  platform phase has started.
-- `lint-hardcoded-strings.py` — spec §9's "CI lint that fails the build
-  on hardcoded UI literal strings outside the resource files." No CI
-  service is configured for this repo yet, so this is a runnable local
-  script rather than a wired-up build step; see its own docstring for
-  `--report` vs `--strict` mode.
+  `source/*.json` file changes.
+- `generate-resx-strings.ps1` — the Windows equivalent (spec §12 item
+  3.7): converts each `source/<locale>.json` into a .NET satellite
+  `.resx` under `apps/windows/VaultSignerUI/VaultSignerUI/Resources/`
+  (`Strings.resx` for the neutral/`en` culture, `Strings.<locale>.resx`
+  for every other one — a plain SDK-default embedded resource, picked
+  up automatically on the next build, no `.csproj` edit needed).
+  **Written in PowerShell, not Python**, unlike every other script
+  here — this Windows dev box has no working Python install (confirmed
+  directly: `python`/`python3` only resolve to the Microsoft Store
+  app-execution-alias stub), and PowerShell is already this project's
+  own native Windows tooling choice (every `apps/windows/Scripts/*.ps1`
+  generator). A generator that can't actually be run and verified on
+  its own target platform would contradict this project's core
+  practice. Android/Linux generators (`strings.xml`, `.po`) still don't
+  exist since neither phase has started.
+- `lint-hardcoded-strings.py` (macOS) / `lint-hardcoded-strings.ps1`
+  (Windows, same Python-availability reason as the generator above) —
+  spec §9's "CI lint that fails the build on hardcoded UI literal
+  strings outside the resource files." No CI service is configured for
+  this repo yet, so these are runnable local scripts rather than a
+  wired-up build step; see each one's own header comment for `--report`/
+  `-Report` (default) vs `--strict`/`-Strict` mode.
 
 **Why semantic keys instead of using the English text as the key**
 (a common alternative i18n pattern): a key like `duality.option3.title`
@@ -31,26 +45,40 @@ like a raw literal rather than obviously-localized text — there's no
 getting around eyeballing `i18n/source/en.json` to know what a given
 key actually says.
 
-## What's actually migrated (as of spec §12 item 2.9)
+## What's actually migrated
 
-Only three screens: `WelcomeView`, `ImportPacketView`, and
-`MasterKeyDualityView` — chosen because spec §9 explicitly calls out
-verifying right-to-left layout "specifically on the import/export
-decision screens, since they are dense, multi-choice, and safety-
-critical." `source/ar.json` (Arabic, RTL) covers exactly the same key
-set as `en.json` for this reason, not the whole app.
+**macOS** (spec §12 item 2.9), four screens: `WelcomeView`,
+`ImportPacketView`, `MasterKeyDualityView`, and `ManageVaultsView`
+(added later, item 2.11) — the first three chosen because spec §9
+explicitly calls out verifying right-to-left layout "specifically on
+the import/export decision screens, since they are dense, multi-choice,
+and safety-critical."
 
-**Not yet migrated:** every other screen (`CreateVaultView`,
-`UnlockView`, `KeyListView`, `CreateKeyView`, `KeyDetailView`,
-`SettingsView`, `ExportPacketView`, `BackupMasterKeyOnlyView`, and the
-sheets inside them) still has hardcoded English string literals — run
-`python3 i18n/lint-hardcoded-strings.py --report` for the full current
-list (88 as of this writing). Migrating a file means: add its strings to
-`source/en.json` (and `source/ar.json`, or drop that file's coverage
+**Windows** (spec §12 item 3.7), the same four screens' Windows
+equivalents for parity: `WelcomePage`, `ImportPacketPage`,
+`MasterKeyDualityPage`, `ManageVaultsPage`. Not always byte-identical
+English wording to macOS's — where a Windows screen's copy already
+differed (e.g. its own inline vault-creation section, which macOS
+handles as a separate, unmigrated sheet), it kept its own wording under
+new keys rather than being rewritten to match; where the concept and
+wording already lined up, Windows adopted the exact shared string. See
+`source/en.json`'s own top comment for the full reasoning and which
+keys are Windows-only.
+
+`source/ar.json` (Arabic, RTL) covers exactly the same key set as
+`en.json`'s migrated screens on both platforms, not the whole app —
+this is spec §9's RTL-verification set, not a launch-language decision.
+
+**Not yet migrated (either platform):** every other screen — run
+`python3 i18n/lint-hardcoded-strings.py --report` (macOS, 88 literals
+as of item 2.9's writing) or `powershell -File
+i18n/lint-hardcoded-strings.ps1` (Windows, 66 literals as of item 3.7's
+writing) for the current list. Migrating a file means: add its strings
+to `source/en.json` (and `source/ar.json`, or drop that file's coverage
 from the RTL-verification set if Arabic isn't the priority for it),
-regenerate, replace the Swift literals with the matching keys, and add
-the filename to `lint-hardcoded-strings.py`'s `MIGRATED_FILES` set so
-`--strict` actually protects it from regressing.
+regenerate, replace the literals with the matching keys, and add the
+filename to the relevant lint script's migrated-files list so
+`--strict`/`-Strict` actually protects it from regressing.
 
 Two known simplifications, not yet addressed:
 - Interpolated/dynamic strings (e.g. `ImportPacketView`'s "N key(s)
@@ -73,3 +101,23 @@ correctly, and that a missing key falls back rather than crashing,
 without needing to actually switch the app's language and read the
 screen (this environment currently can't screenshot the running app —
 see the main macOS README).
+
+`App.xaml.cs`'s `--test-i18n <locale> <key>` hook is the Windows
+equivalent: resolves a key via `Strings.cs`'s `ResourceManager` against
+an explicit `CultureInfo`, prints it to a console it allocates itself
+(this is a `WinExe` with no console by default), and exits — never
+creating the normal UI window. Verified live, not just written: both
+`en` and `ar` resolve correctly (the Arabic result was checked
+byte-for-byte against `Resources/Strings.ar.resx`'s own UTF-8 bytes,
+since a Windows console's default codepage mangles Arabic text on
+display even when the underlying lookup is correct — `Console.OutputEncoding
+= Encoding.UTF8` in the hook fixes the *display* half of that), a
+missing key falls back to the raw key, and the one `{0}`-interpolated
+key (`duality.option3.confirmation_field_format`) formats correctly via
+`Strings.Format`. All four migrated Windows pages were additionally
+verified rendering their real, correct text in a live running app (not
+just the hook) via `System.Windows.Automation` — including
+`MasterKeyDualityPage`, reached for real by creating two disposable
+vaults and exporting/importing a packet with an embedded master key
+between them, exactly the flow spec §9 calls out for RTL/safety
+verification.

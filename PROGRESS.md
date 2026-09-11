@@ -5,6 +5,16 @@ file first before starting work in any session. After finishing a
 checklist item, update it here and commit — never mark an item done
 without a passing build/test artifact referenced by commit hash.
 
+**Entries here stay a checklist line plus, where needed, a short
+exception note — not a narrative.** Debugging history, dead ends, and
+"here's exactly what happened" material belongs in a dev journal
+instead: `apps/<platform>/docs/<platform>-dev-journal.md` for anything
+platform-specific (committed on that platform's own branch), or
+`docs/shared-dev-journal.md` for cross-platform-relevant facts
+(committed on `shared`). See `CLAUDE.md`'s branch-model section for the
+full rule. Reference the relevant journal from your exception note
+rather than inlining the detail here.
+
 Order is strictly platform-sequential per the spec: **macOS → Windows →
 Android → iOS → Linux**, each preceded by the shared `vaultcore` work in
 Phase 1.

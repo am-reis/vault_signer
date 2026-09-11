@@ -828,6 +828,42 @@ independent knobs.
          auto-unlock does), so this would have hit "compartment is not
          unlocked" trying to list keys on the very first relaunch after
          a force-stop. Now checks `compartments[0].unlocked` too.
+
+      **A fourth, more serious finding — a real bug in shared `vaultcore`
+      itself, not Android-specific code.** Doing a real self-export/
+      self-import round trip through this app's UI (create a second
+      vault, export a key "as-is" with "include master key" on, import
+      the packet, complete the §5.3 option-1 duality screen) looked
+      correct — the imported key showed up immediately via a live
+      `vaultsigner.list_public_keys` check. Force-stopping the app and
+      relaunching made the key vanish, even though its `.kblob` was
+      genuinely sitting on disk. Root cause: `vault.rs`'s
+      `apply_merge_result` (used by `merge_reencrypt_discard_incoming`,
+      i.e. spec §5.3's *recommended default* option) updated the
+      in-memory plaintext manifest and copied the new key's blob bytes,
+      but never re-encrypted the updated manifest back into
+      `state.container.master_blobs` before `write_atomic` — so the file
+      on disk kept the pre-merge master blob. Every in-memory read within
+      the same process looked right; only a genuine close+reopen exposed
+      it. Fixed in `vaultcore/src/vault.rs` (committed on `shared`, since
+      this is shared-scope code, not Android-only) by re-encrypting each
+      updated compartment before persisting, mirroring the exact pattern
+      `persist_locked` already uses for every other manifest mutation.
+      Added `merge_option1_key_survives_close_and_reopen` — the existing
+      `merge_option1_reencrypts_into_target_compartment` test only ever
+      checked the same in-memory `Vault` instance, which is exactly how
+      this got past it, past the rest of `vault.rs`'s merge coverage, and
+      past macOS's own interactive verification of this identical facade
+      method (item 2.4's notes explicitly flag that its own no-embedded-
+      master-key path — the *same* underlying method — was exercised live
+      but never through a close-then-reopen). Confirmed: the new test
+      fails against the pre-fix code (0 keys instead of 1) and the full
+      suite is green after the fix (114 passed, 0 failed). **This affects
+      every platform sharing this code path, not just Android** — worth
+      flagging to whoever is working on macOS/Windows import flows, since
+      neither of their own PROGRESS.md entries mention re-testing this
+      specific scenario (close, then reopen) after their own item 2.4/
+      equivalent verification.
 - [x] 4.2 `FLAG_SECURE` (spec §5.0). Applied once, globally, on
       `MainActivity`'s window in `onCreate` — this app is single-Activity
       (Compose Navigation swaps screens within one window), so one call
